@@ -2768,7 +2768,7 @@ export default function App() {
                 {currentUser.identifier_code} · {currentUser.unit_label}
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="sidebar-user-signout">
               <button
                 type="button"
                 className="btn btn-ghost-danger"
