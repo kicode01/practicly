@@ -1,0 +1,5 @@
+{
+  "driver": "sqlite",
+  "sqlite_file": "database/ojt_tracking.db",
+  "comment": "Set driver to 'sqlite' or 'mysql' to switch the live database engine."
+}

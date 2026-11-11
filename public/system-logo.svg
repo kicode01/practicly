@@ -1,0 +1,48 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="practiclyBg" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="practiclyStem" x1="18" y1="48" x2="25" y2="16" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#93c5fd" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+    <linearGradient id="practiclyArc" x1="22" y1="16" x2="48" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="60%" stop-color="#bfdbfe" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+    <linearGradient id="practiclySheen" x1="32" y1="4" x2="32" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <filter id="practiclyShadow" x="0" y="0" width="64" height="64" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.32" />
+    </filter>
+  </defs>
+
+  <!-- Modern Squircle Backdrop -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#practiclyBg)" filter="url(#practiclyShadow)" />
+  <rect x="4" y="4" width="56" height="56" rx="16" stroke="rgba(255,255,255,0.25)" stroke-width="1.2" />
+
+  <!-- Top Glass Luster -->
+  <path d="M4 20C4 11.1634 11.1634 4 20 4H44C52.8366 4 60 11.1634 60 20V24C60 24 46 20 32 20C18 20 4 24 4 24V20Z" fill="url(#practiclySheen)" />
+
+  <!-- Pillar: Classroom Theory (Academic Foundation) -->
+  <rect x="18" y="16" width="7" height="32" rx="3.5" fill="url(#practiclyStem)" />
+
+  <!-- Loop: Real-World Experience (Forward Trajectory Arc) -->
+  <path
+    d="M21.5 16H34C40.6274 16 46 21.3726 46 28C46 34.6274 40.6274 40 34 40H22"
+    stroke="url(#practiclyArc)"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Meeting Point: The Theory & Experience Convergence Spark -->
+  <circle cx="34" cy="28" r="3.5" fill="#ffffff" />
+  <circle cx="34" cy="28" r="1.8" fill="#1d4ed8" />
+</svg>

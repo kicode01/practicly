@@ -1,0 +1,25 @@
+{
+  "name": "practicly-cpe",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Metropolitan Institute of Technology (MIT) Computer Engineering Practicum & Internship Management System",
+  "type": "module",
+  "scripts": {
+    "server": "php -S 127.0.0.1:8000 backend/router.php",
+    "dev": "vite --port 5173 --host 127.0.0.1",
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "dev:vite": "vite --port 5173 --host 127.0.0.1",
+    "preview": "vite preview --port 4173 --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@material/web": "^2.5.0",
+    "glisse": "^0.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}

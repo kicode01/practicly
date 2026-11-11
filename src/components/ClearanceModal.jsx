@@ -1,0 +1,163 @@
+import React from 'react';
+import { IconPrinter, IconBrandLogo } from './Icons';
+
+export default function ClearanceModal({ report, onClose }) {
+  if (!report) return null;
+
+  const isEligible = Number(report.requirement_met) === 1;
+  const hoursMet = Number(report.total_hours_completed) >= Number(report.required_hours);
+  const evalMet = Number(report.evaluation_count) > 0;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="panel-header no-print">
+          <div>
+            <div className="panel-title">OJT Compliance &amp; Clearance Certificate</div>
+            <div className="panel-desc">
+              Official institutional summary for {report.student_name}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => window.print()}>
+              <IconPrinter size={14} />
+              Print Certificate
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div className="certificate-sheet">
+          <div className="cert-header">
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+              <IconBrandLogo size={54} />
+            </div>
+            <div className="cert-univ">Metropolitan Institute of Technology</div>
+            <div className="cert-college">
+              College of Engineering — Department of Computer Engineering
+            </div>
+            <div className="cert-doc-title">
+              CERTIFICATE OF OJT COMPLIANCE &amp; CLEARANCE
+            </div>
+            <div style={{ marginTop: '8px' }}>
+              {isEligible ? (
+                <span className="status-chip success">
+                  Cleared for Completion — Ref: {report.clearance_reference || `MIT-CPE-CLR-2026-000${report.placement_id}`}
+                </span>
+              ) : (
+                <span className="status-chip warning">
+                  Pending Completion of Practicum Requirements
+                </span>
+              )}
+            </div>
+          </div>
+
+          <p style={{ fontSize: '12.5px', lineHeight: '1.6', color: '#374151', marginBottom: '14px' }}>
+            This certifies the On-the-Job Training (OJT) practicum record of the student listed below,
+            verified through daily attendance logs and supervisor performance evaluations on file with
+            the Computer Engineering Department.
+          </p>
+
+          <div className="cert-grid">
+            <div>
+              <div className="cert-field-label">Student Name</div>
+              <div className="cert-field-value">{report.student_name}</div>
+            </div>
+            <div>
+              <div className="cert-field-label">Student Number &amp; Section</div>
+              <div className="cert-field-value mono">
+                {report.student_number} · {report.section || 'BSCpE 4-1'}
+              </div>
+            </div>
+            <div>
+              <div className="cert-field-label">Host Training Establishment</div>
+              <div className="cert-field-value">{report.company_name}</div>
+            </div>
+            <div>
+              <div className="cert-field-label">Industry &amp; Supervisor</div>
+              <div className="cert-field-value">
+                {report.industry} · {report.company_contact_person}
+              </div>
+            </div>
+            <div>
+              <div className="cert-field-label">Faculty OJT Adviser</div>
+              <div className="cert-field-value">{report.adviser_name}</div>
+            </div>
+            <div>
+              <div className="cert-field-label">Academic Term &amp; Period</div>
+              <div className="cert-field-value">
+                {report.academic_term} ({report.start_date} – {report.end_date})
+              </div>
+            </div>
+            <div>
+              <div className="cert-field-label">Total Hours Rendered</div>
+              <div className="cert-field-value tabular-nums">
+                {Number(report.total_hours_completed).toFixed(2)} / {Number(report.required_hours).toFixed(2)} hrs (
+                {report.completion_percentage}%)
+              </div>
+            </div>
+            <div>
+              <div className="cert-field-label">Evaluation Rating</div>
+              <div className="cert-field-value tabular-nums">
+                {report.average_rating
+                  ? `${Number(report.average_rating).toFixed(2)} / 5.00 (${report.evaluation_count} evaluation/s)`
+                  : 'Pending evaluation'}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: '6px',
+              background: '#f8f9fa',
+              border: '1px solid #e5e7eb',
+              fontSize: '12px',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '6px', color: '#111827' }}>
+              Clearance Verification Summary
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#374151' }}>
+              <div>
+                Practicum Hours Requirement:{' '}
+                <strong>
+                  {hoursMet
+                    ? `Met (${Number(report.total_hours_completed).toFixed(2)} of ${Number(report.required_hours).toFixed(0)} hrs)`
+                    : `Incomplete (${Number(report.hours_remaining).toFixed(2)} hrs remaining)`}
+                </strong>
+              </div>
+              <div>
+                Performance Evaluation:{' '}
+                <strong>
+                  {evalMet
+                    ? `Verified (HTE: ${Number(report.has_employer_eval) ? 'Submitted' : 'Pending'}, Adviser: ${
+                        Number(report.has_adviser_eval) ? 'Submitted' : 'Pending'
+                      })`
+                    : 'Awaiting submission'}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="cert-signatures">
+            <div>
+              <div className="cert-sig-line">{report.company_contact_person}</div>
+              <div className="cert-sig-role">HTE Training Supervisor</div>
+            </div>
+            <div>
+              <div className="cert-sig-line">{report.adviser_name}</div>
+              <div className="cert-sig-role">Faculty OJT Adviser</div>
+            </div>
+            <div>
+              <div className="cert-sig-line">Department Chairperson</div>
+              <div className="cert-sig-role">Computer Engineering Dept., MIT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
