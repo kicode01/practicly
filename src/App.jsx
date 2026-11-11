@@ -2888,7 +2888,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="panel" style={{ marginBottom: '20px' }}>
+              <div className="panel">
                 <div className="panel-header">
                   <div>
                     <div className="panel-title">Institutional Practicum Onboarding (CHED CMO 104)</div>
@@ -2900,47 +2900,47 @@ export default function App() {
                 </div>
                 <div className="panel-body">
                   <div className="field-grid-3">
-                    <div style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>1</span>
-                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Explore Accredited HTEs</strong>
+                    <div className="gws-onboarding-step">
+                      <div className="gws-onboarding-head">
+                        <span className="gws-step-badge">1</span>
+                        <span className="gws-step-title">Explore Accredited HTEs</span>
                       </div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                      <p className="gws-step-copy">
                         Review accredited Host Training Establishments with active Memorandums of Agreement (MOAs) in the partner directory.
                       </p>
                     </div>
 
-                    <div style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>2</span>
-                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Adviser Endorsement</strong>
+                    <div className="gws-onboarding-step">
+                      <div className="gws-onboarding-head">
+                        <span className="gws-step-badge">2</span>
+                        <span className="gws-step-title">Adviser Endorsement</span>
                       </div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                      <p className="gws-step-copy">
                         Submit your training contract and parent waiver to your Faculty Practicum Adviser for institutional review.
                       </p>
                     </div>
 
-                    <div style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>3</span>
-                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Coordinator Activation</strong>
+                    <div className="gws-onboarding-step">
+                      <div className="gws-onboarding-head">
+                        <span className="gws-step-badge">3</span>
+                        <span className="gws-step-title">Coordinator Activation</span>
                       </div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                      <p className="gws-step-copy">
                         Upon departmental confirmation, your coordinator links your account, unlocking your Daily Time Record and Live Stopwatch.
                       </p>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      Student ID: <strong className="mono" style={{ color: 'var(--text-primary)' }}>{currentUser.identifier_code}</strong> · Section: <strong style={{ color: 'var(--text-primary)' }}>{currentUser.unit_label}</strong> · Program: <strong style={{ color: 'var(--text-primary)' }}>BS Computer Engineering</strong>
+                  <div className="gws-onboarding-footer">
+                    <div className="gws-onboarding-meta">
+                      Student ID: <strong className="mono">{currentUser.identifier_code}</strong> · Section: <strong>{currentUser.unit_label}</strong> · Program: <strong>BS Computer Engineering</strong>
                     </div>
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-tonal btn-sm"
                       onClick={() => setActiveTab('employers')}
                     >
-                      <IconBuilding size={13} />
+                      <IconBuilding size={14} />
                       View Available Partner Companies ({data.employers.length})
                     </button>
                   </div>
@@ -2996,30 +2996,6 @@ export default function App() {
                   setActiveTab(tab);
                   scrollWorkspaceToTop();
                 }}
-              />
-
-              {/* PRACTICUM VERIFICATION & CLEARANCE PIPELINE */}
-              <WorkflowPipelineIndicator
-                currentRole="student"
-                allowSupervisorPortal={allowSupervisorPortal}
-                activeStage={
-                  myPlacement.status === 'completed' || myPlacement.requirement_met
-                    ? 4
-                    : myTimeLogs.some((tl) => tl.approval_status === 'supervisor_verified') || myPlacement.signed_dtr_filename
-                    ? 3
-                    : myTimeLogs.some((tl) => tl.approval_status === 'pending')
-                    ? 2
-                    : 1
-                }
-                pendingSupervisorCount={
-                  myTimeLogs.filter((tl) => tl.approval_status === 'pending').length
-                }
-                pendingAdviserCount={
-                  myTimeLogs.filter((tl) => tl.approval_status === 'supervisor_verified').length
-                }
-                hoursCompleted={myPlacement.total_hours_completed}
-                requiredHours={myPlacement.required_hours}
-                isCleared={Boolean(myPlacement.requirement_met || myPlacement.status === 'completed')}
               />
 
               {showStudentForm && (
@@ -3145,143 +3121,106 @@ export default function App() {
                 </div>
               )}
 
-              <LiveShiftStopwatch
-                activeShift={activeShift}
-                onClockIn={handleClockIn}
-                onClockOut={handleClockOut}
-                myPlacement={myPlacement}
-                onLogQuickMilestone={(note) => {
-                  setLogForm((prev) => ({
-                    ...prev,
-                    task_description: note,
-                  }));
-                  showNotice('Shift milestone note recorded.');
-                }}
-              />
+              <div className="gws-student-bento">
+                <LiveShiftStopwatch
+                  activeShift={activeShift}
+                  onClockIn={handleClockIn}
+                  onClockOut={handleClockOut}
+                  myPlacement={myPlacement}
+                  onLogQuickMilestone={(note) => {
+                    setLogForm((prev) => ({
+                      ...prev,
+                      task_description: note,
+                    }));
+                    showNotice('Shift milestone note recorded.');
+                  }}
+                />
 
-              <div className="student-hero-card">
-                <div className="student-hero-top">
-                  <div>
-                    <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>
-                      Current Deployment
+                <section className="gws-deployment-card">
+                  <div className="gws-deployment-head">
+                    <div>
+                      <div className="gws-deployment-kicker">Current Deployment</div>
+                      <h2 className="gws-deployment-title">{myPlacement.position_title}</h2>
+                      <div className="gws-deployment-sub">{myPlacement.company_name}</div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#111827', marginTop: '2px' }}>
-                      {myPlacement.position_title} at {myPlacement.company_name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                      Supervisor: {myPlacement.company_contact_person} · Adviser: {myPlacement.adviser_name}
-                    </div>
+                    {Number(myPlacement.requirement_met) === 1 ? (
+                      <StatusChip variant="success">
+                        Cleared ({myPlacement.clearance_reference})
+                      </StatusChip>
+                    ) : Number(myPlacement.total_hours_completed) >= Number(myPlacement.required_hours) ? (
+                      <StatusChip variant="info">Hours Met · Awaiting Eval</StatusChip>
+                    ) : (
+                      <StatusChip variant="warning">
+                        {Number(myPlacement.hours_remaining).toFixed(1)} hrs left
+                      </StatusChip>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className="mono tabular-nums" style={{ fontSize: '20px', fontWeight: 600 }}>
-                      {Number(myPlacement.total_hours_completed).toFixed(2)}{' '}
-                      <span style={{ fontSize: '13px', fontWeight: 400, color: '#6b7280' }}>
-                        / {Number(myPlacement.required_hours).toFixed(0)} hrs
+
+                  <div className="gws-deployment-metrics">
+                    <div className="gws-mini-stat">
+                      <span className="gws-mini-label">Training Period</span>
+                      <span className="gws-mini-value mono">
+                        {myPlacement.start_date} – {myPlacement.end_date}
                       </span>
                     </div>
-                    <div style={{ marginTop: '4px' }}>
-                      {Number(myPlacement.requirement_met) === 1 ? (
-                        <StatusChip variant="success">
-                          Cleared ({myPlacement.clearance_reference})
-                        </StatusChip>
-                      ) : Number(myPlacement.total_hours_completed) >= Number(myPlacement.required_hours) ? (
-                        <StatusChip variant="info">Hours Completed · Awaiting Evaluation</StatusChip>
-                      ) : (
-                        <StatusChip variant="warning">
-                          {Number(myPlacement.hours_remaining).toFixed(1)} hrs remaining
-                        </StatusChip>
-                      )}
+                    <div className="gws-mini-stat">
+                      <span className="gws-mini-label">Logged Shifts</span>
+                      <span className="gws-mini-value mono">
+                        {myPlacement.total_log_days} {Number(myPlacement.total_log_days) === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </div>
+                    <div className="gws-mini-stat">
+                      <span className="gws-mini-label">HTE Evaluation</span>
+                      <span className="gws-mini-value mono">
+                        {Number(myPlacement.has_employer_eval)
+                          ? `${myPlacement.employer_rating} / 5.00`
+                          : 'Pending'}
+                      </span>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <div className="student-progress-bar-large">
-                    <div
-                      className={`student-progress-bar-fill ${
-                        Number(myPlacement.requirement_met) === 1 ? 'done' : ''
-                      }`}
-                      style={{ width: `${Math.min(100, Number(myPlacement.completion_percentage))}%` }}
-                    />
+                  <div className="gws-deployment-foot">
+                    <span>Supervisor: <strong>{myPlacement.company_contact_person}</strong></span>
+                    <span className="gws-meta-sep" aria-hidden="true">·</span>
+                    <span>Adviser: <strong>{myPlacement.adviser_name}</strong></span>
                   </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: '11.5px',
-                      color: '#6b7280',
-                      marginTop: '6px',
-                    }}
-                  >
-                    <span>
-                      Training Period: {myPlacement.start_date} to {myPlacement.end_date}
-                    </span>
-                    <span className="mono">{myPlacement.completion_percentage}% completed</span>
-                  </div>
-                </div>
+                </section>
               </div>
 
-              <div className="checklist-grid">
-                <div className="checklist-item done">
-                  <div className="checklist-step">
-                    <span>Step 1</span>
-                    <StatusChip variant="success">Done</StatusChip>
-                  </div>
-                  <div className="checklist-title">HTE Placement Assigned</div>
-                  <div className="checklist-meta">{myPlacement.company_name}</div>
-                </div>
-
-                <div
-                  className={`checklist-item ${
-                    Number(myPlacement.total_hours_completed) >= Number(myPlacement.required_hours) ? 'done' : ''
-                  }`}
-                >
-                  <div className="checklist-step">
-                    <span>Step 2</span>
-                    {Number(myPlacement.total_hours_completed) >= Number(myPlacement.required_hours) ? (
-                      <StatusChip variant="success">Done</StatusChip>
-                    ) : (
-                      <StatusChip variant="warning">In Progress</StatusChip>
-                    )}
-                  </div>
-                  <div className="checklist-title">Complete {Number(myPlacement.required_hours).toFixed(0)} OJT Hours</div>
-                  <div className="checklist-meta mono">
-                    {Number(myPlacement.total_hours_completed).toFixed(2)} hrs logged ({myPlacement.total_log_days} entries)
-                  </div>
-                </div>
-
-                <div className={`checklist-item ${Number(myPlacement.has_employer_eval) ? 'done' : ''}`}>
-                  <div className="checklist-step">
-                    <span>Step 3</span>
-                    {Number(myPlacement.has_employer_eval) ? (
-                      <StatusChip variant="success">Done</StatusChip>
-                    ) : (
-                      <StatusChip variant="neutral">Pending</StatusChip>
-                    )}
-                  </div>
-                  <div className="checklist-title">Supervisor Evaluation</div>
-                  <div className="checklist-meta">
-                    {Number(myPlacement.has_employer_eval)
-                      ? `Rated ${myPlacement.employer_rating} / 5.00`
-                      : `Awaiting ${myPlacement.company_contact_person}`}
-                  </div>
-                </div>
-
-                <div className={`checklist-item ${Number(myPlacement.requirement_met) === 1 ? 'done' : ''}`}>
-                  <div className="checklist-step">
-                    <span>Step 4</span>
-                    {Number(myPlacement.requirement_met) === 1 ? (
-                      <StatusChip variant="success">Cleared</StatusChip>
-                    ) : (
-                      <StatusChip variant="neutral">Locked</StatusChip>
-                    )}
-                  </div>
-                  <div className="checklist-title">OJT Clearance Certificate</div>
-                  <div className="checklist-meta">
-                    {myPlacement.clearance_reference || 'Issued upon completion'}
-                  </div>
-                </div>
-              </div>
+              {/* UNIFIED 4-STAGE PRACTICUM VERIFICATION & CLEARANCE STEPPER */}
+              <WorkflowPipelineIndicator
+                currentRole="student"
+                allowSupervisorPortal={allowSupervisorPortal}
+                activeStage={
+                  myPlacement.status === 'completed' || myPlacement.requirement_met
+                    ? 4
+                    : myTimeLogs.some((tl) => tl.approval_status === 'supervisor_verified') || myPlacement.signed_dtr_filename
+                    ? 3
+                    : myTimeLogs.some((tl) => tl.approval_status === 'pending')
+                    ? 2
+                    : 1
+                }
+                pendingSupervisorCount={
+                  myTimeLogs.filter((tl) => tl.approval_status === 'pending').length
+                }
+                pendingAdviserCount={
+                  myTimeLogs.filter((tl) => tl.approval_status === 'supervisor_verified').length
+                }
+                hoursCompleted={myPlacement.total_hours_completed}
+                requiredHours={myPlacement.required_hours}
+                isCleared={Boolean(myPlacement.requirement_met || myPlacement.status === 'completed')}
+                stepsMeta={{
+                  step1Sub: myPlacement.company_name,
+                  step1Status: `${Number(myPlacement.total_hours_completed).toFixed(1)} / ${Number(myPlacement.required_hours).toFixed(0)} hrs (${myPlacement.total_log_days} logs)`,
+                  step3Sub: Number(myPlacement.has_employer_eval)
+                    ? `HTE rated ${myPlacement.employer_rating} / 5.00`
+                    : `Awaiting ${myPlacement.company_contact_person}`,
+                  step4Status:
+                    Number(myPlacement.requirement_met) === 1
+                      ? myPlacement.clearance_reference || 'Clearance Issued'
+                      : 'Issued upon completion',
+                }}
+              />
 
               <div className="split-grid">
                 <div className="panel">
@@ -3292,7 +3231,7 @@ export default function App() {
                     </div>
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-tonal btn-sm"
                       onClick={() => setActiveTab('timelogs')}
                     >
                       Manage DTR ({myTimeLogs.length})
@@ -3312,13 +3251,13 @@ export default function App() {
                         {myTimeLogs.slice(0, 6).map((tl) => (
                           <tr key={tl.log_id}>
                             <td className="mono">{tl.date}</td>
-                            <td className="mono" style={{ color: '#4b5563' }}>
+                            <td className="mono row-sub-inline">
                               {String(tl.time_in).slice(0, 5)}–{String(tl.time_out).slice(0, 5)}
                             </td>
                             <td className="text-right mono tabular-nums" style={{ fontWeight: 600 }}>
                               {Number(tl.hours_rendered).toFixed(2)}
                             </td>
-                            <td style={{ color: '#374151' }}>{tl.task_description}</td>
+                            <td className="row-task-cell">{tl.task_description}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -3330,7 +3269,7 @@ export default function App() {
                   <div className="panel-header">
                     <div>
                       <div className="panel-title">Trainee Profile &amp; Contacts</div>
-                      <div className="panel-desc">Your student details, assigned HTE, and faculty adviser</div>
+                      <div className="panel-desc">Student identity, host company &amp; adviser</div>
                     </div>
                     {myStudent && (
                       <button
@@ -3342,38 +3281,61 @@ export default function App() {
                         title="Edit your contact number, email, or section"
                       >
                         <IconEdit size={12} />
-                        Edit My Info
+                        Edit
                       </button>
                     )}
                   </div>
-                  <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <div style={{ paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
-                      <div className="kv-label">Trainee Profile</div>
-                      <div className="kv-value">{myStudent?.full_name || currentUser.display_name}</div>
-                      <div className="kv-sub">
-                        {myStudent?.student_number} · {myStudent?.section} · {myStudent?.program}
+                  <div className="panel-body gws-contact-list">
+                    <div className="gws-contact-row">
+                      <div className="gws-contact-avatar is-student">
+                        {(myStudent?.full_name || currentUser.display_name || 'S').charAt(0)}
                       </div>
-                      <div className="kv-sub" style={{ marginTop: '2px' }}>
-                        Mobile: {myStudent?.contact_number || 'None'} · Email: {myStudent?.email}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="kv-label">Host Company</div>
-                      <div className="kv-value">{myPlacement.company_name}</div>
-                      <div className="kv-sub">{myPlacement.company_address}</div>
-                    </div>
-                    <div>
-                      <div className="kv-label">Training Supervisor</div>
-                      <div className="kv-value">{myPlacement.company_contact_person}</div>
-                      <div className="kv-sub">
-                        {myPlacement.company_email} · {myPlacement.company_contact_number}
+                      <div className="gws-contact-body">
+                        <div className="kv-label">Trainee Profile</div>
+                        <div className="kv-value">{myStudent?.full_name || currentUser.display_name}</div>
+                        <div className="kv-sub mono">
+                          {myStudent?.student_number} · {myStudent?.section}
+                        </div>
+                        <div className="kv-sub">
+                          {myStudent?.contact_number || 'No mobile'} · {myStudent?.email}
+                        </div>
                       </div>
                     </div>
-                    <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                      <div className="kv-label">Faculty Practicum Adviser</div>
-                      <div className="kv-value">{myPlacement.adviser_name}</div>
-                      <div className="kv-sub">
-                        {myPlacement.adviser_department} · {myPlacement.adviser_email}
+
+                    <div className="gws-contact-row">
+                      <div className="gws-contact-avatar is-company">
+                        <IconBuilding size={16} />
+                      </div>
+                      <div className="gws-contact-body">
+                        <div className="kv-label">Host Company</div>
+                        <div className="kv-value">{myPlacement.company_name}</div>
+                        <div className="kv-sub">{myPlacement.company_address}</div>
+                      </div>
+                    </div>
+
+                    <div className="gws-contact-row">
+                      <div className="gws-contact-avatar is-supervisor">
+                        <IconBriefcase size={16} />
+                      </div>
+                      <div className="gws-contact-body">
+                        <div className="kv-label">Training Supervisor</div>
+                        <div className="kv-value">{myPlacement.company_contact_person}</div>
+                        <div className="kv-sub">
+                          {myPlacement.company_email} · {myPlacement.company_contact_number}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="gws-contact-row">
+                      <div className="gws-contact-avatar is-adviser">
+                        <IconSupervisor size={16} />
+                      </div>
+                      <div className="gws-contact-body">
+                        <div className="kv-label">Faculty Practicum Adviser</div>
+                        <div className="kv-value">{myPlacement.adviser_name}</div>
+                        <div className="kv-sub">
+                          {myPlacement.adviser_department} · {myPlacement.adviser_email}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3678,15 +3640,14 @@ export default function App() {
                 </div>
 
                 <div className="table-wrap">
-                  <table className="table">
+                  <table className="table table-fit table-overview table-adviser-overview">
                     <thead>
                       <tr>
                         <th>Student</th>
                         <th>Host Company</th>
-                        <th>Last Log</th>
                         <th className="text-right">Hours</th>
-                        <th>Completion</th>
-                        <th>Evaluations</th>
+                        <th>Progress</th>
+                        <th>Eval</th>
                         <th>Status</th>
                         <th className="text-right">Actions</th>
                       </tr>
@@ -3706,9 +3667,13 @@ export default function App() {
                               <div className="row-title">{pl.company_name}</div>
                               <div className="row-sub">{pl.position_title}</div>
                             </td>
-                            <td className="mono">{pl.last_logged_date || '—'}</td>
                             <td className="text-right mono tabular-nums">
-                              {Number(pl.total_hours_completed).toFixed(1)} / {Number(pl.required_hours).toFixed(0)}
+                              <div>
+                                {Number(pl.total_hours_completed).toFixed(1)} / {Number(pl.required_hours).toFixed(0)}
+                              </div>
+                              <div className="row-sub">
+                                {pl.last_logged_date || 'No logs'}
+                              </div>
                             </td>
                             <td>
                               <div className="inline-progress">
@@ -3722,7 +3687,7 @@ export default function App() {
                               </div>
                             </td>
                             <td>
-                              <div style={{ display: 'flex', gap: '4px' }}>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 <StatusChip variant={Number(pl.has_employer_eval) ? 'success' : 'neutral'}>
                                   HTE: {Number(pl.has_employer_eval) ? pl.employer_rating : '—'}
                                 </StatusChip>
@@ -3743,7 +3708,7 @@ export default function App() {
                               )}
                             </td>
                             <td className="text-right">
-                              <div className="row-actions">
+                              <div className="row-actions row-actions-compact">
                                 <button
                                   type="button"
                                   className="btn btn-ghost"
@@ -3760,12 +3725,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className={`btn ${pl.signed_dtr_filename ? 'btn-secondary' : 'btn-ghost'}`}
-                                  style={{
-                                    color: pl.signed_dtr_filename ? 'var(--role-adviser-accent, #1a73e8)' : 'inherit',
-                                    fontWeight: 600,
-                                    fontSize: '11px',
-                                  }}
+                                  className={`btn ${pl.signed_dtr_filename ? 'btn-tonal' : 'btn-ghost'}`}
                                   onClick={() => {
                                     setAuditPlacement(pl);
                                     setAuditModalOpen(true);
@@ -3776,21 +3736,20 @@ export default function App() {
                                       : 'Cross-audit digital logs against uploaded signed DTR document'
                                   }
                                 >
-                                  <IconShieldCheck size={12} />
-                                  {pl.signed_dtr_filename ? 'Audit (Signed)' : 'Audit'}
+                                  {pl.signed_dtr_filename ? 'Audit*' : 'Audit'}
                                 </button>
                                 <button
                                   type="button"
                                   className="btn btn-ghost"
                                   onClick={() => jumpToEvaluatePlacement(pl)}
                                 >
-                                  Evaluate
+                                  Eval
                                 </button>
                                 {!isEligible && (
                                   <button
                                     type="button"
                                     className="btn btn-ghost"
-                                    style={{ color: '#15803d', fontWeight: 500 }}
+                                    style={{ color: 'var(--success-fg)', fontWeight: 600 }}
                                     onClick={() => handleEndorseClearance(pl.placement_id)}
                                     disabled={syncing}
                                   >
@@ -3799,10 +3758,10 @@ export default function App() {
                                 )}
                                 <button
                                   type="button"
-                                  className="btn btn-secondary btn-sm"
+                                  className="btn btn-secondary btn-xs"
                                   onClick={() => handleOpenClearanceCertificate(pl)}
                                 >
-                                  Certificate
+                                  Cert
                                 </button>
                               </div>
                             </td>
@@ -3878,39 +3837,77 @@ export default function App() {
               {/* KPI METRIC STRIP */}
               <div className="metric-strip">
                 <div className="metric-cell">
-                  <div className="metric-label">Company Interns</div>
-                  <div className="metric-value">{supervisorPlacements.length}</div>
-                  <div className="metric-desc">Assigned to {currentUser.unit_label || 'your organization'}</div>
+                  <div className="metric-head-row">
+                    <span className="metric-label">Company Interns</span>
+                    <span className="metric-icon-badge" aria-hidden="true">
+                      <IconStudent size={15} />
+                    </span>
+                  </div>
+                  <div className="metric-value-row">
+                    <span className="metric-value mono">{supervisorPlacements.length}</span>
+                    <span className="metric-unit">active</span>
+                  </div>
+                  <div className="metric-foot">Assigned to {currentUser.unit_label || 'your organization'}</div>
                 </div>
 
                 <div className="metric-cell">
-                  <div className="metric-label">Total Rendered Hours</div>
-                  <div className="metric-value mono">
-                    {supervisorTimeLogs
-                      .reduce((sum, tl) => sum + Number(tl.hours_rendered || 0), 0)
-                      .toFixed(1)}
+                  <div className="metric-head-row">
+                    <span className="metric-label">Total Rendered Hours</span>
+                    <span className="metric-icon-badge" aria-hidden="true">
+                      <IconClock size={15} />
+                    </span>
                   </div>
-                  <div className="metric-desc">Cumulative workplace training hours</div>
+                  <div className="metric-value-row">
+                    <span className="metric-value mono">
+                      {supervisorTimeLogs
+                        .reduce((sum, tl) => sum + Number(tl.hours_rendered || 0), 0)
+                        .toFixed(1)}
+                    </span>
+                    <span className="metric-unit">hrs</span>
+                  </div>
+                  <div className="metric-foot">Cumulative workplace training hours</div>
                 </div>
 
-                <div className="metric-cell" style={supervisorPendingLogs.length > 0 ? { borderLeft: '3px solid var(--warning-fg)' } : {}}>
-                  <div className="metric-label">Pending Verification</div>
-                  <div className="metric-value mono" style={supervisorPendingLogs.length > 0 ? { color: 'var(--warning-fg)' } : {}}>
-                    {supervisorPendingLogs.length}
+                <div className={`metric-cell ${supervisorPendingLogs.length > 0 ? 'is-warning' : ''}`}>
+                  <div className="metric-head-row">
+                    <span className="metric-label">Pending Verification</span>
+                    <span
+                      className={`metric-icon-badge ${supervisorPendingLogs.length > 0 ? 'is-warning' : 'is-success'}`}
+                      aria-hidden="true"
+                    >
+                      <IconCheckCircle size={15} />
+                    </span>
                   </div>
-                  <div className="metric-desc">
+                  <div className="metric-value-row">
+                    <span
+                      className="metric-value mono"
+                      style={supervisorPendingLogs.length > 0 ? { color: 'var(--warning-fg)' } : {}}
+                    >
+                      {supervisorPendingLogs.length}
+                    </span>
+                    <span className="metric-unit">{supervisorPendingLogs.length === 1 ? 'log' : 'logs'}</span>
+                  </div>
+                  <div className="metric-foot">
                     {supervisorPendingLogs.length > 0
-                      ? 'DTR submissions awaiting supervisor sign-off'
+                      ? 'DTR entries awaiting supervisor sign-off'
                       : 'All submissions verified'}
                   </div>
                 </div>
 
                 <div className="metric-cell">
-                  <div className="metric-label">Supervisor Evaluations</div>
-                  <div className="metric-value mono">
-                    {supervisorEvaluations.length} / {supervisorPlacements.length}
+                  <div className="metric-head-row">
+                    <span className="metric-label">Supervisor Evaluations</span>
+                    <span className="metric-icon-badge is-success" aria-hidden="true">
+                      <IconEvaluation size={15} />
+                    </span>
                   </div>
-                  <div className="metric-desc">Completed employer assessments</div>
+                  <div className="metric-value-row">
+                    <span className="metric-value mono">
+                      {supervisorEvaluations.length}
+                    </span>
+                    <span className="metric-unit">of {supervisorPlacements.length} completed</span>
+                  </div>
+                  <div className="metric-foot">Employer performance assessments</div>
                 </div>
               </div>
 
@@ -4185,7 +4182,12 @@ export default function App() {
 
               <div className="metric-strip">
                 <div className="metric-cell">
-                  <span className="metric-label">Active Placements</span>
+                  <div className="metric-head-row">
+                    <span className="metric-label">Active Placements</span>
+                    <span className="metric-icon-badge" aria-hidden="true">
+                      <IconBriefcase size={15} />
+                    </span>
+                  </div>
                   <div className="metric-value-row">
                     <span className="metric-value">{data.kpis?.ongoing_placements ?? 0}</span>
                     <span className="metric-unit">of {data.kpis?.total_placements ?? 0} interns</span>
@@ -4196,7 +4198,12 @@ export default function App() {
                 </div>
 
                 <div className="metric-cell">
-                  <span className="metric-label">Total Rendered Hours</span>
+                  <div className="metric-head-row">
+                    <span className="metric-label">Total Rendered Hours</span>
+                    <span className="metric-icon-badge" aria-hidden="true">
+                      <IconClock size={15} />
+                    </span>
+                  </div>
                   <div className="metric-value-row">
                     <span className="metric-value">
                       {Number(data.kpis?.total_hours_rendered ?? 0).toLocaleString('en-US', {
@@ -4212,7 +4219,12 @@ export default function App() {
                 </div>
 
                 <div className="metric-cell">
-                  <span className="metric-label">Cleared Students</span>
+                  <div className="metric-head-row">
+                    <span className="metric-label">Cleared Students</span>
+                    <span className="metric-icon-badge is-success" aria-hidden="true">
+                      <IconCheckCircle size={15} />
+                    </span>
+                  </div>
                   <div className="metric-value-row">
                     <span className="metric-value">{data.kpis?.eligible_for_clearance ?? 0}</span>
                     <span className="metric-unit">eligible</span>
@@ -4223,13 +4235,18 @@ export default function App() {
                 </div>
 
                 <div className="metric-cell">
-                  <span className="metric-label">Partner HTEs</span>
+                  <div className="metric-head-row">
+                    <span className="metric-label">Partner HTEs</span>
+                    <span className="metric-icon-badge" aria-hidden="true">
+                      <IconBuilding size={15} />
+                    </span>
+                  </div>
                   <div className="metric-value-row">
                     <span className="metric-value">{data.kpis?.total_employers ?? 0}</span>
                     <span className="metric-unit">companies</span>
                   </div>
                   <span className="metric-foot">
-                    {data.kpis?.active_moa_employers ?? 0} active MOAs · Mean rating {data.kpis?.average_rating ?? '4.95'}/5.00
+                    {data.kpis?.active_moa_employers ?? 0} active MOAs · Mean {data.kpis?.average_rating ?? '4.95'}/5.00
                   </span>
                 </div>
               </div>
@@ -4257,16 +4274,21 @@ export default function App() {
                       <div className="panel-title">Cohort Placement Progress</div>
                       <div className="panel-desc">Real-time hour accumulation and clearance status</div>
                     </div>
+                    <button
+                      type="button"
+                      className="btn btn-tonal btn-sm"
+                      onClick={() => setActiveTab('placements')}
+                    >
+                      View All ({data.placements.length})
+                    </button>
                   </div>
                   <div className="table-wrap">
-                    <table className="table">
+                    <table className="table table-fit table-overview table-admin-split">
                       <thead>
                         <tr>
                           <th>Student</th>
                           <th>Host Company</th>
-                          <th className="text-right">Hours</th>
-                          <th>Completion</th>
-                          <th>Rating</th>
+                          <th>Progress (hrs)</th>
                           <th>Status</th>
                           <th className="text-right">Actions</th>
                         </tr>
@@ -4286,15 +4308,15 @@ export default function App() {
                                 <div className="row-title">{pl.company_name}</div>
                                 <div className="row-sub">{pl.position_title}</div>
                               </td>
-                              <td className="text-right mono tabular-nums">
-                                {Number(pl.total_hours_completed).toFixed(1)} / {Number(pl.required_hours).toFixed(0)}
-                              </td>
                               <td>
-                                <div className="inline-progress">
+                                <div className="mono tabular-nums row-hours-compact">
+                                  {Number(pl.total_hours_completed).toFixed(1)} / {Number(pl.required_hours).toFixed(0)}
+                                </div>
+                                <div className="inline-progress" style={{ marginTop: '4px' }}>
                                   <div className="inline-progress-track">
                                     <div
                                       className={`inline-progress-fill ${
-                                        pl.status === 'completed'
+                                        pl.status === 'completed' || isEligible
                                           ? 'done'
                                           : pl.status === 'dropped'
                                           ? 'muted'
@@ -4306,26 +4328,24 @@ export default function App() {
                                   <span className="inline-progress-pct">{pl.completion_percentage}%</span>
                                 </div>
                               </td>
-                              <td className="tabular-nums">
-                                {Number(pl.evaluation_count) > 0 ? (
-                                  <span className="mono">{pl.average_rating} / 5.0</span>
-                                ) : (
-                                  <span style={{ color: '#9ca3af', fontSize: '12px' }}>Pending</span>
-                                )}
-                              </td>
                               <td>
-                                {isEligible ? (
-                                  <StatusChip variant="success">Cleared</StatusChip>
-                                ) : pl.status === 'dropped' ? (
-                                  <StatusChip variant="danger">Dropped</StatusChip>
-                                ) : Number(pl.total_hours_completed) >= Number(pl.required_hours) ? (
-                                  <StatusChip variant="info">Needs Eval</StatusChip>
-                                ) : (
-                                  <StatusChip variant="warning">Ongoing</StatusChip>
-                                )}
+                                <div>
+                                  {isEligible ? (
+                                    <StatusChip variant="success">Cleared</StatusChip>
+                                  ) : pl.status === 'dropped' ? (
+                                    <StatusChip variant="danger">Dropped</StatusChip>
+                                  ) : Number(pl.total_hours_completed) >= Number(pl.required_hours) ? (
+                                    <StatusChip variant="info">Needs Eval</StatusChip>
+                                  ) : (
+                                    <StatusChip variant="warning">Ongoing</StatusChip>
+                                  )}
+                                </div>
+                                <div className="row-sub mono" style={{ marginTop: '3px' }}>
+                                  {Number(pl.evaluation_count) > 0 ? `Rated ${pl.average_rating}/5.0` : 'Eval pending'}
+                                </div>
                               </td>
                               <td className="text-right">
-                                <div className="row-actions">
+                                <div className="row-actions row-actions-compact">
                                   <button
                                     type="button"
                                     className="btn btn-ghost"
@@ -4338,14 +4358,14 @@ export default function App() {
                                     className="btn btn-ghost"
                                     onClick={() => jumpToEvaluatePlacement(pl)}
                                   >
-                                    Evaluate
+                                    Eval
                                   </button>
                                   <button
                                     type="button"
-                                    className="btn btn-secondary btn-sm"
+                                    className="btn btn-secondary btn-xs"
                                     onClick={() => handleOpenClearanceCertificate(pl)}
                                   >
-                                    Certificate
+                                    Cert
                                   </button>
                                 </div>
                               </td>
@@ -4357,56 +4377,54 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                  <div className="panel">
-                    <div className="panel-header">
-                      <div>
-                        <div className="panel-title">Faculty Advisers</div>
-                        <div className="panel-desc">Click an adviser to inspect supervised students</div>
-                      </div>
+                <div className="panel">
+                  <div className="panel-header">
+                    <div>
+                      <div className="panel-title">Faculty Advisers</div>
+                      <div className="panel-desc">Select an adviser to filter supervised students</div>
                     </div>
-                    <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {data.advisers.map((adv) => (
-                        <div
+                  </div>
+                  <div className="gws-adviser-list">
+                    {data.advisers.map((adv) => {
+                      const initials = (adv.full_name || 'A')
+                        .replace(/^(Dr\.|Engr\.)\s+/i, '')
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part) => part[0])
+                        .join('')
+                        .toUpperCase();
+                      const hasPendingEvals = Number(adv.pending_adviser_evals) > 0;
+                      return (
+                        <button
                           key={adv.adviser_id}
+                          type="button"
+                          className="gws-adviser-row"
                           onClick={() => {
                             setSelectedAdviserFilter(String(adv.adviser_id));
                             setActiveTab('adviser-monitoring');
                           }}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #e5e7eb',
-                            background: '#fafafa',
-                            cursor: 'pointer',
-                          }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, fontSize: '12.5px' }}>{adv.full_name}</span>
-                            <span className="mono" style={{ fontSize: '11px', color: '#6b7280' }}>
-                              {adv.employee_number}
-                            </span>
+                          <div className="gws-adviser-avatar" aria-hidden="true">
+                            {initials}
                           </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              marginTop: '8px',
-                              paddingTop: '8px',
-                              borderTop: '1px solid #eef0f3',
-                              fontSize: '11.5px',
-                              color: '#4b5563',
-                            }}
-                          >
-                            <span>{adv.total_supervised} interns</span>
-                            <span>{adv.clearance_ready_count} cleared</span>
-                            <span style={{ color: Number(adv.pending_adviser_evals) > 0 ? '#b45309' : '#6b7280' }}>
-                              {adv.pending_adviser_evals} pending eval
-                            </span>
+                          <div className="gws-adviser-info">
+                            <div className="gws-adviser-top">
+                              <span className="gws-adviser-name">{adv.full_name}</span>
+                              <span className="gws-adviser-code mono">{adv.employee_number}</span>
+                            </div>
+                            <div className="gws-adviser-metrics">
+                              <span>{adv.total_supervised} interns</span>
+                              <span aria-hidden="true">·</span>
+                              <span>{adv.clearance_ready_count} cleared</span>
+                              <span className={`gws-pending-tag ${hasPendingEvals ? 'is-pending' : ''}`}>
+                                {adv.pending_adviser_evals} pending eval
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

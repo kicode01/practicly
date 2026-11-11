@@ -32,10 +32,8 @@ export default function LiveShiftStopwatch({
   const hours = Math.floor(elapsed / 3600);
   const minutes = Math.floor((elapsed % 3600) / 60);
   const seconds = elapsed % 60;
-
   const pad = (n) => String(n).padStart(2, '0');
 
-  // Estimate hours rendered today
   const estGrossHours = elapsed / 3600;
   const estNetHours = Math.max(0, estGrossHours - breakMins / 60);
 
@@ -52,26 +50,29 @@ export default function LiveShiftStopwatch({
   if (!activeShift) {
     return (
       <div className="stopwatch-idle-card">
-        <div className="stopwatch-idle-left">
-          <div className="stopwatch-idle-badge">Practicum Attendance</div>
-          <div className="stopwatch-idle-title">Ready to Start Today's Shift?</div>
-          <div className="stopwatch-idle-sub">
-            {myPlacement
-              ? `Assigned to ${myPlacement.company_name} · Required: 300 hrs`
-              : 'Select your host training establishment to track hours'}
+        <div className="stopwatch-idle-main">
+          <div className="stopwatch-icon-tile" aria-hidden="true">
+            <IconClock size={20} />
+          </div>
+          <div className="stopwatch-idle-left">
+            <div className="stopwatch-idle-badge">Live Shift Tracker</div>
+            <div className="stopwatch-idle-title">Ready to Start Today's Shift?</div>
+            <div className="stopwatch-idle-sub">
+              {myPlacement
+                ? `Logs directly to ${myPlacement.company_name} DTR`
+                : 'Select your host training establishment to track hours'}
+            </div>
           </div>
         </div>
         <div className="stopwatch-idle-right">
           <button
             type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              onClockIn();
-            }}
+            className="btn btn-primary btn-sm"
+            onClick={() => onClockIn()}
             disabled={!myPlacement}
           >
-            <IconClock size={15} />
-            <span>Clock In for Today</span>
+            <IconClock size={14} />
+            <span>Clock In Shift</span>
           </button>
         </div>
       </div>
@@ -83,7 +84,7 @@ export default function LiveShiftStopwatch({
       <div className="stopwatch-active-header">
         <div className="stopwatch-beacon-group">
           <span className="stopwatch-beacon-pulse" />
-          <span className="stopwatch-beacon-text">ACTIVE PRACTICUM SHIFT</span>
+          <span className="stopwatch-beacon-text">ACTIVE SHIFT</span>
         </div>
         <div className="stopwatch-company-tag">
           {myPlacement?.company_name || 'Host Training Establishment'}
@@ -100,24 +101,22 @@ export default function LiveShiftStopwatch({
             <span className="digit">{pad(seconds)}</span>
           </div>
           <div className="stopwatch-digits-sub">
-            Clocked in at {activeShift.time_in} · Date: {activeShift.date}
+            Started {activeShift.time_in} · {activeShift.date}
           </div>
         </div>
 
         <div className="stopwatch-meta-strip">
           <div className="stopwatch-meta-item">
-            <div className="meta-label">Est. Net Hours</div>
+            <div className="meta-label">Est. Net</div>
             <div className="meta-val">{estNetHours.toFixed(2)} hrs</div>
           </div>
           <div className="stopwatch-meta-item">
-            <div className="meta-label">Break Deduction</div>
+            <div className="meta-label">Break</div>
             <div className="meta-controls">
               <button
                 type="button"
                 className="btn-micro"
-                onClick={() => {
-                  setBreakMins((p) => Math.max(0, p - 15));
-                }}
+                onClick={() => setBreakMins((p) => Math.max(0, p - 15))}
                 title="Decrease break by 15m"
               >
                 -15m
@@ -126,9 +125,7 @@ export default function LiveShiftStopwatch({
               <button
                 type="button"
                 className="btn-micro"
-                onClick={() => {
-                  setBreakMins((p) => p + 15);
-                }}
+                onClick={() => setBreakMins((p) => p + 15)}
                 title="Increase break by 15m"
               >
                 +15m
@@ -143,7 +140,7 @@ export default function LiveShiftStopwatch({
           <input
             type="text"
             className="input"
-            placeholder="e.g., Finished UART testbench coverage & submitted daily status report..."
+            placeholder="e.g., Finished UART testbench coverage & daily status report..."
             value={milestoneText}
             onChange={(e) => setMilestoneText(e.target.value)}
             autoFocus
@@ -164,9 +161,7 @@ export default function LiveShiftStopwatch({
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => {
-              setShowMilestoneInput(true);
-            }}
+            onClick={() => setShowMilestoneInput(true)}
           >
             <IconEdit size={13} />
             <span>Add Task Note</span>
@@ -175,12 +170,10 @@ export default function LiveShiftStopwatch({
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => {
-              onClockOut();
-            }}
+            onClick={() => onClockOut()}
           >
             <IconCheckCircle size={14} />
-            <span>Clock Out & Log DTR</span>
+            <span>Clock Out &amp; Save</span>
           </button>
         </div>
       )}

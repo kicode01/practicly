@@ -183,113 +183,76 @@ export default function PublicSupervisorVerifyView({
         )}
 
         {/* TRAINEE OVERVIEW CARD */}
-        <div
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px 24px',
-            boxShadow: 'var(--shadow-sm)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Student Trainee
+        <div className="public-verify-summary-grid">
+          <div className="public-verify-summary-item">
+            <div className="public-verify-summary-label">Student Trainee</div>
+            <div className="public-verify-summary-val">{placement.student_name}</div>
+            <div className="public-verify-summary-sub mono">
+              ID: {placement.student_number}
             </div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-              {placement.student_name}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }} className="mono">
-              Student ID: {placement.student_number}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            <div className="public-verify-summary-sub">
               {placement.program || 'BS Computer Engineering'}
             </div>
           </div>
 
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Host Training Establishment (HTE)
-            </div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-              {placement.company_name}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+          <div className="public-verify-summary-item">
+            <div className="public-verify-summary-label">Host Training Establishment</div>
+            <div className="public-verify-summary-val">{placement.company_name}</div>
+            <div className="public-verify-summary-sub">
               Designation: <strong>{placement.position_title}</strong>
             </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            <div className="public-verify-summary-sub">
               Signatory: {placement.company_contact_person || 'HTE Supervisor / HR Mentor'}
             </div>
           </div>
 
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Faculty Academic Adviser
-            </div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-              {placement.adviser_name}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+          <div className="public-verify-summary-item">
+            <div className="public-verify-summary-label">Faculty Academic Adviser</div>
+            <div className="public-verify-summary-val">{placement.adviser_name}</div>
+            <div className="public-verify-summary-sub">
               {placement.academic_term || 'AY 2026-2027 1st Sem'}
             </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-              Required Minimum: {Number(placement.required_hours || 300).toFixed(0)} Hours
+            <div className="public-verify-summary-sub">
+              Required: {Number(placement.required_hours || 300).toFixed(0)} Hours
             </div>
           </div>
 
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Rendered Practicum Hours
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--brand)', marginTop: '2px' }} className="mono">
+          <div className="public-verify-summary-item is-highlight">
+            <div className="public-verify-summary-label">Rendered Hours</div>
+            <div className="public-verify-summary-metric mono">
               {totalHours.toFixed(2)}h
             </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-              {placementLogs.length} total shifts ({pendingCount} pending verification)
+            <div className="public-verify-summary-sub">
+              {placementLogs.length} {placementLogs.length === 1 ? 'shift' : 'shifts'} ({pendingCount} pending review)
             </div>
           </div>
         </div>
 
         {/* ACTION TOOLBAR FOR SUPERVISOR */}
-        <div
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            padding: '14px 20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+        <div className="public-verify-actionbar">
+          <div className="public-verify-action-info">
+            <div className="public-verify-action-title">
               Supervisor Verification Action
             </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-              Review the student's logged daily shifts below and click verify if hours and tasks match company records.
+            <div className="public-verify-action-sub">
+              Review the student's logged daily shifts below and confirm if hours and tasks match company records.
             </div>
           </div>
 
-          <div className="no-print" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="no-print public-verify-action-buttons">
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={() => window.print()}
               title="Print official attendance log sheet"
             >
-              <IconPrinter size={13} />
+              <IconPrinter size={14} />
               Print Summary
             </button>
 
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary btn-sm"
               onClick={handleVerifyAll}
               disabled={isSubmitting || pendingCount === 0}
             >
@@ -298,32 +261,26 @@ export default function PublicSupervisorVerifyView({
                 ? 'Submitting...'
                 : pendingCount === 0
                 ? 'All Shifts Verified'
-                : `Verify & Confirm All ${pendingCount} Shifts`}
+                : `Verify All (${pendingCount} ${pendingCount === 1 ? 'Shift' : 'Shifts'})`}
             </button>
           </div>
         </div>
 
         {/* ATTENDANCE SHIFT RECORDS TABLE */}
-        <div
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Daily Time Record (DTR) Shift Logs ({placementLogs.length} Entries)
-            </span>
-            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-              Click 'Flag' on any row if hours or task description needs correction by the student.
-            </span>
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <div className="panel-title">
+                Daily Time Record (DTR) Shift Logs ({placementLogs.length})
+              </div>
+              <div className="panel-desc">
+                Click &lsquo;Flag&rsquo; on any row if hours or task description requires correction by the student.
+              </div>
+            </div>
           </div>
 
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-fit">
               <thead>
                 <tr>
                   <th>Date</th>

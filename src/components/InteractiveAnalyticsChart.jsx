@@ -77,8 +77,10 @@ export default function InteractiveAnalyticsChart({
         };
       }
       counts[name].count += 1;
-      counts[name].totalHours += Number(p.hours_rendered || 0);
-      if (Number(p.hours_rendered || 0) >= 300) {
+      const rendered = Number(p.completed_hours ?? p.total_hours_completed ?? p.hours_rendered ?? 0);
+      const req = Number(p.required_hours || 300);
+      counts[name].totalHours += rendered;
+      if (Number(p.requirement_met) === 1 || p.status === 'completed' || rendered >= req) {
         counts[name].completedCount += 1;
       }
     });
@@ -94,9 +96,10 @@ export default function InteractiveAnalyticsChart({
     let near = 0;
     let ongoing = 0;
     placements.forEach((p) => {
-      const hrs = Number(p.hours_rendered || 0);
-      if (hrs >= 300) cleared++;
-      else if (hrs >= 200) near++;
+      const hrs = Number(p.completed_hours ?? p.total_hours_completed ?? p.hours_rendered ?? 0);
+      const req = Number(p.required_hours || 300);
+      if (Number(p.requirement_met) === 1 || p.status === 'completed' || hrs >= req) cleared++;
+      else if (hrs >= req * 0.66) near++;
       else ongoing++;
     });
     const total = placements.length || 1;

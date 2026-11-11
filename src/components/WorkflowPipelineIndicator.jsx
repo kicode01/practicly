@@ -1,16 +1,10 @@
 import React from 'react';
-import {
-  IconClock,
-  IconBuilding,
-  IconSupervisor,
-  IconShieldCheck,
-  IconCheckCircle,
-} from './Icons';
+import { IconCheckCircle } from './Icons';
 
 /**
  * WorkflowPipelineIndicator
- * Visualizes the 4-stage practicum verification & clearance lifecycle:
- * [Stage 1: Workplace Attendance] -> [Stage 2: HTE Supervisor Verification] -> [Stage 3: Faculty Adviser Endorsement] -> [Stage 4: Department Clearance]
+ * Unified Material Design 3 4-stage verification & clearance stepper.
+ * Eliminates duplicate checklists by embedding stage-specific telemetry cleanly.
  */
 export default function WorkflowPipelineIndicator({
   currentRole = 'student',
@@ -21,51 +15,54 @@ export default function WorkflowPipelineIndicator({
   requiredHours = 300,
   isCleared = false,
   compact = false,
+  stepsMeta = null,
 }) {
   const stages = [
     {
       stage: 1,
-      name: '1. Student DTR Input',
-      subtext: 'Daily logs & task submission',
-      icon: IconClock,
-      statusLabel: `${Number(hoursCompleted).toFixed(1)} / ${Number(requiredHours).toFixed(0)} hrs`,
-      roleLabel: 'Student',
+      name: 'Attendance & DTR Input',
+      subtext: stepsMeta?.step1Sub || 'Daily logs & task submissions',
+      statusLabel: stepsMeta?.step1Status || `${Number(hoursCompleted).toFixed(1)} / ${Number(requiredHours).toFixed(0)} hrs`,
+      roleLabel: 'Step 1 · Student',
       isCurrentRole: currentRole === 'student',
+      isComplete: Number(hoursCompleted) >= Number(requiredHours || 300) || activeStage > 1,
     },
     {
       stage: 2,
-      name: '2. Supervisor Link Verification',
-      subtext: 'Zero-login link verification',
-      icon: IconBuilding,
+      name: 'Supervisor Verification',
+      subtext: stepsMeta?.step2Sub || 'Zero-login HTE verification',
       statusLabel:
-        pendingSupervisorCount > 0
+        stepsMeta?.step2Status ||
+        (pendingSupervisorCount > 0
           ? `${pendingSupervisorCount} Pending Review`
-          : 'Supervisor Verified',
-      roleLabel: 'HTE Supervisor (via Link)',
-      isCurrentRole: false,
+          : 'Supervisor Verified'),
+      roleLabel: 'Step 2 · HTE Supervisor',
+      isCurrentRole: currentRole === 'supervisor',
       hasAlert: pendingSupervisorCount > 0,
+      isComplete: pendingSupervisorCount === 0 && (activeStage > 2 || isCleared),
     },
     {
       stage: 3,
-      name: '3. Signed Proof & Adviser Audit',
-      subtext: 'Upload signed DTR & cross-audit',
-      icon: IconSupervisor,
+      name: 'Adviser Audit & Eval',
+      subtext: stepsMeta?.step3Sub || 'Signed DTR audit & rubric',
       statusLabel:
-        pendingAdviserCount > 0
+        stepsMeta?.step3Status ||
+        (pendingAdviserCount > 0
           ? `${pendingAdviserCount} Awaiting Audit`
-          : 'Adviser Endorsed',
-      roleLabel: 'Faculty Adviser',
+          : 'Adviser Endorsed'),
+      roleLabel: 'Step 3 · Faculty Adviser',
       isCurrentRole: currentRole === 'adviser',
       hasAlert: pendingAdviserCount > 0,
+      isComplete: activeStage > 3 || isCleared,
     },
     {
       stage: 4,
-      name: '4. Admin Clearance',
-      subtext: 'CHED CMO 104 final certificate',
-      icon: IconShieldCheck,
-      statusLabel: isCleared ? 'Clearance Issued' : 'Final Clearance',
-      roleLabel: 'Admin / Coordinator',
+      name: 'OJT Clearance Certificate',
+      subtext: stepsMeta?.step4Sub || 'CHED CMO 104 final sign-off',
+      statusLabel: stepsMeta?.step4Status || (isCleared ? 'Clearance Issued' : 'Pending Final Review'),
+      roleLabel: 'Step 4 · Coordinator',
       isCurrentRole: currentRole === 'admin',
+      isComplete: isCleared,
     },
   ];
 
@@ -77,22 +74,23 @@ export default function WorkflowPipelineIndicator({
           <span className="pipeline-title">4-Stage Verification &amp; Clearance Pipeline</span>
         </div>
         <div className="pipeline-role-hint">
-          Active Role:{' '}
+          Your Focus:{' '}
           <span className="pipeline-active-role">
             {currentRole === 'adviser'
-              ? 'Stage 3 · Faculty OJT Adviser (Audit & Endorsement)'
+              ? 'Stage 3 · Faculty OJT Adviser Audit & Endorsement'
+              : currentRole === 'supervisor'
+              ? 'Stage 2 · HTE Workplace DTR Verification'
               : currentRole === 'student'
-              ? 'Stage 1 · Student Intern (Logs & Signed Upload)'
-              : 'Stage 4 · Practicum Coordinator & Dean (Final Clearance)'}
+              ? 'Stage 1 · Student Intern Logs & Signed Proof'
+              : 'Stage 4 · Practicum Coordinator Final Clearance'}
           </span>
         </div>
       </div>
 
       <div className="pipeline-stepper" role="list">
         {stages.map((st, idx) => {
-          const IconComp = st.icon;
-          const isDone = activeStage > st.stage || (st.stage === 4 && isCleared);
-          const isCurrent = activeStage === st.stage && !(st.stage === 4 && isCleared);
+          const isDone = st.isComplete || activeStage > st.stage || (st.stage === 4 && isCleared);
+          const isCurrent = activeStage === st.stage && !isDone;
           const isRoleFocus = st.isCurrentRole;
 
           return (
@@ -103,13 +101,8 @@ export default function WorkflowPipelineIndicator({
                   isCurrent ? 'is-current' : ''
                 } ${isRoleFocus ? 'is-role-focus' : ''}`}
               >
-                <div className="pipeline-step-node">
-                  {isDone ? (
-                    <IconCheckCircle size={16} />
-                  ) : (
-                    <IconComp size={16} />
-                  )}
-                  <span className="pipeline-node-number">{st.stage}</span>
+                <div className="pipeline-step-node" aria-hidden="true">
+                  {isDone ? <IconCheckCircle size={16} /> : <span>{st.stage}</span>}
                 </div>
 
                 <div className="pipeline-step-content">
@@ -128,9 +121,7 @@ export default function WorkflowPipelineIndicator({
 
               {idx < stages.length - 1 && (
                 <div
-                  className={`pipeline-connector ${
-                    activeStage > st.stage ? 'is-connected' : ''
-                  }`}
+                  className={`pipeline-connector ${isDone ? 'is-connected' : ''}`}
                   aria-hidden="true"
                 >
                   <div className="pipeline-connector-line" />
