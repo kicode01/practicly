@@ -146,26 +146,13 @@ export default function PublicSupervisorVerifyView({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--brand)',
-                background: 'var(--brand-subtle)',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid var(--border-default)',
-              }}
-            >
-              Public Access · No Login Required
-            </span>
             <button
               type="button"
               className="btn btn-secondary btn-sm no-print"
               onClick={onClose}
               title="Return to main university portal"
             >
-              Exit View
+              Exit
             </button>
           </div>
         </header>
