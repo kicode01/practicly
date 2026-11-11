@@ -2687,15 +2687,6 @@ export default function App() {
           </div>
           <button
             type="button"
-            className="sidebar-collapse-btn desktop-only"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onClick={handleToggleSidebar}
-          >
-            {sidebarCollapsed ? <IconChevronRight size={15} /> : <IconChevronLeft size={15} />}
-          </button>
-          <button
-            type="button"
             className="sidebar-close-btn mobile-only"
             aria-label="Close sidebar navigation"
             onClick={() => setMobileMenuOpen(false)}
