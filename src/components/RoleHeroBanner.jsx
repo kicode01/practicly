@@ -14,7 +14,9 @@ import {
   IconDatabase,
   IconAlert,
   IconEdit,
-  IconLink
+  IconLink,
+  IconUpload,
+  IconFileText
 } from './Icons';
 
 export default function RoleHeroBanner({
