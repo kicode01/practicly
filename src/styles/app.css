@@ -1228,9 +1228,23 @@ p {
   border: 1px solid var(--border-default);
   border-radius: 20px;
   box-shadow: var(--shadow-xs);
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
   animation: panelSlideDown 0.25s var(--ease-out-expo) both;
   transition: box-shadow 0.2s var(--ease-standard), border-color 0.2s var(--ease-standard);
+}
+
+.panel > *:first-child,
+.panel-header:first-child,
+.panel-toolbar:first-child {
+  border-top-left-radius: 19px;
+  border-top-right-radius: 19px;
+}
+
+.panel > *:last-child,
+.panel-body:last-child {
+  border-bottom-left-radius: 19px;
+  border-bottom-right-radius: 19px;
 }
 
 .panel:hover {
@@ -4646,18 +4660,39 @@ textarea.input:focus {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 100%;
+  min-width: 240px;
   width: max-content;
-  max-width: 380px;
-  max-height: 270px;
+  max-width: min(400px, 92vw);
+  max-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
-  padding: 4px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 6px;
   z-index: 1050;
   animation: m3SelectPop 0.16s cubic-bezier(0.1, 0.8, 0.2, 1) both;
+}
+
+/* Auto-align to right when inside right-aligned containers or flagged with .is-align-right */
+.panel-toolbar .m3-select-menu,
+.panel-actions .m3-select-menu,
+.page-actions .m3-select-menu,
+.topbar-controls .m3-select-menu,
+.table td.text-right .m3-select-menu,
+.m3-select-menu.is-align-right {
+  left: auto;
+  right: 0;
+}
+
+.m3-select-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.m3-select-menu::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #c4c7c5);
+  border-radius: 6px;
 }
 
 @keyframes m3SelectPop {
@@ -4675,24 +4710,31 @@ textarea.input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 9px 14px;
+  border-radius: 9px;
   border: none;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.12s ease;
+  box-sizing: border-box;
+}
+
+.m3-select-item-text {
+  flex: 1 1 auto;
+  white-space: nowrap;
 }
 
 .m3-select-item:hover:not(:disabled) {
   background: var(--bg-subtle);
+  color: var(--md-sys-color-primary, #0b57d0);
 }
 
 .m3-select-item.is-selected {

@@ -117,9 +117,27 @@ export function MaterialSelect({
   id,
   style = {},
   prefixIcon,
+  align = 'auto',
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const containerRef = useRef(null);
+
+  // Auto-detect right alignment when opening
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      if (align === 'right') {
+        setAlignRight(true);
+      } else if (align === 'left') {
+        setAlignRight(false);
+      } else {
+        const rect = containerRef.current.getBoundingClientRect();
+        // If container is within 340px of right screen edge or in the right half of the page
+        const isNearRight = window.innerWidth - rect.left < 340 || rect.right > window.innerWidth - 120;
+        setAlignRight(isNearRight);
+      }
+    }
+  }, [isOpen, align]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -212,7 +230,7 @@ export function MaterialSelect({
       </button>
 
       {isOpen && (
-        <div className="m3-select-menu" role="listbox">
+        <div className={`m3-select-menu ${alignRight ? 'is-align-right' : ''}`} role="listbox">
           {items.length === 0 ? (
             <div className="m3-select-empty">No options available</div>
           ) : (
