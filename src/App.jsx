@@ -2671,7 +2671,9 @@ export default function App() {
             onClick={sidebarCollapsed ? handleToggleSidebar : undefined}
             style={{ cursor: sidebarCollapsed ? 'pointer' : 'default' }}
           >
-            <IconBrandLogo size={32} />
+            <div className="sidebar-brand-icon-wrap">
+              <IconBrandLogo size={32} />
+            </div>
             <div className="sidebar-brand-text">
               <div className="sidebar-title">Practicly</div>
               <div className="sidebar-subtitle">
@@ -2734,7 +2736,9 @@ export default function App() {
                           }}
                         >
                           <span className="sidebar-link-main">
-                            <IconComp size={15} />
+                            <span className="sidebar-link-icon-wrap">
+                              <IconComp size={16} />
+                            </span>
                             <span className="sidebar-link-label">{item.label}</span>
                           </span>
                           {item.count !== undefined && (
@@ -2755,10 +2759,12 @@ export default function App() {
             className="sidebar-user"
             title={sidebarCollapsed ? `${currentUser.display_name} (${currentUser.identifier_code})` : undefined}
           >
-            <div className="sidebar-user-avatar">
-              <span className="sidebar-user-initial">
-                {(currentUser.display_name || 'U').charAt(0).toUpperCase()}
-              </span>
+            <div className="sidebar-user-avatar-wrap">
+              <div className="sidebar-user-avatar">
+                <span className="sidebar-user-initial">
+                  {(currentUser.display_name || 'U').charAt(0).toUpperCase()}
+                </span>
+              </div>
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name" title={currentUser.display_name}>
