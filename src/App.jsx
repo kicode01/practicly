@@ -457,7 +457,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     const allowedTabs = {
-      student: new Set(['dashboard', 'timelogs', 'evaluations', 'employers', 'students']),
+      student: new Set(['dashboard', 'timelogs', 'evaluations', 'employers']),
       adviser: new Set(['dashboard', 'timelogs', 'evaluations', 'compliance', 'employers', 'students', 'adviser-monitoring']),
       supervisor: new Set(['dashboard', 'timelogs', 'evaluations', 'employers', 'students']),
       admin: new Set(['dashboard', 'compliance', 'adviser-monitoring', 'placements', 'students', 'employers', 'timelogs', 'evaluations', 'users', 'database-erd']),
@@ -664,7 +664,8 @@ export default function App() {
     if (!currentUser || currentUser.role !== 'student') return null;
     return (
       data.students.find((s) => Number(s.student_id) === Number(currentUser.linked_id)) ||
-      data.students.find((s) => s.student_number === currentUser.identifier_code) ||
+      data.students.find((s) => s.student_number && s.student_number === currentUser.identifier_code) ||
+      data.students.find((s) => s.full_name && currentUser.display_name && s.full_name.toLowerCase() === currentUser.display_name.toLowerCase()) ||
       null
     );
   }, [currentUser, data.students]);
@@ -672,11 +673,14 @@ export default function App() {
 
   const myPlacement = useMemo(() => {
     if (!currentUser || currentUser.role !== 'student') return null;
+    const targetStudentId = myStudent?.student_id || currentUser.linked_id;
     return (
-      data.placements.find((p) => Number(p.student_id) === Number(currentUser.linked_id)) ||
+      (targetStudentId ? data.placements.find((p) => Number(p.student_id) === Number(targetStudentId)) : null) ||
+      data.placements.find((p) => p.student_number && p.student_number === currentUser.identifier_code) ||
+      (myStudent ? data.placements.find((p) => p.student_name && p.student_name === myStudent.full_name) : null) ||
       null
     );
-  }, [currentUser, data.placements]);
+  }, [currentUser, myStudent, data.placements]);
 
   const myTimeLogs = useMemo(() => {
     if (!myPlacement) return [];
@@ -2148,8 +2152,8 @@ export default function App() {
 
   const scopedTimeLogs = useMemo(() => {
     return data.timelogs.filter((tl) => {
-      if (currentUser?.role === 'student' && myPlacement) {
-        if (Number(tl.placement_id) !== Number(myPlacement.placement_id)) return false;
+      if (currentUser?.role === 'student') {
+        if (!myPlacement || Number(tl.placement_id) !== Number(myPlacement.placement_id)) return false;
       } else if (currentUser?.role === 'supervisor' && timelogPlacementFilter === 'all') {
         const empId = Number(currentUser.linked_id);
         const matchPlacement = data.placements.find(
@@ -2197,7 +2201,7 @@ export default function App() {
   const scopedEvaluations = useMemo(() => {
     return data.evaluations.filter((ev) => {
       if (currentUser?.role === 'student') {
-        if (myPlacement && Number(ev.placement_id) !== Number(myPlacement.placement_id)) return false;
+        if (!myPlacement || Number(ev.placement_id) !== Number(myPlacement.placement_id)) return false;
       } else if (currentUser?.role === 'supervisor') {
         const pids = new Set(supervisorPlacements.map((p) => Number(p.placement_id)));
         if (!pids.has(Number(ev.placement_id))) return false;
@@ -2719,7 +2723,10 @@ export default function App() {
             <PersonaSwitcher
               currentUser={currentUser}
               users={data.users}
-              onSwitchUser={(username) => handleLogin(null, username)}
+              onSwitchUser={(username) => {
+                setActiveTab('dashboard');
+                handleLogin(null, username);
+              }}
               demoPresets={DEMO_PRESETS}
               onOpenSupervisorView={() => {
                 const targetId = myPlacement?.placement_id || (data.placements[0]?.placement_id);
@@ -3198,22 +3205,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-
-              <InteractiveAnalyticsChart
-                placements={data.placements}
-                timelogs={data.timelogs}
-                employers={data.employers}
-                onFilterCompany={(companyName) => {
-                  setSearchQuery(companyName);
-                  setActiveTab('placements');
-                  showNotice(`Filtered trainees for ${companyName}`);
-                }}
-                onFilterStatus={(statusKey) => {
-                  setActiveTab('placements');
-                  setPlacementQuickFilter(statusKey);
-                  showNotice(`Filtered ${statusKey} trainees`);
-                }}
-              />
 
               <div className="split-grid">
                 <div className="panel">
@@ -5828,8 +5819,57 @@ export default function App() {
                 />
               </div>
 
+              {/* UNASSIGNED STUDENT NOTICE */}
+              {currentUser.role === 'student' && !myPlacement && (
+                <div
+                  style={{
+                    marginBottom: '16px',
+                    padding: '16px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                    boxShadow: 'var(--shadow-xs)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        padding: '10px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--brand-subtle)',
+                        color: 'var(--brand)',
+                        flexShrink: 0
+                      }}
+                    >
+                      <IconAlert size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        OJT Placement Not Activated
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        To log attendance hours and submit DTR shifts, you must first register your assigned Host Training Establishment (HTE) on your dashboard.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setActiveTab('dashboard')}
+                  >
+                    <IconDashboard size={13} />
+                    Activate Placement
+                  </button>
+                </div>
+              )}
+
               {/* STUDENT SIGNED PHYSICAL DTR CARD */}
-              {currentUser.role === 'student' && (
+              {currentUser.role === 'student' && myPlacement && (
                 <div
                   style={{
                     marginBottom: '16px',
@@ -6041,7 +6081,19 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTimeLogs.map((tl) => (
+                        {filteredTimeLogs.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={currentUser.role !== 'student' ? 7 : 6}
+                              style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}
+                            >
+                              {currentUser.role === 'student'
+                                ? 'No attendance entries found. Click "Log Attendance" above to record your training hours.'
+                                : 'No attendance records match the selected filter.'}
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredTimeLogs.map((tl) => (
                           <tr
                             key={tl.log_id}
                             className={Number(editingLogId) === Number(tl.log_id) ? 'is-editing' : ''}
@@ -6194,7 +6246,8 @@ export default function App() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                        ))
+                      )}
                       </tbody>
                     </table>
                   </div>
