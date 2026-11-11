@@ -4662,17 +4662,19 @@ textarea.input:focus {
   left: 0;
   min-width: 240px;
   width: max-content;
-  max-width: min(400px, 92vw);
-  max-height: 320px;
+  max-width: min(420px, 92vw);
+  max-height: min(420px, 68vh);
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 14px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: 6px;
+  padding: 6px 4px 6px 6px;
   z-index: 1050;
   animation: m3SelectPop 0.16s cubic-bezier(0.1, 0.8, 0.2, 1) both;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(60, 64, 67, 0.25) transparent;
 }
 
 /* Auto-align to right when inside right-aligned containers or flagged with .is-align-right */
@@ -4686,13 +4688,25 @@ textarea.input:focus {
   right: 0;
 }
 
+/* Google Material 3 Sleek Pill Floating Scrollbar */
 .m3-select-menu::-webkit-scrollbar {
   width: 6px;
 }
 
+.m3-select-menu::-webkit-scrollbar-track {
+  background: transparent !important;
+  margin: 8px 0;
+}
+
 .m3-select-menu::-webkit-scrollbar-thumb {
-  background: var(--border-strong, #c4c7c5);
-  border-radius: 6px;
+  background-color: rgba(60, 64, 67, 0.22);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.m3-select-menu::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(60, 64, 67, 0.45);
 }
 
 @keyframes m3SelectPop {
@@ -4781,6 +4795,19 @@ textarea.input:focus {
   background: #1e1f23;
   border-color: #44474e;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48);
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+[data-theme="dark"] .m3-select-menu::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .m3-select-menu::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .m3-select-menu::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.45);
 }
 
 [data-theme="dark"] .m3-select-item {
