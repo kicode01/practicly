@@ -234,31 +234,23 @@ export default function OfficialEvaluationModal({
         </div>
 
         {/* 4-WAY INSTRUMENT SELECTOR BAR */}
-        <div className="no-print" style={{ padding: '12px 24px 0', borderBottom: '1px solid var(--border-default)', background: 'var(--bg-subtle)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', paddingBottom: '12px' }}>
+        <div className="no-print" style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-default)', background: 'var(--bg-subtle)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
             {EVALUATION_INSTRUMENTS.map((inst) => {
               const active = inst.id === selectedInstrumentId;
               return (
                 <button
                   key={inst.id}
                   type="button"
-                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    padding: '8px 10px',
-                    height: 'auto',
-                    textAlign: 'left',
-                  }}
+                  className={`eval-instrument-tab ${active ? 'active' : ''}`}
                   onClick={() => {
                     setSelectedInstrumentId(inst.id);
                   }}
                 >
-                  <span style={{ fontSize: '10px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span className="eval-tab-code">
                     {inst.code}
                   </span>
-                  <span style={{ fontSize: '11.5px', fontWeight: 600, marginTop: '2px', lineHeight: 1.2 }}>
+                  <span className="eval-tab-title">
                     {inst.shortTitle}
                   </span>
                 </button>
@@ -277,27 +269,29 @@ export default function OfficialEvaluationModal({
             justifyContent: 'space-between',
             background: 'var(--bg-surface)',
             borderBottom: '1px solid var(--border-default)',
-            gap: '16px',
+            gap: '20px',
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '280px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Placement:</span>
-            <MaterialSelect
-              className="select-sm"
-              value={selectedPlacementId}
-              onChange={(e) => setSelectedPlacementId(e.target.value)}
-              style={{ flex: 1 }}
-            >
-              {placements.map((p) => (
-                <option key={p.placement_id} value={p.placement_id}>
-                  {p.student_name} — {p.company_name} ({p.student_number})
-                </option>
-              ))}
-            </MaterialSelect>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 360px', maxWidth: '520px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Placement:</span>
+            <div style={{ flex: 1, minWidth: '240px' }}>
+              <MaterialSelect
+                className="select-sm"
+                value={selectedPlacementId}
+                onChange={(e) => setSelectedPlacementId(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                {placements.map((p) => (
+                  <option key={p.placement_id} value={p.placement_id}>
+                    {p.student_name} — {p.company_name} ({p.student_number})
+                  </option>
+                ))}
+              </MaterialSelect>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weighted Mean</div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand)' }} className="mono tabular-nums">
@@ -312,9 +306,10 @@ export default function OfficialEvaluationModal({
                 fontWeight: 600,
                 padding: '4px 10px',
                 borderRadius: 'var(--radius-pill)',
-                background: 'var(--success-bg)',
-                color: 'var(--success-fg)',
-                border: '1px solid var(--success-border)',
+                background: 'var(--success-bg, rgba(16, 185, 129, 0.12))',
+                color: 'var(--success-fg, #059669)',
+                border: '1px solid var(--success-border, rgba(16, 185, 129, 0.25))',
+                whiteSpace: 'nowrap',
               }}
             >
               {interpretation.label}

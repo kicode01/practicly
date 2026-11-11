@@ -153,26 +153,26 @@ export default function SupervisorShareModal({
               <div><strong>4. Faculty Adviser &amp; Admin:</strong> Adviser verifies consistency and endorses; Admin issues final clearance.</div>
             </div>
           </div>
+        </div>
 
-          {/* ACTIONS */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                onClose();
-                if (onOpenSupervisorView) onOpenSupervisorView(placement);
-              }}
-              title="Test the exact screen the supervisor will see without logging out"
-            >
-              <IconSupervisor size={13} />
-              Open Supervisor Verification View (Demo / Test)
-            </button>
+        {/* MODAL FOOTER */}
+        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              onClose();
+              if (onOpenSupervisorView) onOpenSupervisorView(placement);
+            }}
+            title="Test the exact screen the supervisor will see without logging out"
+          >
+            <IconSupervisor size={13} />
+            Open Supervisor Verification View (Demo / Test)
+          </button>
 
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
-              Done
-            </button>
-          </div>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onClose} style={{ minWidth: '80px' }}>
+            Done
+          </button>
         </div>
       </div>
     </div>
