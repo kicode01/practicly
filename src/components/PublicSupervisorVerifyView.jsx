@@ -10,7 +10,6 @@ import {
   IconEdit,
   IconClose
 } from './Icons';
-import { playClickSound, playSuccessChime, playCelebrationFanfare } from '../utils/soundEffects';
 
 export default function PublicSupervisorVerifyView({
   placement,
@@ -47,8 +46,6 @@ export default function PublicSupervisorVerifyView({
   const handleVerifyAll = async () => {
     if (!placement) return;
     setIsSubmitting(true);
-    playClickSound();
-
     try {
       const res = await fetch('/api/timelogs/approve-all', {
         method: 'POST',
@@ -60,7 +57,6 @@ export default function PublicSupervisorVerifyView({
       });
       const json = await res.json();
       if (json.ok) {
-        playCelebrationFanfare();
         setVerificationSuccess(true);
         if (onRefresh) onRefresh();
       } else {
@@ -77,8 +73,6 @@ export default function PublicSupervisorVerifyView({
   const handleConfirmFlag = async () => {
     if (!selectedLogToFlag) return;
     setIsSubmitting(true);
-    playClickSound();
-
     try {
       const res = await fetch(`/api/timelogs/${selectedLogToFlag.log_id}`, {
         method: 'PUT',
@@ -91,7 +85,6 @@ export default function PublicSupervisorVerifyView({
       });
       const json = await res.json();
       if (json.ok) {
-        playSuccessChime();
         setFlagModalOpen(false);
         setSelectedLogToFlag(null);
         if (onRefresh) onRefresh();

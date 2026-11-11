@@ -11,7 +11,6 @@ import {
   IconExternalLink,
   IconEdit
 } from './Icons';
-import { playClickSound, playSuccessChime, playCelebrationFanfare } from '../utils/soundEffects';
 
 export default function DtrAuditComparisonModal({
   isOpen,
@@ -60,7 +59,6 @@ export default function DtrAuditComparisonModal({
 
   const handleEndorseVerified = async () => {
     setIsSubmitting(true);
-    playClickSound();
     try {
       if (onEndorseAll) {
         await onEndorseAll(placement.placement_id);
@@ -73,7 +71,6 @@ export default function DtrAuditComparisonModal({
   const handleConfirmFlag = async () => {
     if (!selectedLogToFlag || !onUpdateApproval) return;
     setIsSubmitting(true);
-    playClickSound();
     try {
       await onUpdateApproval(selectedLogToFlag, 'flagged');
       setFlagModalOpen(false);

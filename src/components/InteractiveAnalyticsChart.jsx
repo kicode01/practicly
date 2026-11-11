@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { playClickSound } from '../utils/soundEffects';
 
 export default function InteractiveAnalyticsChart({
   placements = [],
@@ -153,7 +152,6 @@ export default function InteractiveAnalyticsChart({
             type="button"
             className={`analytics-tab-btn ${activeMetricTab === 'velocity' ? 'active' : ''}`}
             onClick={() => {
-              playClickSound();
               setActiveMetricTab('velocity');
             }}
           >
@@ -163,7 +161,6 @@ export default function InteractiveAnalyticsChart({
             type="button"
             className={`analytics-tab-btn ${activeMetricTab === 'cohort' ? 'active' : ''}`}
             onClick={() => {
-              playClickSound();
               setActiveMetricTab('cohort');
             }}
           >
@@ -173,7 +170,6 @@ export default function InteractiveAnalyticsChart({
             type="button"
             className={`analytics-tab-btn ${activeMetricTab === 'partners' ? 'active' : ''}`}
             onClick={() => {
-              playClickSound();
               setActiveMetricTab('partners');
             }}
           >
@@ -275,7 +271,6 @@ export default function InteractiveAnalyticsChart({
                   <g
                     key={p.week}
                     onMouseEnter={() => {
-                      playClickSound();
                       setHoveredPoint(p);
                     }}
                     onMouseLeave={() => setHoveredPoint(null)}

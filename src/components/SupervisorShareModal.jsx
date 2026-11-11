@@ -8,7 +8,6 @@ import {
   IconClock,
   IconBriefcase
 } from './Icons';
-import { playClickSound, playSuccessChime } from '../utils/soundEffects';
 
 export default function SupervisorShareModal({
   isOpen,
@@ -24,12 +23,10 @@ export default function SupervisorShareModal({
   const verifyUrl = `${origin}/?verify=${placement.placement_id}&token=MIT-VERIFY-${placement.student_number || 'CPE'}`;
 
   const handleCopy = () => {
-    playClickSound();
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(verifyUrl);
     }
     setCopied(true);
-    playSuccessChime();
     setTimeout(() => setCopied(false), 3000);
   };
 

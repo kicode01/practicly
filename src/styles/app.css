@@ -3336,48 +3336,7 @@ textarea.input:focus {
 /* =============================================================================
    GOOGLE MATERIAL DESIGN 3 (M3) TOPBAR CONTROLS
    ============================================================================= */
-.topbar-search-btn,
-.topbar-cmd-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 14px;
-  background: var(--md-sys-color-surface-container, var(--bg-subtle));
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.16s ease;
-}
-
-.topbar-search-btn:hover,
-.topbar-cmd-btn:hover {
-  background: var(--md-sys-color-surface-container-high, var(--bg-surface));
-  border-color: var(--md-sys-color-primary, #0b57d0);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
-}
-
-.topbar-kbd,
-.cmd-kbd {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.topbar-icon-btn,
-.topbar-theme-btn {
+.topbar-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3392,8 +3351,7 @@ textarea.input:focus {
   flex-shrink: 0;
 }
 
-.topbar-icon-btn:hover,
-.topbar-theme-btn:hover {
+.topbar-icon-btn:hover {
   background: var(--md-sys-color-surface-container-high, var(--bg-subtle));
   color: var(--md-sys-color-primary, #0b57d0);
   border-color: var(--md-sys-color-primary, #0b57d0);
@@ -3737,60 +3695,7 @@ textarea.input:focus {
   gap: 8px;
 }
 
-/* 1. M3 Segmented Role Navigation */
-.m3-role-nav {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-pill);
-  gap: 2px;
-}
-
-.m3-role-nav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.16s cubic-bezier(0.2, 0, 0, 1);
-}
-
-.m3-role-nav-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--text-primary);
-}
-
-.m3-role-nav-btn.is-active {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  font-weight: 600;
-}
-
-.m3-role-nav-btn.is-active.m3-role-student {
-  background: #ceead6;
-  color: #0d652d;
-}
-
-.m3-role-nav-btn.is-active.m3-role-adviser {
-  background: #d3e3fd;
-  color: #041e49;
-}
-
-.m3-role-nav-btn.is-active.m3-role-admin {
-  background: #ede7f6;
-  color: #311b92;
-}
-
-/* 2. M3 Profile Trigger Pill */
+/* M3 Profile Trigger Pill */
 .m3-persona-trigger {
   display: inline-flex;
   align-items: center;
@@ -4303,31 +4208,6 @@ textarea.input:focus {
   color: #041e49;
 }
 
-/* Dark Mode Overrides for M3 Account Switcher */
-[data-theme="dark"] .m3-role-nav {
-  background: var(--md-sys-color-surface-container, #1f2024);
-  border-color: var(--md-sys-color-outline-variant, #44474e);
-}
-
-[data-theme="dark"] .m3-role-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e3e2e6;
-}
-
-[data-theme="dark"] .m3-role-nav-btn.is-active.m3-role-student {
-  background: #00522c;
-  color: #85f8ab;
-}
-
-[data-theme="dark"] .m3-role-nav-btn.is-active.m3-role-adviser {
-  background: #00458f;
-  color: #d3e3fd;
-}
-
-[data-theme="dark"] .m3-role-nav-btn.is-active.m3-role-admin {
-  background: #472681;
-  color: #e9ddff;
-}
 
 [data-theme="dark"] .m3-account-dialog {
   background: #1e1f23;

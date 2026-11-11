@@ -13,7 +13,6 @@ import {
   IconCheck
 } from './Icons';
 import { EVALUATION_INSTRUMENTS, getInterpretation } from '../utils/evaluationRubrics';
-import { playClickSound, playSuccessChime } from '../utils/soundEffects';
 
 export default function OfficialEvaluationModal({
   isOpen,
@@ -144,7 +143,6 @@ export default function OfficialEvaluationModal({
 
   // Set all scores to a specific number
   const handleSetAllScores = (val) => {
-    playClickSound();
     const updated = {};
     allItems.forEach((item) => {
       updated[item.key] = val;
@@ -165,8 +163,6 @@ export default function OfficialEvaluationModal({
     if (!activePlacement) return;
 
     setIsSubmitting(true);
-    playClickSound();
-
     let combinedComments = comments;
     if (activeInstrument.hasQualitativeBreakdown) {
       combinedComments = `Strengths: ${strengths}\nAreas for Improvement: ${areasImprovement}\nRecommendations: ${recommendations}`;
@@ -194,7 +190,6 @@ export default function OfficialEvaluationModal({
       });
       const json = await res.json();
       if (json.ok) {
-        playSuccessChime();
         if (onSuccess) onSuccess(`Recorded ${activeInstrument.name} (Score: ${computedRating.toFixed(2)}/5.00)`);
         onClose();
       } else {
@@ -208,7 +203,6 @@ export default function OfficialEvaluationModal({
   };
 
   const handlePrint = () => {
-    playClickSound();
     window.print();
   };
 
@@ -258,7 +252,6 @@ export default function OfficialEvaluationModal({
                     textAlign: 'left',
                   }}
                   onClick={() => {
-                    playClickSound();
                     setSelectedInstrumentId(inst.id);
                   }}
                 >

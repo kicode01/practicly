@@ -9,7 +9,6 @@ import {
   IconEye,
   IconShieldCheck
 } from './Icons';
-import { playClickSound, playSuccessChime } from '../utils/soundEffects';
 
 export default function SignedDtrUploadModal({
   isOpen,
@@ -44,7 +43,6 @@ export default function SignedDtrUploadModal({
     reader.onload = (e) => {
       setSelectedFile(file);
       setFileDataUri(e.target.result);
-      playClickSound();
     };
     reader.onerror = () => {
       setErrorMsg('Failed to read the selected file.');
@@ -80,8 +78,6 @@ export default function SignedDtrUploadModal({
 
     setIsUploading(true);
     setErrorMsg('');
-    playClickSound();
-
     try {
       const res = await fetch('/api/placements/upload-signed-dtr', {
         method: 'POST',
@@ -96,7 +92,6 @@ export default function SignedDtrUploadModal({
 
       const json = await res.json();
       if (json.ok) {
-        playSuccessChime();
         if (onSuccess) onSuccess(json.message);
         onClose();
       } else {
@@ -115,8 +110,6 @@ export default function SignedDtrUploadModal({
     }
 
     setIsDeleting(true);
-    playClickSound();
-
     try {
       const res = await fetch('/api/placements/remove-signed-dtr', {
         method: 'POST',
@@ -128,7 +121,6 @@ export default function SignedDtrUploadModal({
 
       const json = await res.json();
       if (json.ok) {
-        playSuccessChime();
         setSelectedFile(null);
         setFileDataUri('');
         if (onSuccess) onSuccess('Signed DTR document removed.');

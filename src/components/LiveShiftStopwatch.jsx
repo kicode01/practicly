@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { IconClock, IconCheckCircle, IconEdit } from './Icons';
-import { playClickSound, playSuccessChime } from '../utils/soundEffects';
 
 export default function LiveShiftStopwatch({
   activeShift,
@@ -45,7 +44,6 @@ export default function LiveShiftStopwatch({
     if (!milestoneText.trim()) return;
     if (onLogQuickMilestone) {
       onLogQuickMilestone(milestoneText.trim());
-      playSuccessChime();
     }
     setMilestoneText('');
     setShowMilestoneInput(false);
@@ -68,7 +66,6 @@ export default function LiveShiftStopwatch({
             type="button"
             className="btn btn-primary"
             onClick={() => {
-              playClickSound();
               onClockIn();
             }}
             disabled={!myPlacement}
@@ -119,7 +116,6 @@ export default function LiveShiftStopwatch({
                 type="button"
                 className="btn-micro"
                 onClick={() => {
-                  playClickSound();
                   setBreakMins((p) => Math.max(0, p - 15));
                 }}
                 title="Decrease break by 15m"
@@ -131,7 +127,6 @@ export default function LiveShiftStopwatch({
                 type="button"
                 className="btn-micro"
                 onClick={() => {
-                  playClickSound();
                   setBreakMins((p) => p + 15);
                 }}
                 title="Increase break by 15m"
@@ -170,7 +165,6 @@ export default function LiveShiftStopwatch({
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={() => {
-              playClickSound();
               setShowMilestoneInput(true);
             }}
           >
@@ -182,7 +176,6 @@ export default function LiveShiftStopwatch({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => {
-              playClickSound();
               onClockOut();
             }}
           >

@@ -113,51 +113,13 @@ export default function PersonaSwitcher({
     }
   };
 
-  // Quick primary role switchers: Strictly Student, Adviser, Admin
-  const primaryAccounts = useMemo(() => {
-    const studentAcc = userList.find((u) => u.role === 'student');
-    const adviserAcc = userList.find((u) => u.role === 'adviser');
-    const adminAcc = userList.find((u) => u.role === 'admin');
-    return [
-      { role: 'student', label: 'Student', user: studentAcc, icon: IconStudent },
-      { role: 'adviser', label: 'Adviser', user: adviserAcc, icon: IconSupervisor },
-      { role: 'admin', label: 'Admin', user: adminAcc, icon: IconShieldCheck },
-    ].filter((item) => !!item.user);
-  }, [userList]);
-
   const studentCount = userList.filter((u) => u.role === 'student').length;
   const adviserCount = userList.filter((u) => u.role === 'adviser').length;
   const adminCount = userList.filter((u) => u.role === 'admin').length;
 
   return (
     <div className="m3-persona-switcher-wrapper" ref={popoverRef}>
-      {/* 1. GOOGLE M3 SEGMENTED ROLE BUTTONS */}
-      <div className="m3-role-nav" role="tablist" aria-label="Quick Role POV">
-        {primaryAccounts.map((item) => {
-          const isActive = currentUser?.role === item.role;
-          const IconComp = item.icon;
-          return (
-            <button
-              key={item.role}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={`m3-role-nav-btn ${isActive ? 'is-active' : ''} m3-role-${item.role}`}
-              onClick={() => {
-                if (!isActive && item.user) {
-                  onSwitchUser(item.user.username);
-                }
-              }}
-              title={`Switch active view to ${item.label}`}
-            >
-              <IconComp size={16} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 2. GOOGLE PROFILE TRIGGER PILL */}
+      {/* GOOGLE PROFILE TRIGGER PILL */}
       <button
         type="button"
         className={`m3-persona-trigger ${isOpen ? 'is-expanded' : ''} m3-role-${currentUser?.role || 'student'}`}

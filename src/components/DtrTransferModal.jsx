@@ -10,8 +10,6 @@ import {
   IconPrinter,
   IconPlus,
 } from './Icons';
-import { playClickSound, playSuccessChime, playCelebrationFanfare } from '../utils/soundEffects';
-import { launchConfetti } from '../utils/confetti';
 
 export default function DtrTransferModal({
   isOpen,
@@ -81,7 +79,6 @@ export default function DtrTransferModal({
 
   // Download Sample Excel / CSV DTR Template with UTF-8 BOM
   const handleDownloadTemplate = () => {
-    playClickSound();
     const headers = 'Date,Time In,Time Out,Break Minutes,Net Hours,Task Description';
     const sampleRows = [
       '2026-11-02,08:00,17:00,60,8.00,"Orientation, workplace safety briefing, and engineering workstation setup"',
@@ -131,7 +128,6 @@ export default function DtrTransferModal({
   };
 
   const handleLoadSampleProof = () => {
-    playClickSound();
     const dataUrl = generateSampleProofSvg(activePlacement);
     const fileName = `Signed_DTR_Proof_${activePlacement?.student_number || 'BSCpE'}.png`;
     setProofFile({ name: fileName });
@@ -216,7 +212,6 @@ export default function DtrTransferModal({
 
   // Helper to generate a full 300-hour realistic practicum DTR batch
   const handleFillCompleteSample = () => {
-    playClickSound();
     const rows = [];
     const engineeringTasks = [
       'Orientation, engineering workstation configuration, and safety protocol briefing',
@@ -272,8 +267,6 @@ export default function DtrTransferModal({
   const handleTransferToDatabase = async () => {
     if (parsedRows.length === 0) return;
     setIsSubmitting(true);
-    playClickSound();
-
     try {
       const res = await fetch('/api/timelogs', {
         method: 'POST',
@@ -286,7 +279,6 @@ export default function DtrTransferModal({
       });
       const json = await res.json();
       if (json.ok) {
-        playSuccessChime();
         if (onSuccess) onSuccess(json.message);
         setActiveTab('audit');
       } else {
@@ -325,15 +317,12 @@ export default function DtrTransferModal({
       }
     };
     reader.readAsDataURL(file);
-    playClickSound();
   };
 
   // Adviser Endorse Complete DTR
   const handleAdviserEndorseDtr = async () => {
     if (!activePlacement) return;
     setIsSubmitting(true);
-    playClickSound();
-
     try {
       const res = await fetch('/api/timelogs/approve-all', {
         method: 'POST',
@@ -345,8 +334,6 @@ export default function DtrTransferModal({
       });
       const json = await res.json();
       if (json.ok) {
-        playCelebrationFanfare();
-        launchConfetti();
         if (onSuccess) onSuccess('Official DTR verified & endorsed! Student required hours marked completed.');
         onClose();
       } else {
@@ -756,7 +743,6 @@ export default function DtrTransferModal({
                   type="button"
                   className="btn btn-primary"
                   onClick={() => {
-                    playSuccessChime();
                     setVerificationPushed(true);
                     if (onSuccess) {
                       onSuccess(

@@ -23,11 +23,6 @@ import {
   IconLogOut,
   IconMenu,
   IconClose,
-  IconSun,
-  IconMoon,
-  IconVolume,
-  IconVolumeMute,
-  IconSparkles,
   IconUser,
   IconFilter,
   IconCheck,
@@ -55,15 +50,6 @@ import PublicSupervisorVerifyView from './components/PublicSupervisorVerifyView'
 import SignedDtrUploadModal from './components/SignedDtrUploadModal';
 import DtrAuditComparisonModal from './components/DtrAuditComparisonModal';
 import { SegmentedControl, Switch, MaterialSelect } from './components/MaterialComponents';
-import {
-  playClickSound,
-  playSwitchSound,
-  playSuccessChime,
-  playCelebrationFanfare,
-  isSoundEnabled,
-  toggleSoundEnabled,
-} from './utils/soundEffects';
-import { launchConfetti } from './utils/confetti';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
 
 const DEMO_PRESETS = [
@@ -417,27 +403,13 @@ export default function App() {
     }
   });
   const [shiftElapsedSeconds, setShiftElapsedSeconds] = useState(0);
-
-  // Astryx Dark / Light Theme
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem('mit_ojt_theme') || 'light';
-    } catch {
-      return 'light';
-    }
-  });
-
+  // Material 3 Light Theme Standard
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', 'light');
     try {
-      localStorage.setItem('mit_ojt_theme', theme);
+      localStorage.setItem('mit_ojt_theme', 'light');
     } catch {}
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-    playSwitchSound();
-  };
+  }, []);
 
   // Interactive Table Filter Pills & Sorting
   const [placementQuickFilter, setPlacementQuickFilter] = useState('all');
@@ -922,8 +894,6 @@ export default function App() {
 
   const handleOpenClearanceCertificate = (report) => {
     setSelectedClearanceReport(report);
-    playCelebrationFanfare();
-    launchConfetti();
   };
 
   // ===========================================================================
@@ -1049,7 +1019,6 @@ export default function App() {
   };
 
   const handleVerifySupervisorLog = async (tl, targetStatus = 'supervisor_verified') => {
-    playClickSound();
     setSyncing(true);
     try {
       const res = await fetch(`/api/timelogs/${tl.log_id}`, {
@@ -1063,7 +1032,6 @@ export default function App() {
       const json = await res.json();
       if (json.ok) {
         if (targetStatus === 'supervisor_verified') {
-          playSuccessChime();
           showNotice(`Log #${tl.log_id} verified by HTE Supervisor and forwarded to Faculty Adviser.`);
         } else if (targetStatus === 'flagged') {
           showNotice(`Log #${tl.log_id} flagged for intern correction.`, 'warning');
@@ -1080,7 +1048,6 @@ export default function App() {
   };
 
   const handleVerifyAllSupervisorLogs = async () => {
-    playClickSound();
     setSyncing(true);
     try {
       const res = await fetch('/api/timelogs/approve-all', {
@@ -1093,8 +1060,6 @@ export default function App() {
       });
       const json = await res.json();
       if (json.ok) {
-        playCelebrationFanfare();
-        launchConfetti();
         showNotice('All company intern logs verified and forwarded to Faculty Advisers!');
         await fetchSystemData(true);
       } else {
@@ -1106,7 +1071,6 @@ export default function App() {
   };
 
   const handleApproveAllTimeLogs = async () => {
-    playClickSound();
     setSyncing(true);
     try {
       const payload =
@@ -1122,12 +1086,7 @@ export default function App() {
       });
       const json = await res.json();
       if (json.ok) {
-        if (currentUser.role === 'supervisor') {
-          playCelebrationFanfare();
-          launchConfetti();
-        } else {
-          playSuccessChime();
-        }
+        
         showNotice(json.message);
         await fetchSystemData(true);
       } else {
@@ -1139,7 +1098,6 @@ export default function App() {
   };
 
   const handleUpdateTimeLogApproval = async (tl, newApprovalStatus) => {
-    playClickSound();
     setSyncing(true);
     try {
       const res = await fetch(`/api/timelogs/${tl.log_id}`, {
@@ -1154,10 +1112,8 @@ export default function App() {
       const json = await res.json();
       if (json.ok) {
         if (newApprovalStatus === 'supervisor_verified') {
-          playSuccessChime();
           showNotice(`Log #${tl.log_id} verified by HTE Supervisor and forwarded to Faculty Adviser.`);
         } else if (newApprovalStatus === 'approved') {
-          playSuccessChime();
           showNotice(`Log #${tl.log_id} endorsed by Faculty Adviser.`);
         } else if (newApprovalStatus === 'flagged') {
           showNotice(`Log #${tl.log_id} flagged for discrepancy review.`, 'warning');
@@ -2719,16 +2675,6 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <button
                 type="button"
-                className="btn btn-ghost"
-                onClick={toggleTheme}
-                title={`Switch to ${theme === 'dark' ? 'Light Mode' : 'Dark Mode'}`}
-                aria-label="Toggle dark/light theme"
-                style={{ padding: '6px' }}
-              >
-                {theme === 'dark' ? <IconSun size={14} /> : <IconMoon size={14} />}
-              </button>
-              <button
-                type="button"
                 className="btn btn-ghost-danger"
                 title="Sign out"
                 onClick={handleLogout}
@@ -2788,7 +2734,6 @@ export default function App() {
               title="Refresh live system data"
               aria-label="Refresh data"
               onClick={() => {
-                playClickSound();
                 fetchSystemData(false);
               }}
               disabled={loading || syncing}
@@ -2949,23 +2894,18 @@ export default function App() {
                 onOpenDtrModal={(pl) => setSelectedDtrPlacement(pl)}
                 onOpenClearanceModal={(pl) => handleOpenClearanceCertificate(pl)}
                 onOpenOfficialEval={() => {
-                  playClickSound();
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
-                  playClickSound();
                   setSignedDtrModalOpen(true);
                 }}
                 onOpenDtrTransfer={() => {
-                  playClickSound();
                   setDtrTransferModalOpen(true);
                 }}
                 onShareSupervisorLink={() => {
-                  playClickSound();
                   setSupervisorShareModalOpen(true);
                 }}
                 onEditProfile={() => {
-                  playClickSound();
                   if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
@@ -3329,7 +3269,6 @@ export default function App() {
                         type="button"
                         className="btn btn-secondary btn-xs"
                         onClick={() => {
-                          playClickSound();
                           handleStartEditStudent(myStudent);
                         }}
                         title="Edit your contact number, email, or section"
@@ -3401,23 +3340,18 @@ export default function App() {
                   setEvalModalOpen(true);
                 }}
                 onOpenOfficialEval={() => {
-                  playClickSound();
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
-                  playClickSound();
                   setSignedDtrModalOpen(true);
                 }}
                 onOpenDtrTransfer={() => {
-                  playClickSound();
                   setDtrTransferModalOpen(true);
                 }}
                 onShareSupervisorLink={() => {
-                  playClickSound();
                   setSupervisorShareModalOpen(true);
                 }}
                 onEditProfile={() => {
-                  playClickSound();
                   if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
@@ -3668,7 +3602,6 @@ export default function App() {
                     <Switch
                       checked={adviserScopeOnly}
                       onCheckedChange={(checked) => {
-                        playSwitchSound();
                         setAdviserScopeOnly(checked);
                         showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
                       }}
@@ -3766,7 +3699,6 @@ export default function App() {
                                     fontSize: '11px',
                                   }}
                                   onClick={() => {
-                                    playClickSound();
                                     setAuditPlacement(pl);
                                     setAuditModalOpen(true);
                                   }}
@@ -3841,23 +3773,18 @@ export default function App() {
                   setEvalModalOpen(true);
                 }}
                 onOpenOfficialEval={() => {
-                  playClickSound();
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
-                  playClickSound();
                   setSignedDtrModalOpen(true);
                 }}
                 onOpenDtrTransfer={() => {
-                  playClickSound();
                   setDtrTransferModalOpen(true);
                 }}
                 onShareSupervisorLink={() => {
-                  playClickSound();
                   setSupervisorShareModalOpen(true);
                 }}
                 onEditProfile={() => {
-                  playClickSound();
                   if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
@@ -4168,23 +4095,18 @@ export default function App() {
                 currentUser={currentUser}
                 kpis={data.kpis}
                 onOpenOfficialEval={() => {
-                  playClickSound();
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
-                  playClickSound();
                   setSignedDtrModalOpen(true);
                 }}
                 onOpenDtrTransfer={() => {
-                  playClickSound();
                   setDtrTransferModalOpen(true);
                 }}
                 onShareSupervisorLink={() => {
-                  playClickSound();
                   setSupervisorShareModalOpen(true);
                 }}
                 onEditProfile={() => {
-                  playClickSound();
                   if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
@@ -4739,7 +4661,6 @@ export default function App() {
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => {
-                      playClickSound();
                       if (myStudent) handleStartEditStudent(myStudent);
                     }}
                   >
@@ -5488,7 +5409,6 @@ export default function App() {
                       ]}
                       value={placementQuickFilter}
                       onValueChange={(val) => {
-                        playClickSound();
                         setPlacementQuickFilter(val);
                       }}
                     />
@@ -5513,7 +5433,6 @@ export default function App() {
                         <th
                           className="th-sortable"
                           onClick={() => {
-                            playClickSound();
                             if (placementSortCol === 'student_name') {
                               setPlacementSortAsc(!placementSortAsc);
                             } else {
@@ -5527,7 +5446,6 @@ export default function App() {
                         <th
                           className="th-sortable"
                           onClick={() => {
-                            playClickSound();
                             if (placementSortCol === 'company_name') {
                               setPlacementSortAsc(!placementSortAsc);
                             } else {
@@ -5543,7 +5461,6 @@ export default function App() {
                         <th
                           className="th-sortable text-right"
                           onClick={() => {
-                            playClickSound();
                             if (placementSortCol === 'hours_rendered') {
                               setPlacementSortAsc(!placementSortAsc);
                             } else {
@@ -5758,7 +5675,6 @@ export default function App() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => {
-                          playClickSound();
                           setSupervisorShareModalOpen(true);
                         }}
                         title="Share verification link to your HTE supervisor (no account required)"
@@ -5770,7 +5686,6 @@ export default function App() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => {
-                          playClickSound();
                           setSignedDtrModalOpen(true);
                         }}
                         title="Upload official scanned physical DTR signed by your supervisor"
@@ -5786,7 +5701,6 @@ export default function App() {
                       type="button"
                       className="btn btn-secondary btn-sm"
                       onClick={() => {
-                        playClickSound();
                         const targetPl =
                           data.placements.find(
                             (p) => String(p.placement_id) === String(timelogPlacementFilter)
@@ -5811,7 +5725,6 @@ export default function App() {
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => {
-                      playClickSound();
                       setDtrTransferModalOpen(true);
                     }}
                     title="Transfer DTR from Excel or upload signed HR copy"
@@ -5910,7 +5823,6 @@ export default function App() {
                   ]}
                   value={timelogQuickFilter}
                   onValueChange={(val) => {
-                    playClickSound();
                     setTimelogQuickFilter(val);
                   }}
                 />
@@ -5976,7 +5888,6 @@ export default function App() {
                       type="button"
                       className="btn btn-secondary btn-sm"
                       onClick={() => {
-                        playClickSound();
                         setSupervisorShareModalOpen(true);
                       }}
                     >
@@ -5987,7 +5898,6 @@ export default function App() {
                       type="button"
                       className="btn btn-primary btn-sm"
                       onClick={() => {
-                        playClickSound();
                         setSignedDtrModalOpen(true);
                       }}
                     >
@@ -6041,7 +5951,6 @@ export default function App() {
                       type="button"
                       className="btn btn-secondary btn-sm"
                       onClick={() => {
-                        playClickSound();
                         const targetPl =
                           data.placements.find(
                             (p) => String(p.placement_id) === String(timelogPlacementFilter)
@@ -6110,7 +6019,6 @@ export default function App() {
                         <Switch
                           checked={adviserScopeOnly}
                           onCheckedChange={(checked) => {
-                            playSwitchSound();
                             setAdviserScopeOnly(checked);
                             showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
                           }}
@@ -6314,7 +6222,6 @@ export default function App() {
                           type="button"
                           className="btn btn-primary btn-sm"
                           onClick={() => {
-                            playClickSound();
                             setOfficialEvalModalOpen(true);
                           }}
                         >
@@ -6399,7 +6306,6 @@ export default function App() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => {
-                          playClickSound();
                           setOfficialEvalModalOpen(true);
                         }}
                       >
@@ -6481,7 +6387,6 @@ export default function App() {
                       ]}
                       value={evalQuickFilter}
                       onValueChange={(val) => {
-                        playClickSound();
                         setEvalQuickFilter(val);
                       }}
                     />
@@ -6567,7 +6472,6 @@ export default function App() {
                                         className="btn btn-ghost"
                                         title="Open Official Rubrics & Print Form"
                                         onClick={() => {
-                                          playClickSound();
                                           setOfficialEvalModalOpen(true);
                                         }}
                                       >
@@ -7937,8 +7841,6 @@ export default function App() {
             });
             const json = await res.json();
             if (json.ok) {
-              playCelebrationFanfare();
-              launchConfetti();
               showNotice('All supervisor-verified shifts endorsed to Practicum Coordinator / Admin!');
               await fetchSystemData(true);
               setAuditModalOpen(false);
