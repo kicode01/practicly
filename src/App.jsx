@@ -2760,7 +2760,7 @@ export default function App() {
           ) : (
             <div key={`${currentUser.role}-${activeTab}`} className="view-stage">
           {/* =================================================================
-              ROLE 1: STUDENT PORTAL — UNASSIGNED STUDENT ONBOARDING
+              ROLE 1: STUDENT PORTAL — AWAITING OFFICIAL HTE PLACEMENT
               ================================================================= */}
           {currentUser.role === 'student' && activeTab === 'dashboard' && !myPlacement && (
             <>
@@ -2768,105 +2768,77 @@ export default function App() {
                 <div>
                   <h1 className="page-title">Welcome, {currentUser.display_name}</h1>
                   <p className="page-subtitle">
-                    {currentUser.identifier_code} · {currentUser.unit_label} — Activate your OJT placement to begin logging training hours
+                    {currentUser.identifier_code} · {currentUser.unit_label} — Awaiting official practicum placement assignment from your Practicum Coordinator
                   </p>
                 </div>
                 <div className="page-actions">
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    className="btn btn-primary btn-sm"
                     onClick={() => setActiveTab('employers')}
                   >
                     <IconBuilding size={13} />
-                    Browse Partner HTEs
+                    Browse Accredited HTEs
                   </button>
                 </div>
               </div>
 
-              <div className="panel">
+              <div className="panel" style={{ marginBottom: '20px' }}>
                 <div className="panel-header">
                   <div>
-                    <div className="panel-title">Step 1: Register Your Host Training Establishment (HTE) Placement</div>
+                    <div className="panel-title">Institutional Practicum Onboarding (CHED CMO 104)</div>
                     <div className="panel-desc">
-                      Select your accredited partner company and faculty OJT adviser to initialize your 300-hour practicum ledger
+                      Official company assignments and 300-hour practicum ledgers are authorized by the Practicum Coordinator and Faculty Adviser
                     </div>
                   </div>
+                  <StatusChip variant="warning">Awaiting Assignment</StatusChip>
                 </div>
                 <div className="panel-body">
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      setSyncing(true);
-                      try {
-                        const res = await fetch('/api/placements', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            ...placementForm,
-                            student_id: currentUser.linked_id,
-                            employer_id: placementForm.employer_id || (data.employers[0]?.employer_id ?? 1),
-                            adviser_id: placementForm.adviser_id || (data.advisers[0]?.adviser_id ?? 1),
-                          }),
-                        });
-                        const json = await res.json();
-                        if (json.ok) {
-                          showNotice('Your OJT placement has been activated!');
-                          await fetchSystemData(true);
-                        } else {
-                          showNotice(json.error || 'Could not activate placement.', 'error');
-                        }
-                      } finally {
-                        setSyncing(false);
-                      }
-                    }}
-                  >
-                    <div className="field-grid-3">
-                      <div className="field">
-                        <label className="field-label">Host Company (HTE)</label>
-                        <MaterialSelect
-                          className="select"
-                          value={placementForm.employer_id || (data.employers[0]?.employer_id ?? '')}
-                          onChange={(e) => setPlacementForm({ ...placementForm, employer_id: e.target.value })}
-                        >
-                          {data.employers.map((emp) => (
-                            <option key={emp.employer_id} value={emp.employer_id}>
-                              {emp.company_name} ({emp.industry})
-                            </option>
-                          ))}
-                        </MaterialSelect>
+                  <div className="field-grid-3">
+                    <div style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>1</span>
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Explore Accredited HTEs</strong>
                       </div>
-                      <div className="field">
-                        <label className="field-label">Faculty OJT Adviser</label>
-                        <MaterialSelect
-                          className="select"
-                          value={placementForm.adviser_id || (data.advisers[0]?.adviser_id ?? '')}
-                          onChange={(e) => setPlacementForm({ ...placementForm, adviser_id: e.target.value })}
-                        >
-                          {data.advisers.map((adv) => (
-                            <option key={adv.adviser_id} value={adv.adviser_id}>
-                              {adv.full_name}
-                            </option>
-                          ))}
-                        </MaterialSelect>
-                      </div>
-                      <div className="field">
-                        <label className="field-label">Internship Designation / Role</label>
-                        <input
-                          type="text"
-                          className="input"
-                          value={placementForm.position_title}
-                          onChange={(e) => setPlacementForm({ ...placementForm, position_title: e.target.value })}
-                          required
-                        />
-                      </div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                        Review accredited Host Training Establishments with active Memorandums of Agreement (MOAs) in the partner directory.
+                      </p>
                     </div>
-                    <div style={{ marginTop: '14px' }}>
-                      <button type="submit" className="btn btn-primary" disabled={syncing}>
-                        <IconCheckCircle size={14} />
-                        Activate My OJT Placement
-                      </button>
+
+                    <div style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>2</span>
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Adviser Endorsement</strong>
+                      </div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                        Submit your training contract and parent waiver to your Faculty Practicum Adviser for institutional review.
+                      </p>
                     </div>
-                  </form>
+
+                    <div style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>3</span>
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Coordinator Activation</strong>
+                      </div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                        Upon departmental confirmation, your coordinator links your account, unlocking your Daily Time Record and Live Stopwatch.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Student ID: <strong className="mono" style={{ color: 'var(--text-primary)' }}>{currentUser.identifier_code}</strong> · Section: <strong style={{ color: 'var(--text-primary)' }}>{currentUser.unit_label}</strong> · Program: <strong style={{ color: 'var(--text-primary)' }}>BS Computer Engineering</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setActiveTab('employers')}
+                    >
+                      <IconBuilding size={13} />
+                      View Available Partner Companies ({data.employers.length})
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
@@ -4774,7 +4746,9 @@ export default function App() {
                 <div>
                   <h1 className="page-title">Partner Companies (HTEs)</h1>
                   <p className="page-subtitle">
-                    Accredited Host Training Establishments and Memorandum of Agreement (MOA) validity
+                    {currentUser.role === 'student'
+                      ? 'Directory of accredited Host Training Establishments (HTEs). Official placements are assigned and endorsed by your Practicum Coordinator and Faculty Adviser.'
+                      : 'Accredited Host Training Establishments and Memorandum of Agreement (MOA) validity'}
                   </p>
                 </div>
                 {currentUser.role === 'admin' && (
@@ -5018,44 +4992,11 @@ export default function App() {
                             <td className="text-right">
                               {currentUser.role === 'student' ? (
                                 Number(myPlacement?.employer_id) === Number(emp.employer_id) ? (
-                                  <StatusChip variant="success">My Host Company</StatusChip>
+                                  <StatusChip variant="success">Assigned Host Company</StatusChip>
                                 ) : emp.moa_status === 'active' ? (
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={syncing}
-                                    onClick={async () => {
-                                      setSyncing(true);
-                                      try {
-                                        const res = await fetch('/api/placements', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                            student_id: currentUser.linked_id,
-                                            employer_id: emp.employer_id,
-                                            adviser_id: myPlacement?.adviser_id || (data.advisers[0]?.adviser_id ?? 1),
-                                            position_title:
-                                              myPlacement?.position_title || 'Computer Engineering Intern',
-                                            required_hours: myPlacement?.required_hours || 300,
-                                          }),
-                                        });
-                                        const json = await res.json();
-                                        if (json.ok) {
-                                          showNotice(`Selected ${emp.company_name} as your Host Company.`);
-                                          await fetchSystemData(true);
-                                          setActiveTab('dashboard');
-                                        } else {
-                                          showNotice(json.error, 'error');
-                                        }
-                                      } finally {
-                                        setSyncing(false);
-                                      }
-                                    }}
-                                  >
-                                    Select HTE
-                                  </button>
+                                  <StatusChip variant="neutral">Accredited Partner</StatusChip>
                                 ) : (
-                                  <span style={{ fontSize: '11.5px', color: '#9ca3af' }}>MOA Inactive</span>
+                                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>MOA Inactive</span>
                                 )
                               ) : currentUser.role === 'supervisor' ? (
                                 <div className="row-actions" style={{ justifyContent: 'flex-end', gap: '6px' }}>
