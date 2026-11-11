@@ -2592,9 +2592,21 @@ export default function App() {
     3
   ).toFixed(2);
 
+  const isAnyModalOpen = Boolean(
+    selectedClearanceReport ||
+    selectedDtrPlacement ||
+    officialEvalModalOpen ||
+    timeLogModalOpen ||
+    evalModalOpen ||
+    dtrTransferModalOpen ||
+    supervisorShareModalOpen ||
+    signedDtrModalOpen ||
+    auditModalOpen
+  );
+
   return (
     <div
-      className={`app-layout ${mobileMenuOpen ? 'drawer-open' : ''} ${selectedClearanceReport || selectedDtrPlacement ? 'modal-open' : ''}`}
+      className={`app-layout ${mobileMenuOpen ? 'drawer-open' : ''} ${isAnyModalOpen ? 'modal-open' : ''}`}
       data-role={currentUser?.role || 'student'}
     >
       {/* MOBILE BACKDROP */}

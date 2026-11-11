@@ -5704,72 +5704,276 @@ textarea.input:focus {
   }
 }
 
+/* =============================================================================
+   OFFICIAL DOCUMENT PRINT SPECIFICATIONS (DEFAULT PORTRAIT - CHED CMO 104)
+   ============================================================================= */
+@page {
+  size: portrait;
+  margin: 12mm 10mm;
+}
+
 @media print {
+  @page {
+    size: portrait;
+    margin: 12mm 10mm;
+  }
+
+  /* Force clean institutional monochrome / high-contrast palette */
+  :root,
+  [data-theme='dark'],
+  body,
+  .app-layout {
+    --bg-canvas: #ffffff !important;
+    --bg-surface: #ffffff !important;
+    --bg-surface-elevated: #ffffff !important;
+    --bg-subtle: #f8fafc !important;
+    --text-primary: #0f172a !important;
+    --text-secondary: #334155 !important;
+    --text-muted: #64748b !important;
+    --border-default: #e2e8f0 !important;
+    --border-strong: #cbd5e1 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Universal UI Chrome Suppression */
   .sidebar,
   .topbar,
+  .mobile-bottom-nav,
+  .sidebar-backdrop,
+  .toast,
   .no-print,
-  .toast {
+  .panel-toolbar,
+  .search-box,
+  .modal-close-btn,
+  .eval-instrument-tab,
+  .m3-segmented-button-row,
+  .glisse-native-segmented,
+  .persona-switcher,
+  .role-hero-banner,
+  .role-hub-grid,
+  .tab-nav,
+  button.no-print {
     display: none !important;
   }
+
+  /* When ANY modal document is being printed, hide background application and dashboard */
+  .app-layout.modal-open > .main-Region,
+  .app-layout.modal-open .page-container,
+  .app-layout:has(.modal-backdrop) > .main-Region,
+  .app-layout:has(.modal-backdrop) .page-container,
+  body:has(.modal-backdrop) .main-Region,
+  body:has(.modal-backdrop) .page-container,
+  .modal-open .sidebar,
+  .modal-open .topbar,
+  .modal-open .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  /* Reset layout containers */
   .app-layout {
     display: block !important;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
   }
+
   .main-Region {
     height: auto !important;
     overflow: visible !important;
-  }
-  .table-wrap,
-  .certificate-sheet .table-wrap {
-    max-height: none !important;
-    overflow: visible !important;
-  }
-  .app-layout.modal-open > .main-Region {
-    display: none !important;
-  }
-  .modal-backdrop {
-    position: static !important;
-    background: transparent !important;
     padding: 0 !important;
-    animation: none !important;
+    margin: 0 !important;
   }
-  .modal-card {
-    box-shadow: none !important;
-    max-width: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-    animation: none !important;
-  }
+
   .page-container,
   .view-stage {
     padding: 0 !important;
+    margin: 0 !important;
     animation: none !important;
   }
+
   .panel {
     border: none !important;
     box-shadow: none !important;
     animation: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
-  .official-eval-modal {
-    max-width: 100% !important;
+
+  /* Modal unboxing for clean document output */
+  .modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
-    max-height: none !important;
+    min-height: 0 !important;
     overflow: visible !important;
+    display: block !important;
+    animation: none !important;
+  }
+
+  .modal-card,
+  .dtr-modal-card,
+  .official-eval-modal,
+  .modal-entry-card {
+    position: static !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 0 !important;
-  }
-  .official-eval-modal .modal-body {
-    overflow: visible !important;
-    height: auto !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
     max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
     padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    animation: none !important;
   }
+
+  .modal-header,
+  .modal-footer,
+  .dtr-modal-header {
+    display: none !important;
+  }
+
+  .modal-body,
+  .dtr-modal-body,
+  .modal-entry-body {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    display: block !important;
+  }
+
+  /* Document sheets styling */
+  .certificate-sheet,
   .official-instrument-print-area {
-    color: #000 !important;
-    background: #fff !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .cert-header {
+    text-align: center !important;
+    margin-bottom: 20px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .cert-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px 24px !important;
+    margin-bottom: 20px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .cert-signatures,
+  .cert-signatures-eval {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-top: 32px !important;
+  }
+
+  .cert-sig-line {
+    border-top: 1px solid #000000 !important;
+    padding-top: 6px !important;
+    font-weight: 600 !important;
+    color: #000000 !important;
+  }
+
+  .cert-sig-role {
+    font-size: 10.5px !important;
+    color: #475569 !important;
+  }
+
+  /* Rubric sections */
+  .official-rubric-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 16px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+  }
+
+  /* Table rules for print */
+  .table-wrap,
+  .certificate-sheet .table-wrap {
+    overflow: visible !important;
+    max-height: none !important;
+    width: 100% !important;
+  }
+
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th,
+  td {
+    border-color: #cbd5e1 !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Preserve score ratings and badges */
+  .official-instrument-print-area button,
+  .status-chip,
+  .badge {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  textarea,
+  input {
+    border: 1px solid #94a3b8 !important;
+    color: #000000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    resize: none !important;
   }
 }
 

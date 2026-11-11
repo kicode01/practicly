@@ -435,6 +435,7 @@ export default function OfficialEvaluationModal({
               {activeInstrument.sections.map((sec, sIdx) => (
                 <div
                   key={sec.title}
+                  className="official-rubric-section"
                   style={{
                     border: '1px solid var(--border-default)',
                     borderRadius: 'var(--radius-md)',
@@ -560,6 +561,7 @@ export default function OfficialEvaluationModal({
 
             {/* OFFICIAL SIGNATURE BLOCKS (PRINT READY) */}
             <div
+              className="cert-signatures-eval"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',

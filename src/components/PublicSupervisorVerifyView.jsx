@@ -161,7 +161,7 @@ export default function PublicSupervisorVerifyView({
             </span>
             <button
               type="button"
-              className="btn btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm no-print"
               onClick={onClose}
               title="Return to main university portal"
             >
@@ -289,7 +289,7 @@ export default function PublicSupervisorVerifyView({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="no-print" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
@@ -346,7 +346,7 @@ export default function PublicSupervisorVerifyView({
                   <th className="text-right">Net Hours</th>
                   <th>Task Description &amp; Deliverables</th>
                   <th>Status</th>
-                  <th className="text-right">Actions</th>
+                  <th className="text-right no-print">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -378,7 +378,7 @@ export default function PublicSupervisorVerifyView({
                           <span className="badge badge-neutral">Pending Sign-off</span>
                         )}
                       </td>
-                      <td className="text-right">
+                      <td className="text-right no-print">
                         {tl.approval_status !== 'flagged' && (
                           <button
                             type="button"
