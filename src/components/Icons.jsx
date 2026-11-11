@@ -434,6 +434,28 @@ export function IconChevronDown({ size = 15, className = '' }) {
   );
 }
 
+// Google Material Symbol: chevron_left
+export function IconChevronLeft({ size = 15, className = '' }) {
+  return (
+    <SvgIcon
+      size={size}
+      className={className}
+      d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"
+    />
+  );
+}
+
+// Google Material Symbol: chevron_right
+export function IconChevronRight({ size = 15, className = '' }) {
+  return (
+    <SvgIcon
+      size={size}
+      className={className}
+      d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"
+    />
+  );
+}
+
 // Google Material Symbol: person (user)
 export function IconUser({ size = 16, className = '' }) {
   return (
@@ -567,6 +589,8 @@ export default {
   IconVolumeMute,
   IconSparkles,
   IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
   IconUser,
   IconFilter,
   IconCheck,

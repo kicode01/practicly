@@ -27,6 +27,8 @@ import {
   IconFilter,
   IconCheck,
   IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
   IconFileText,
   IconUpload,
   IconEye,
@@ -421,6 +423,48 @@ export default function App() {
   // Dedicated Modal Dialog States
   const [timeLogModalOpen, setTimeLogModalOpen] = useState(false);
   const [evalModalOpen, setEvalModalOpen] = useState(false);
+
+  // Collapsible Navigation Drawer & Nav Groups
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('practicly_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [collapsedNavGroups, setCollapsedNavGroups] = useState(() => {
+    try {
+      const saved = localStorage.getItem('practicly_collapsed_nav_groups');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleToggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('practicly_sidebar_collapsed', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const handleToggleNavGroup = (groupLabel) => {
+    setCollapsedNavGroups((prev) => {
+      const next = { ...prev, [groupLabel]: !prev[groupLabel] };
+      try {
+        localStorage.setItem('practicly_collapsed_nav_groups', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   // Synchronize currentUser displayName if updated from server
   useEffect(() => {
@@ -2606,7 +2650,7 @@ export default function App() {
 
   return (
     <div
-      className={`app-layout ${mobileMenuOpen ? 'drawer-open' : ''} ${isAnyModalOpen ? 'modal-open' : ''}`}
+      className={`app-layout ${mobileMenuOpen ? 'drawer-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${isAnyModalOpen ? 'modal-open' : ''}`}
       data-role={currentUser?.role || 'student'}
     >
       {/* MOBILE BACKDROP */}
@@ -2619,11 +2663,16 @@ export default function App() {
       )}
 
       {/* LEFT SIDEBAR / MOBILE DRAWER */}
-      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-          <div className="sidebar-brand-wrapper">
+          <div
+            className="sidebar-brand-wrapper"
+            title={sidebarCollapsed ? 'Expand sidebar' : undefined}
+            onClick={sidebarCollapsed ? handleToggleSidebar : undefined}
+            style={{ cursor: sidebarCollapsed ? 'pointer' : 'default' }}
+          >
             <IconBrandLogo size={32} />
-            <div>
+            <div className="sidebar-brand-text">
               <div className="sidebar-title">Practicly</div>
               <div className="sidebar-subtitle">
                 {currentUser.role === 'student'
@@ -2638,7 +2687,16 @@ export default function App() {
           </div>
           <button
             type="button"
-            className="sidebar-close-btn"
+            className="sidebar-collapse-btn desktop-only"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={handleToggleSidebar}
+          >
+            {sidebarCollapsed ? <IconChevronRight size={15} /> : <IconChevronLeft size={15} />}
+          </button>
+          <button
+            type="button"
+            className="sidebar-close-btn mobile-only"
             aria-label="Close sidebar navigation"
             onClick={() => setMobileMenuOpen(false)}
           >
@@ -2647,39 +2705,70 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary Navigation">
-          {navGroups.map((group) => (
-            <div key={group.label}>
-              <div className="sidebar-group-label">{group.label}</div>
-              {group.items.map((item) => {
-                const IconComp = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setSearchQuery('');
-                      scrollWorkspaceToTop();
-                      setMobileMenuOpen(false);
-                    }}
-                  >
-                    <span className="sidebar-link-main">
-                      <IconComp size={15} />
-                      <span>{item.label}</span>
-                    </span>
-                    {item.count !== undefined && (
-                      <span className="sidebar-count">{item.count}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          {navGroups.map((group) => {
+            const isGroupCollapsed = Boolean(collapsedNavGroups[group.label]);
+            const hasActiveItem = group.items.some((i) => i.id === activeTab);
+            const isExpanded = !isGroupCollapsed || hasActiveItem;
+
+            return (
+              <div key={group.label} className="sidebar-group">
+                <button
+                  type="button"
+                  className="sidebar-group-header"
+                  onClick={() => handleToggleNavGroup(group.label)}
+                  title={`${isExpanded ? 'Collapse' : 'Expand'} ${group.label}`}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="sidebar-group-label">{group.label}</span>
+                  <span className={`sidebar-group-chevron ${isExpanded ? 'is-expanded' : ''}`}>
+                    <IconChevronDown size={13} />
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="sidebar-group-items">
+                    {group.items.map((item) => {
+                      const IconComp = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
+                          title={sidebarCollapsed ? `${item.label}${item.count !== undefined ? ` (${item.count})` : ''}` : undefined}
+                          onClick={() => {
+                            setActiveTab(item.id);
+                            setSearchQuery('');
+                            scrollWorkspaceToTop();
+                            setMobileMenuOpen(false);
+                          }}
+                        >
+                          <span className="sidebar-link-main">
+                            <IconComp size={15} />
+                            <span className="sidebar-link-label">{item.label}</span>
+                          </span>
+                          {item.count !== undefined && (
+                            <span className="sidebar-count">{item.count}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
+          <div
+            className="sidebar-user"
+            title={sidebarCollapsed ? `${currentUser.display_name} (${currentUser.identifier_code})` : undefined}
+          >
+            <div className="sidebar-user-avatar">
+              <span className="sidebar-user-initial">
+                {(currentUser.display_name || 'U').charAt(0).toUpperCase()}
+              </span>
+            </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name" title={currentUser.display_name}>
                 {currentUser.display_name}
@@ -2709,11 +2798,18 @@ export default function App() {
           <div className="topbar-left">
             <button
               type="button"
-              className="mobile-menu-btn"
-              aria-label={mobileMenuOpen ? 'Close navigation drawer' : 'Open navigation drawer'}
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="topbar-nav-toggle"
+              aria-label={sidebarCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              onClick={() => {
+                if (window.innerWidth <= 960) {
+                  setMobileMenuOpen((prev) => !prev);
+                } else {
+                  handleToggleSidebar();
+                }
+              }}
             >
-              {mobileMenuOpen ? <IconClose size={18} /> : <IconMenu size={18} />}
+              <IconMenu size={18} />
             </button>
             <div className="topbar-breadcrumbs">
               <span className="crumb-root">
