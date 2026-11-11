@@ -955,17 +955,15 @@ p {
 }
 
 .sidebar.collapsed .sidebar-count {
-  position: absolute;
-  top: 3px;
-  right: 4px;
-  margin: 0;
-  font-size: 9.5px;
-  height: 16px;
-  min-width: 16px;
-  padding: 0 4px;
-  line-height: 16px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  display: none !important;
+  max-width: 0 !important;
+  opacity: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 .sidebar-nav {
@@ -1044,22 +1042,30 @@ p {
 }
 
 .sidebar-count {
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  padding: 0 6px;
+  padding: 1px 7px;
   height: 18px;
-  line-height: 18px;
-  border-radius: 999px;
-  background: var(--role-container, var(--md-sys-color-secondary-container, #c2e7ff));
-  color: var(--role-on-container, var(--md-sys-color-on-secondary-container, #001d35));
+  line-height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
   flex-shrink: 0;
-  max-width: 40px;
+  max-width: 48px;
   opacity: 1;
   margin-left: auto;
-  margin-right: 12px;
+  margin-right: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
   transition:
-    max-width 0.28s cubic-bezier(0.2, 0, 0, 1),
-    opacity 0.18s cubic-bezier(0.2, 0, 0, 1);
+    max-width 0.24s cubic-bezier(0.2, 0, 0, 1),
+    opacity 0.18s cubic-bezier(0.2, 0, 0, 1),
+    padding 0.24s cubic-bezier(0.2, 0, 0, 1),
+    margin 0.24s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.14s ease,
+    color 0.14s ease;
 }
 
 .sidebar-link:hover {
@@ -1093,17 +1099,6 @@ p {
 .sidebar-link.active svg,
 .sidebar-link.active .material-symbols-outlined {
   color: var(--md-sys-color-on-secondary-container);
-}
-
-.sidebar-count {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-  transition: background-color 0.14s ease, color 0.14s ease;
 }
 
 .sidebar-link.active .sidebar-count {
