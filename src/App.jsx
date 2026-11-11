@@ -5601,33 +5601,6 @@ export default function App() {
                     </button>
                   )}
 
-                  {currentUser.role === 'student' && (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => {
-                          setSupervisorShareModalOpen(true);
-                        }}
-                        title="Share verification link to your HTE supervisor (no account required)"
-                      >
-                        <IconLink size={13} />
-                        Share Link to Supervisor
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => {
-                          setSignedDtrModalOpen(true);
-                        }}
-                        title="Upload official scanned physical DTR signed by your supervisor"
-                      >
-                        <IconUpload size={13} />
-                        {myPlacement?.signed_dtr_filename ? 'Manage Signed DTR' : 'Upload Signed DTR'}
-                      </button>
-                    </>
-                  )}
-
                   {(currentUser.role === 'adviser' || currentUser.role === 'admin') && (
                     <button
                       type="button"
@@ -5663,38 +5636,6 @@ export default function App() {
                   >
                     <IconDownload size={13} />
                     {currentUser.role === 'student' ? 'Excel Batch Import' : 'Batch DTR Transfer'}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      const targetPl =
-                        currentUser.role === 'student'
-                          ? myPlacement
-                          : data.placements.find(
-                              (p) =>
-                                String(p.placement_id) ===
-                                String(
-                                  timelogPlacementFilter !== 'all'
-                                    ? timelogPlacementFilter
-                                    : logForm.placement_id
-                                )
-                            ) || data.placements[0];
-                      if (targetPl) setSelectedDtrPlacement(targetPl);
-                    }}
-                  >
-                    <IconPrinter size={13} />
-                    Print Official DTR
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => handleExportTimeLogsCsv(filteredTimeLogs)}
-                  >
-                    <IconDownload size={13} />
-                    Export DTR CSV
                   </button>
                 </div>
               </div>
@@ -5964,48 +5905,85 @@ export default function App() {
 
               <div className="panel">
                   <div className="panel-toolbar">
-                    <div className="search-box">
-                      <IconSearch size={14} />
-                      <input
-                        type="text"
-                        placeholder="Search by date or task description..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    {currentUser.role !== 'student' && (
-                      <MaterialSelect
-                        className="select-sm"
-                        value={timelogPlacementFilter}
-                        onChange={(e) => setTimelogPlacementFilter(e.target.value)}
-                      >
-                        <option value="all">
-                          {currentUser.role === 'supervisor' ? 'All Company Interns' : 'All Students'}
-                        </option>
-                        {(currentUser.role === 'supervisor'
-                          ? supervisorPlacements
-                          : currentUser.role === 'adviser' && adviserScopeOnly
-                          ? data.placements.filter((p) => Number(p.adviser_id) === Number(currentUser.linked_id))
-                          : data.placements
-                        ).map((pl) => (
-                          <option key={pl.placement_id} value={pl.placement_id}>
-                            {pl.student_name}
-                          </option>
-                        ))}
-                      </MaterialSelect>
-                    )}
-                    {currentUser.role === 'adviser' && (
-                      <div className="toolbar-scope-toggle" title="Toggle between assigned advisees and all university interns">
-                        <span className="scope-toggle-label">My Advisees Only</span>
-                        <Switch
-                          checked={adviserScopeOnly}
-                          onCheckedChange={(checked) => {
-                            setAdviserScopeOnly(checked);
-                            showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
-                          }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: '1 1 auto' }}>
+                      <div className="search-box">
+                        <IconSearch size={14} />
+                        <input
+                          type="text"
+                          placeholder="Search by date or task description..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
                         />
                       </div>
-                    )}
+                      {currentUser.role !== 'student' && (
+                        <MaterialSelect
+                          className="select-sm"
+                          value={timelogPlacementFilter}
+                          onChange={(e) => setTimelogPlacementFilter(e.target.value)}
+                        >
+                          <option value="all">
+                            {currentUser.role === 'supervisor' ? 'All Company Interns' : 'All Students'}
+                          </option>
+                          {(currentUser.role === 'supervisor'
+                            ? supervisorPlacements
+                            : currentUser.role === 'adviser' && adviserScopeOnly
+                            ? data.placements.filter((p) => Number(p.adviser_id) === Number(currentUser.linked_id))
+                            : data.placements
+                          ).map((pl) => (
+                            <option key={pl.placement_id} value={pl.placement_id}>
+                              {pl.student_name}
+                            </option>
+                          ))}
+                        </MaterialSelect>
+                      )}
+                      {currentUser.role === 'adviser' && (
+                        <div className="toolbar-scope-toggle" title="Toggle between assigned advisees and all university interns">
+                          <span className="scope-toggle-label">My Advisees Only</span>
+                          <Switch
+                            checked={adviserScopeOnly}
+                            onCheckedChange={(checked) => {
+                              setAdviserScopeOnly(checked);
+                              showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          const targetPl =
+                            currentUser.role === 'student'
+                              ? myPlacement
+                              : data.placements.find(
+                                  (p) =>
+                                    String(p.placement_id) ===
+                                    String(
+                                      timelogPlacementFilter !== 'all'
+                                        ? timelogPlacementFilter
+                                        : logForm.placement_id
+                                    )
+                                ) || data.placements[0];
+                          if (targetPl) setSelectedDtrPlacement(targetPl);
+                        }}
+                        title="Print official CHED CMO 104 Daily Time Record"
+                      >
+                        <IconPrinter size={13} />
+                        Print Official DTR
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleExportTimeLogsCsv(filteredTimeLogs)}
+                        title="Download records as CSV spreadsheet"
+                      >
+                        <IconDownload size={13} />
+                        Export DTR CSV
+                      </button>
+                    </div>
                   </div>
 
                   <div className="table-wrap">
