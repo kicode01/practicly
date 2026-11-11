@@ -6377,8 +6377,18 @@ textarea.input:focus {
 }
 
 /* =============================================================================
-   DTR PANEL TOOLBAR - SINGLE ROW & PROPORTIONAL GEOMETRY
+   DTR PANEL TOOLBAR - PERFECT VERTICAL ALIGNMENT & PROPORTIONAL GEOMETRY
    ============================================================================= */
+/* Ensure filter wrappers inside any panel-toolbar never offset vertical centering */
+.panel-toolbar .table-filter-pills,
+.panel-toolbar .m3-filter-wrap,
+.panel-toolbar .filter-pill-bar {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
 .dtr-panel-toolbar {
   display: flex !important;
   align-items: center !important;
@@ -6387,7 +6397,8 @@ textarea.input:focus {
   flex-wrap: nowrap !important;
   overflow-x: auto;
   scrollbar-width: thin;
-  padding: 10px 18px !important;
+  padding: 12px 18px !important;
+  box-sizing: border-box !important;
 }
 
 .dtr-panel-toolbar::-webkit-scrollbar {
@@ -6404,41 +6415,90 @@ textarea.input:focus {
 }
 
 .dtr-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
   flex: 1 1 auto;
   min-width: 0;
   flex-wrap: nowrap;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
+/* Search Box: Height exactly 36px, perfectly centered icon & text */
 .dtr-panel-toolbar .search-box {
+  display: inline-flex !important;
+  align-items: center !important;
+  position: relative !important;
   flex: 0 1 230px !important;
   min-width: 140px !important;
   width: auto !important;
+  height: 36px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 .dtr-panel-toolbar .search-box input {
-  height: 32px !important;
+  height: 36px !important;
+  line-height: 34px !important;
   font-size: 12.5px !important;
-  padding: 0 12px 0 34px !important;
+  padding: 0 14px 0 34px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  border-radius: var(--radius-pill) !important;
 }
 
-.dtr-panel-toolbar .table-filter-pills {
-  flex-shrink: 0;
+.dtr-panel-toolbar .search-box svg,
+.dtr-panel-toolbar .search-box .material-symbols-outlined {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  left: 12px !important;
+  margin: 0 !important;
 }
 
-.dtr-panel-toolbar .m3-segmented-button-row {
+/* Status Filter Segmented Control: Height exactly 36px, zero outer margin/padding */
+.dtr-panel-toolbar .table-filter-pills,
+.dtr-panel-toolbar .m3-filter-wrap {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+.dtr-panel-toolbar .m3-segmented-button-row,
+.dtr-panel-toolbar .dtr-status-segmented {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 36px !important;
   padding: 2px !important;
-  height: 32px;
-  box-sizing: border-box;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-pill) !important;
+  flex-shrink: 0 !important;
 }
 
 .dtr-panel-toolbar .m3-seg-item {
-  height: 26px !important;
-  padding: 2px 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  padding: 0 11px !important;
+  margin: 0 !important;
   font-size: 12px !important;
-  gap: 5px !important;
+  gap: 6px !important;
+  border-radius: var(--radius-pill) !important;
+  box-sizing: border-box !important;
+}
+
+.dtr-panel-toolbar .seg-filter-item {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  line-height: 1 !important;
 }
 
 .dtr-panel-toolbar .filter-pill-count {
@@ -6447,25 +6507,43 @@ textarea.input:focus {
   height: 16px !important;
   min-width: 16px !important;
   line-height: 16px !important;
-  border-radius: 999px;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
+/* Right-side Action Buttons: Height exactly 36px */
 .dtr-toolbar-actions {
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
   flex-shrink: 0 !important;
-  margin-left: auto;
+  margin: 0 0 0 auto !important;
+  padding: 0 !important;
+  height: 36px !important;
 }
 
 .dtr-toolbar-actions .btn {
-  height: 32px !important;
-  padding: 0 12px !important;
+  height: 36px !important;
+  line-height: 34px !important;
+  padding: 0 14px !important;
   font-size: 12px !important;
   white-space: nowrap !important;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border-radius: var(--radius-pill) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+.dtr-panel-toolbar .m3-select-menu,
+.dtr-panel-toolbar .toolbar-scope-toggle {
+  height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 0 !important;
 }
 
 @media (max-width: 768px) {
@@ -6487,5 +6565,6 @@ textarea.input:focus {
     margin-left: 0;
   }
 }
+
 
 

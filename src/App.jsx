@@ -5964,65 +5964,64 @@ export default function App() {
                       </div>
 
                       {/* MATERIAL DESIGN 3 (M3) STATUS FILTER */}
-                      <div className="table-filter-pills m3-filter-wrap">
-                        <SegmentedControl
-                          items={[
-                            {
-                              value: 'all',
-                              label: (
-                                <span className="seg-filter-item">
-                                  <span>All Records</span>
-                                  <span className="filter-pill-count">{timelogCounts.all}</span>
-                                </span>
-                              ),
-                            },
-                            {
-                              value: 'pending',
-                              label: (
-                                <span className="seg-filter-item">
-                                  <span>Pending</span>
-                                  <span className="filter-pill-count">{timelogCounts.pending}</span>
-                                </span>
-                              ),
-                            },
-                            {
-                              value: 'supervisor_verified',
-                              label: (
-                                <span className="seg-filter-item">
-                                  <span>Supervisor Verified</span>
-                                  <span className="filter-pill-count">{timelogCounts.supervisor_verified}</span>
-                                </span>
-                              ),
-                            },
-                            {
-                              value: 'approved',
-                              label: (
-                                <span className="seg-filter-item">
-                                  <span>Adviser Endorsed</span>
-                                  <span className="filter-pill-count">{timelogCounts.approved}</span>
-                                </span>
-                              ),
-                            },
-                            ...(timelogCounts.flagged > 0
-                              ? [
-                                  {
-                                    value: 'flagged',
-                                    label: (
-                                      <span className="seg-filter-item">
-                                        <span>Flagged</span>
-                                        <span className="filter-pill-count">{timelogCounts.flagged}</span>
-                                      </span>
-                                    ),
-                                  },
-                                ]
-                              : []),
-                          ]}
-                          value={timelogQuickFilter}
-                          onValueChange={(val) => {
-                            setTimelogQuickFilter(val);
-                          }}
-                        />
-                      </div>
+                      <SegmentedControl
+                        className="dtr-status-segmented"
+                        items={[
+                          {
+                            value: 'all',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>All Records</span>
+                                <span className="filter-pill-count">{timelogCounts.all}</span>
+                              </span>
+                            ),
+                          },
+                          {
+                            value: 'pending',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>Pending</span>
+                                <span className="filter-pill-count">{timelogCounts.pending}</span>
+                              </span>
+                            ),
+                          },
+                          {
+                            value: 'supervisor_verified',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>Supervisor Verified</span>
+                                <span className="filter-pill-count">{timelogCounts.supervisor_verified}</span>
+                              </span>
+                            ),
+                          },
+                          {
+                            value: 'approved',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>Adviser Endorsed</span>
+                                <span className="filter-pill-count">{timelogCounts.approved}</span>
+                              </span>
+                            ),
+                          },
+                          ...(timelogCounts.flagged > 0
+                            ? [
+                                {
+                                  value: 'flagged',
+                                  label: (
+                                    <span className="seg-filter-item">
+                                      <span>Flagged</span>
+                                      <span className="filter-pill-count">{timelogCounts.flagged}</span>
+                                    </span>
+                                  ),
+                                },
+                              ]
+                            : []),
+                        ]}
+                        value={timelogQuickFilter}
+                        onValueChange={(val) => {
+                          setTimelogQuickFilter(val);
+                        }}
+                      />
                       {currentUser.role !== 'student' && (
                         <MaterialSelect
                           className="select-sm"
