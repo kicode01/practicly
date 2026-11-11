@@ -11,8 +11,8 @@ export default function DtrModal({ placement, logs = [], onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="panel-header no-print">
+      <div className="modal-card dtr-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="panel-header dtr-modal-header no-print">
           <div>
             <div className="panel-title">Official OJT Daily Time Record (DTR)</div>
             <div className="panel-desc">
@@ -30,7 +30,8 @@ export default function DtrModal({ placement, logs = [], onClose }) {
           </div>
         </div>
 
-        <div className="certificate-sheet">
+        <div className="dtr-modal-body">
+          <div className="certificate-sheet">
           <div className="cert-header">
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
               <IconBrandLogo size={54} />
@@ -139,6 +140,7 @@ export default function DtrModal({ placement, logs = [], onClose }) {
               <div className="cert-sig-role">Faculty Practicum Adviser</div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

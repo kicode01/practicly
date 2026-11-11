@@ -2048,14 +2048,167 @@ textarea.input:focus {
   box-shadow: var(--shadow-modal);
   animation: modalCardPop 0.28s var(--ease-out-expo) both;
   border: 1px solid var(--md-sys-color-outline-variant);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(60, 64, 67, 0.22) transparent;
+}
+
+.modal-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-card::-webkit-scrollbar-track {
+  background: transparent !important;
+  margin: 12px 0;
+}
+
+.modal-card::-webkit-scrollbar-thumb {
+  background-color: rgba(60, 64, 67, 0.22);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.modal-card::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(60, 64, 67, 0.45);
+}
+
+[data-theme="dark"] .modal-card {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+[data-theme="dark"] .modal-card::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .modal-card::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+/* ============================================================================
+   OFFICIAL DOCUMENT DIALOGS (DTR & CLEARANCE CERTIFICATES)
+   ============================================================================ */
+.dtr-modal-card {
+  max-width: min(960px, 95vw) !important;
+  width: 100%;
+  max-height: 92vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: 28px !important;
+}
+
+.dtr-modal-header {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+}
+
+.dtr-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 12px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(60, 64, 67, 0.22) transparent;
+}
+
+.dtr-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dtr-modal-body::-webkit-scrollbar-track {
+  background: transparent !important;
+  margin: 10px 0;
+}
+
+.dtr-modal-body::-webkit-scrollbar-thumb {
+  background-color: rgba(60, 64, 67, 0.22);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.dtr-modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(60, 64, 67, 0.45);
+}
+
+[data-theme="dark"] .dtr-modal-body {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+[data-theme="dark"] .dtr-modal-body::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .dtr-modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.45);
 }
 
 .certificate-sheet {
   padding: 32px 36px;
-  margin: 16px;
+  margin: 12px 4px 16px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: #ffffff;
+}
+
+/* Certificate Sheet Table Layout: Zero Horizontal Scrolling */
+.certificate-sheet .table-wrap {
+  overflow-x: hidden !important;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.certificate-sheet .table {
+  min-width: 100% !important;
+  width: 100% !important;
+  table-layout: auto;
+}
+
+.certificate-sheet .table th,
+.certificate-sheet .table td {
+  padding: 10px 12px;
+}
+
+.certificate-sheet .table th:nth-child(1),
+.certificate-sheet .table td:nth-child(1) {
+  width: 105px;
+  white-space: nowrap;
+}
+
+.certificate-sheet .table th:nth-child(2),
+.certificate-sheet .table td:nth-child(2),
+.certificate-sheet .table th:nth-child(3),
+.certificate-sheet .table td:nth-child(3) {
+  width: 80px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.certificate-sheet .table th:nth-child(4),
+.certificate-sheet .table td:nth-child(4) {
+  width: 70px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.certificate-sheet .table th:nth-child(5),
+.certificate-sheet .table td:nth-child(5) {
+  width: 150px;
+  white-space: nowrap;
+}
+
+.certificate-sheet .table th:nth-child(6),
+.certificate-sheet .table td:nth-child(6) {
+  width: auto;
+  line-height: 1.45;
 }
 
 .cert-header {

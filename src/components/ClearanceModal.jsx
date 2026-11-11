@@ -10,8 +10,8 @@ export default function ClearanceModal({ report, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="panel-header no-print">
+      <div className="modal-card dtr-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="panel-header dtr-modal-header no-print">
           <div>
             <div className="panel-title">OJT Compliance &amp; Clearance Certificate</div>
             <div className="panel-desc">
@@ -29,7 +29,8 @@ export default function ClearanceModal({ report, onClose }) {
           </div>
         </div>
 
-        <div className="certificate-sheet">
+        <div className="dtr-modal-body">
+          <div className="certificate-sheet">
           <div className="cert-header">
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
               <IconBrandLogo size={54} />
@@ -156,6 +157,7 @@ export default function ClearanceModal({ report, onClose }) {
               <div className="cert-sig-role">Computer Engineering Dept., MIT</div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
