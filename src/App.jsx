@@ -481,6 +481,21 @@ export default function App() {
     };
   }, []);
 
+  // Role Tab Guard: Prevents blank screens if an invalid tab is retained across role switches
+  useEffect(() => {
+    if (!currentUser) return;
+    const allowedTabs = {
+      student: new Set(['dashboard', 'timelogs', 'evaluations', 'employers', 'students']),
+      adviser: new Set(['dashboard', 'timelogs', 'evaluations', 'compliance', 'employers', 'students', 'adviser-monitoring']),
+      supervisor: new Set(['dashboard', 'timelogs', 'evaluations', 'employers', 'students']),
+      admin: new Set(['dashboard', 'compliance', 'adviser-monitoring', 'placements', 'students', 'employers', 'timelogs', 'evaluations', 'users', 'database-erd']),
+    };
+    const validSet = allowedTabs[currentUser.role] || new Set(['dashboard']);
+    if (!validSet.has(activeTab)) {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser?.role, activeTab]);
+
   useEffect(() => {
     if (!activeShift?.startedAt) {
       setShiftElapsedSeconds(0);
@@ -635,14 +650,22 @@ export default function App() {
     }, 3800);
   }, []);
 
+  const isFetchingRef = useRef(false);
+
   const fetchSystemData = useCallback(
     async (silent = false) => {
-      if (!silent) setLoading(true);
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+
+      // Only show full skeleton on very first load; subsequent refreshes stay mounted with smooth topbar sync
+      setData((prev) => {
+        if (!prev.system_info && !silent) setLoading(true);
+        else setSyncing(true);
+        return prev;
+      });
+
       try {
-        const minWait = silent
-          ? Promise.resolve()
-          : new Promise((resolve) => setTimeout(resolve, 420));
-        const [response] = await Promise.all([fetch('/api/bootstrap'), minWait]);
+        const response = await fetch('/api/bootstrap');
         const json = await response.json();
         if (json.ok) {
           setData(json);
@@ -652,7 +675,9 @@ export default function App() {
       } catch {
         showNotice('Cannot reach backend server on port 8000.', 'error');
       } finally {
+        isFetchingRef.current = false;
         setLoading(false);
+        setSyncing(false);
       }
     },
     [showNotice]
@@ -4609,16 +4634,16 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.students
+                      {(data.students || [])
                         .filter((st) => {
                           if (!searchQuery.trim()) return true;
                           const q = searchQuery.toLowerCase();
                           return (
-                            st.full_name.toLowerCase().includes(q) ||
-                            st.student_number.toLowerCase().includes(q) ||
-                            st.section?.toLowerCase().includes(q) ||
-                            st.email.toLowerCase().includes(q) ||
-                            st.company_name?.toLowerCase().includes(q)
+                            (st.full_name || '').toLowerCase().includes(q) ||
+                            (st.student_number || '').toLowerCase().includes(q) ||
+                            (st.section || '').toLowerCase().includes(q) ||
+                            (st.email || '').toLowerCase().includes(q) ||
+                            (st.company_name || '').toLowerCase().includes(q)
                           );
                         })
                         .map((st) => (
@@ -4750,6 +4775,79 @@ export default function App() {
                       <div className="kv-value">{myPlacement?.company_name || 'Awaiting assignment'}</div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* =================================================================
+              SUPERVISOR VIEW: COMPANY INTERNS ROSTER (PREVENTS BLANK SCREEN ON STUDENTS TAB)
+              ================================================================= */}
+          {activeTab === 'students' && currentUser.role === 'supervisor' && (
+            <>
+              <div className="page-header">
+                <div>
+                  <h1 className="page-title">Company Interns</h1>
+                  <p className="page-subtitle">Trainees currently assigned to your Host Training Establishment</p>
+                </div>
+                <div className="page-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setActiveTab('dashboard')}
+                  >
+                    <IconDashboard size={13} />
+                    Workplace Supervision
+                  </button>
+                </div>
+              </div>
+              <div className="panel">
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Designation</th>
+                        <th>Adviser</th>
+                        <th className="text-right">Hours Rendered</th>
+                        <th>Status</th>
+                        <th className="text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {supervisorPlacements.map((pl) => (
+                        <tr key={pl.placement_id}>
+                          <td>
+                            <div className="row-title">{pl.student_name}</div>
+                            <div className="row-sub mono">{pl.student_number} · {pl.section}</div>
+                          </td>
+                          <td>{pl.position_title}</td>
+                          <td>{pl.adviser_name}</td>
+                          <td className="text-right mono tabular-nums">
+                            {Number(pl.total_hours_completed || 0).toFixed(1)} / {Number(pl.required_hours || 300).toFixed(0)} hrs
+                          </td>
+                          <td>
+                            <StatusChip variant={pl.status === 'completed' ? 'success' : 'warning'}>
+                              {pl.status}
+                            </StatusChip>
+                          </td>
+                          <td className="text-right">
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setTimelogPlacementFilter(String(pl.placement_id));
+                                setActiveTab('timelogs');
+                              }}
+                            >
+                              <IconClock size={12} />
+                              Verify DTR
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>
@@ -4954,17 +5052,17 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.employers
+                      {(data.employers || [])
                         .filter((emp) => {
                           if (employerIndustryFilter !== 'all' && emp.industry !== employerIndustryFilter)
                             return false;
                           if (!searchQuery.trim()) return true;
                           const q = searchQuery.toLowerCase();
                           return (
-                            emp.company_name.toLowerCase().includes(q) ||
-                            emp.industry.toLowerCase().includes(q) ||
-                            emp.address.toLowerCase().includes(q) ||
-                            emp.contact_person.toLowerCase().includes(q)
+                            (emp.company_name || '').toLowerCase().includes(q) ||
+                            (emp.industry || '').toLowerCase().includes(q) ||
+                            (emp.address || '').toLowerCase().includes(q) ||
+                            (emp.contact_person || '').toLowerCase().includes(q)
                           );
                         })
                         .map((emp) => (
