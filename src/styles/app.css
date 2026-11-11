@@ -151,8 +151,16 @@
 }
 
 /* ============================================================================
-   GOOGLE MATERIAL SYMBOLS STANDARD & LIGATURE OVERFLOW SHIELD
+   GOOGLE MATERIAL SYMBOLS & VECTOR SVG STANDARD
    ============================================================================ */
+.m3-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  fill: currentColor;
+  transition: transform 0.16s ease, color 0.14s ease;
+}
+
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined' !important;
   font-weight: normal;
