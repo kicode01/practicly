@@ -6376,3 +6376,116 @@ textarea.input:focus {
   cursor: pointer;
 }
 
+/* =============================================================================
+   DTR PANEL TOOLBAR - SINGLE ROW & PROPORTIONAL GEOMETRY
+   ============================================================================= */
+.dtr-panel-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 10px 18px !important;
+}
+
+.dtr-panel-toolbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.dtr-panel-toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dtr-panel-toolbar::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 4px;
+}
+
+.dtr-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.dtr-panel-toolbar .search-box {
+  flex: 0 1 230px !important;
+  min-width: 140px !important;
+  width: auto !important;
+}
+
+.dtr-panel-toolbar .search-box input {
+  height: 32px !important;
+  font-size: 12.5px !important;
+  padding: 0 12px 0 34px !important;
+}
+
+.dtr-panel-toolbar .table-filter-pills {
+  flex-shrink: 0;
+}
+
+.dtr-panel-toolbar .m3-segmented-button-row {
+  padding: 2px !important;
+  height: 32px;
+  box-sizing: border-box;
+}
+
+.dtr-panel-toolbar .m3-seg-item {
+  height: 26px !important;
+  padding: 2px 10px !important;
+  font-size: 12px !important;
+  gap: 5px !important;
+}
+
+.dtr-panel-toolbar .filter-pill-count {
+  font-size: 10px !important;
+  padding: 0 5px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  line-height: 16px !important;
+  border-radius: 999px;
+}
+
+.dtr-toolbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  margin-left: auto;
+}
+
+.dtr-toolbar-actions .btn {
+  height: 32px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  white-space: nowrap !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 768px) {
+  .dtr-panel-toolbar {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+  .dtr-toolbar-left {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .dtr-panel-toolbar .search-box {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+  .dtr-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
+

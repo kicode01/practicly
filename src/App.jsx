@@ -5951,13 +5951,13 @@ export default function App() {
               )}
 
               <div className="panel">
-                  <div className="panel-toolbar">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: '1 1 auto' }}>
+                  <div className="panel-toolbar dtr-panel-toolbar">
+                    <div className="dtr-toolbar-left">
                       <div className="search-box">
                         <IconSearch size={14} />
                         <input
                           type="text"
-                          placeholder="Search by date or task description..."
+                          placeholder="Search date or description..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -6058,7 +6058,7 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div className="toolbar-actions dtr-toolbar-actions">
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
