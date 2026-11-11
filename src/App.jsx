@@ -3231,7 +3231,7 @@ export default function App() {
                     </button>
                   </div>
                   <div className="table-wrap">
-                    <table className="table">
+                    <table className="table table-fit">
                       <thead>
                         <tr>
                           <th>Date</th>

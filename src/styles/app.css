@@ -1179,23 +1179,32 @@ p {
    ============================================================================ */
 .split-grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 18px;
   align-items: start;
 }
 
 .split-grid-form {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 420px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
 
 .equal-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   align-items: start;
+}
+
+.split-grid > *,
+.split-grid-form > *,
+.equal-grid > *,
+.panel,
+.panel-body,
+.table-wrap {
+  min-width: 0;
 }
 
 @media (max-width: 1080px) {
@@ -1318,40 +1327,138 @@ p {
   box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.15);
 }
 
+/* ============================================================================
+   GOOGLE MATERIAL DESIGN 3 (M3) DATA TABLES
+   Specification: https://github.com/material-components/material-web
+   Clean alignment, robust overflow containment, proportional columns, and no squishing
+   ============================================================================ */
 .table-wrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
   position: relative;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant, #c4c7c5) transparent;
+  background: var(--bg-surface);
+  border-radius: 0 0 20px 20px;
+}
+
+.table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: var(--md-sys-color-surface-container-low, #f8fafd);
+  border-radius: 0 0 20px 20px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 9999px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, #747775);
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
+  min-width: 820px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
 }
 
-.table th {
-  padding: 13px 18px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
+/* Modifiers for tables that must fit 100% of the container (e.g. 3-4 column tables or modal rubrics) */
+.table.table-fit,
+.table-fit {
+  min-width: 100%;
+}
+
+.table.table-compact,
+.table-compact {
+  min-width: 100%;
+  font-size: 12px;
+}
+
+.table-dense,
+.table.table-dense {
+  min-width: 960px;
+}
+
+/* Table Headers (M3 elevated container header) */
+.table thead th {
+  padding: 10px 14px;
+  height: 42px;
+  background: var(--md-sys-color-surface-container, #f0f4f9);
+  color: var(--md-sys-color-on-surface-variant, #444746);
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-align: left;
+  border-top: none;
   border-bottom: 1px solid var(--border-default);
   white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  box-sizing: border-box;
 }
 
-.table td {
-  padding: 14px 18px;
+.table thead th:first-child {
+  padding-left: 18px;
+}
+
+.table thead th:last-child {
+  padding-right: 18px;
+}
+
+/* Sortable Headers */
+.th-sortable {
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.th-sortable:hover {
+  color: var(--md-sys-color-primary, #0b57d0);
+  background: var(--md-sys-color-surface-container-high, #e9eef6);
+}
+
+.th-sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  color: var(--md-sys-color-primary, #0b57d0);
+}
+
+/* Table Cells */
+.table tbody td {
+  padding: 11px 14px;
   border-bottom: 1px solid var(--border-default);
   color: var(--text-primary);
   vertical-align: middle;
+  font-size: 13px;
   transition: background-color 0.12s ease;
+  box-sizing: border-box;
+}
+
+.table tbody td:first-child {
+  padding-left: 18px;
+}
+
+.table tbody td:last-child {
+  padding-right: 18px;
 }
 
 .table tbody tr {
+  height: 50px;
+  background: var(--bg-surface);
   transition: background-color 0.12s ease;
 }
 
@@ -1360,69 +1467,214 @@ p {
 }
 
 .table tbody tr:hover td {
-  background: var(--bg-subtle);
+  background: var(--md-sys-color-surface-container-low, #f8fafd);
 }
 
 .table tbody tr.is-editing td {
-  background: var(--brand-subtle);
-  animation: rowHighlightPulse 1.2s ease-in-out infinite alternate;
+  background: rgba(11, 87, 208, 0.07);
+  border-top: 1px solid rgba(11, 87, 208, 0.25);
+  border-bottom: 1px solid rgba(11, 87, 208, 0.25);
 }
 
-.table-empty-state {
-  padding: 40px 20px !important;
+/* Text Alignment Helpers */
+.table th.text-right,
+.table td.text-right {
+  text-align: right;
+}
+
+.table th.text-center,
+.table td.text-center {
   text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
 }
 
+/* Numeric & Monospace Cells */
+.table td.mono,
+.table th.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table td.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Action Buttons Cell (Always single horizontal row, never wrapped) */
+.table th:last-child,
+.table td.text-right:last-child {
+  text-align: right;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+.row-actions .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+}
+
+/* Titles and Sub-labels inside Table Cells */
 .row-title {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 .row-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
+.row-sub.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Task & Accomplishment Text Cell */
+.table td.task-cell,
+.table td.col-task,
+.table td[style*="maxWidth"] {
+  max-width: 300px;
+  min-width: 160px;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: normal;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* Inline Progress Bar */
 .inline-progress {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 140px;
+  gap: 8px;
+  width: 100%;
+  min-width: 85px;
+  max-width: 130px;
+  white-space: nowrap;
 }
 
 .inline-progress-track {
   flex: 1;
-  height: 8px;
-  background: var(--md-sys-color-surface-container-highest);
+  height: 6px;
+  background: var(--md-sys-color-surface-container-highest, #dfe4ec);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
 .inline-progress-fill {
   height: 100%;
-  background: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary, #0b57d0);
   border-radius: var(--radius-pill);
   transition: width 0.55s var(--ease-out-expo), background-color 0.25s ease;
 }
 
 .inline-progress-fill.done {
-  background: linear-gradient(90deg, #15803d 0%, #22c55e 100%);
+  background: #188038;
 }
 
 .inline-progress-fill.muted {
-  background: var(--text-faint);
+  background: var(--text-muted);
 }
 
 .inline-progress-pct {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-secondary);
-  min-width: 40px;
+  min-width: 32px;
   text-align: right;
+  flex-shrink: 0;
+}
+
+/* Status Chips & Badges in Tables */
+.table td .status-chip,
+.table td .m3-role-chip,
+.table td .badge {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Select Dropdown in Tables */
+.table td .m3-select-container {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.table td .m3-select-container.m3-select-sm .m3-select-trigger {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  white-space: nowrap;
+}
+
+.table td .m3-select-container .m3-select-menu {
+  z-index: 1050;
+  min-width: 160px;
+}
+
+/* Table Empty State */
+.table-empty-state {
+  padding: 44px 20px !important;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  background: var(--bg-surface);
+}
+
+/* Compact Table Variant */
+.table-compact thead th {
+  padding: 7px 10px;
+  height: 36px;
+  font-size: 11px;
+}
+
+.table-compact thead th:first-child,
+.table-compact tbody td:first-child {
+  padding-left: 12px;
+}
+
+.table-compact thead th:last-child,
+.table-compact tbody td:last-child {
+  padding-right: 12px;
+}
+
+.table-compact tbody td {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.table-compact tbody tr {
+  height: 38px;
 }
 
 /* ============================================================================
@@ -2328,14 +2580,20 @@ textarea.input:focus {
     flex: 1 1 auto;
   }
 
-  /* Tables horizontal smooth scroll */
+  /* Tables horizontal smooth scroll on mobile & tablets */
   .table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
 
   .table-wrap table {
-    min-width: 600px;
+    min-width: 760px;
+  }
+
+  .table-wrap table.table-fit,
+  .table-wrap table.table-compact {
+    min-width: 100%;
   }
 
   /* Mobile Modals */
