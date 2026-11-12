@@ -1,7 +1,7 @@
 @echo off
-title PUP-CpE OJT Tracking & Employer Database System — Group 8 Launcher
+title Practicly (MIT-CpE) OJT Tracking & Employer Database System — Group 8 Launcher
 echo ============================================================================
-echo   POLYTECHNIC UNIVERSITY OF THE PHILIPPINES
+echo   PRACTICLY — METROPOLITAN INSTITUTE OF TECHNOLOGY (MIT)
 echo   College of Engineering — Computer Engineering Department (Sta. Mesa)
 echo   Internship / OJT Tracking and Employer Database System (Group 8)
 echo ============================================================================
@@ -27,8 +27,8 @@ if not "%ERRORLEVEL%"=="0" (
     echo       Database ojt_tracking_db verified ready.
 )
 
-echo [3/4] Starting PHP 8.2 REST API Server on http://127.0.0.1:8000 ...
-start "PUP-CpE PHP API Server" /MIN "C:\xampp\php\php.exe" -S 127.0.0.1:8000 "%~dp0backend\router.php"
+echo [3/4] Starting PHP REST API Server on http://127.0.0.1:8000 ...
+start "Practicly PHP API Server" /MIN "C:\xampp\php\php.exe" -S 127.0.0.1:8000 "%~dp0backend\router.php"
 
 echo [4/4] Starting React (Vite) Frontend Server on http://127.0.0.1:5173 ...
 echo.

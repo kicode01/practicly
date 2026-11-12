@@ -1,75 +1,90 @@
-# Internship / OJT Tracking and Employer Database System
+# Practicly — Internship / OJT Tracking & Employer Database System
 
-**Polytechnic University of the Philippines (PUP)**  
-*College of Engineering — Computer Engineering Department (Sta. Mesa, Manila)*  
-**Course:** Database Management System (Software Development / Computer Engineering)
+**Metropolitan Institute of Technology (MIT)**  
+*College of Engineering — Department of Computer Engineering (Sta. Mesa, Manila)*  
+**Course:** Database Management System (BSCpE Software Development)  
+**Live Deployment:** [https://practicly-portal.vercel.app](https://practicly-portal.vercel.app)
 
 ### Prepared by Group 8
 | Member Name | Role | Primary Responsibilities |
 | :--- | :--- | :--- |
-| **Balanag, Kian H.** | Frontend Developer | UI/UX for time-log entry, student/adviser dashboards, compliance report & clearance certificate views |
-| **Calangian, Emmanuel G.** | Backend Developer | Relational database schema, SQL views/triggers, PHP REST API for placements & attendance aggregation |
-| **Gutierrez, Sophia Margarete N.** | Documentation Lead | Project proposal, ERD specification, system documentation, compliance reporting & QA |
-| **Yadao, Adrian E.** | Backend Developer | Stored procedures for hour aggregation (`SUM`), multi-table eligibility logic, and HTE analytics |
+| **Balanag, Kian H.** | Frontend Developer | Material Design 3 UI/UX, role-scoped workspaces, DTR/evaluation workflows, compliance & clearance views |
+| **Calangian, Emmanuel G.** | Backend Developer | Normalized relational schema, SQL views/triggers, PHP REST API, RBAC & HMAC token security |
+| **Gutierrez, Sophia Margarete N.** | Documentation Lead | System ERD specification, compliance & 4-instrument documentation, QA verification |
+| **Yadao, Adrian E.** | Backend Developer | Hours aggregation (`SUM`), multi-table clearance eligibility triggers, HTE partner analytics |
 
 ---
 
-## 1. System Overview & Key Optimizations
+## 1. System Overview & Architecture
 
-The **Internship / OJT Tracking and Employer Database System** centralizes student OJT placements, partner Host Training Establishments (HTEs), daily/weekly attendance time logs, supervisor evaluations, and clearance compliance reporting into a normalized 8-table MySQL/MariaDB relational database backed by a PHP 8.2 REST API and a React (Vite) frontend.
+**Practicly** centralizes student On-the-Job Training (OJT) placements, accredited Host Training Establishments (HTEs), Daily Time Records (DTRs), 360-degree evaluations, and clearance compliance reporting into a normalized relational database backed by a unified PHP REST API ([`backend/api/index.php`](backend/api/index.php)) and a Google Material Design 3 React (Vite) single-page application.
 
-### Key Architectural & Database Improvements Implemented
-1. **Normalized 8-Table Relational Schema (`database/schema_and_seed.sql`)**:
-   - **Master Stakeholder Entities**: `Users`, `Student`, `Employer`, `Adviser`
-   - **Core 3-Way Junction Contract Entity**: `Placement` (linking `student_id`, `employer_id`, `adviser_id`, `required_hours`, and `status`)
-   - **Dependent Transaction & Aggregation Entities**: `TimeLog`, `Evaluation`, `ComplianceReport`
-2. **Real-Time Database Triggers & Stored Procedures**:
-   - `sp_sync_placement_compliance(p_placement_id)` and `sp_sync_all_compliance_reports()` automatically execute `SUM(hours_rendered)` grouped by `placement_id` and join `Evaluation` records whenever any `TimeLog` or `Evaluation` row is inserted, updated, or deleted (`trg_timelog_after_*` and `trg_evaluation_after_*`).
-   - Enforces the core eligibility rule:
-     $$\text{total\_hours\_completed} \ge \text{required\_hours} \land \text{evaluation\_exists} \implies \text{requirement\_met} = 1$$
-3. **Pre-Joined Analytical SQL Views**:
-   - `vw_placement_progress`: Multi-table `JOIN` across `Placement`, `Student`, `Employer`, `Adviser`, aggregated `TimeLog` (`SUM`, `COUNT`, `MAX(date)`), `Evaluation` (`AVG(rating)`), and `ComplianceReport`.
-   - `vw_employer_analytics`: Aggregates active interns, completed interns, total hours hosted, and mean rating per HTE partner.
-   - `vw_adviser_monitoring`: Tracks each faculty adviser's supervision load, average student progress, and pending evaluations.
-4. **Bespoke Institutional UI with Custom SVG Icons**:
-   - Crafted specifically for the PUP College of Engineering (CpE Department) with custom inline SVG iconography, tabular-numeric alignment, CSV export, a live **ERD & SQL Architecture Inspector**, and a printable **Official PUP-CpE OJT Clearance Certificate**.
+### Key Implemented Features
+1. **Material Design 3 Interface & Clean Client Routing**:
+   - Built with React 18, Vite 5, custom SVG iconography, `@fontsource/inter` & `@fontsource/open-runde`, dark/light theme tokens, Material 3 modals, segmented filters, filter chips, sliders, and responsive desktop/mobile navigation.
+   - Clean path-based routing via [`src/utils/appRouter.js`](src/utils/appRouter.js) (`/dashboard`, `/timelogs`, `/evaluations`, `/compliance`, `/employers`, `/students`, `/adviser-monitoring`, `/placements`, `/admin`, `/database-erd`) with role-scoped guards and zero-login HTE verification links (`?verify=1`).
+2. **4-Role Access Control + Zero-Login HTE Verification**:
+   - **Student**, **HTE Supervisor**, **Faculty Adviser**, and **Coordinator (`admin`)** workspaces enforced server-side via HMAC-SHA256 stateless bearer tokens, bcrypt `Users.password_hash`, tenant-scoped queries, and `Cache-Control: no-store` headers.
+   - Faculty Advisers and Coordinators can generate signed verification links so external HTE supervisors can verify shifts and submit rubrics (`?verify=1`) without needing a portal password.
+3. **4-Stage DTR Pipeline & 360-Degree Evaluation Model**:
+   - Supports daily shift tracking, Supervisor HTE verification, Faculty Adviser DTR audit & physical signed-DTR comparison, and Coordinator clearance sign-off.
+   - Evaluates 4 instruments (`INST-01` Student -> HTE, `INST-02` Supervisor -> Student, `INST-03` Adviser -> HTE Audit, `INST-04` Student -> Adviser) plus weighted rubric scoring.
+4. **Automated Relational Database Triggers & Views**:
+   - Normalized 8 core tables (`Student`, `Employer`, `Adviser`, `Users`, `Placement`, `TimeLog`, `Evaluation`, `ComplianceReport`) plus runtime `AppSecret` key storage for HMAC signing.
+   - Dual driver support in [`backend/config/database.php`](backend/config/database.php): portable **SQLite 3** (`database/ojt_tracking.db`, seeded via [`database/schema_and_seed_sqlite.sql`](database/schema_and_seed_sqlite.sql)) and **MySQL / MariaDB** ([`database/schema_and_seed.sql`](database/schema_and_seed.sql)).
+   - Triggers (`trg_timelog_after_*`, `trg_evaluation_after_*`, `trg_placement_after_*`) automatically recompute non-flagged rendered hours, evaluation flags, mean rating, `Placement.status`, and clearance references (`MIT-CPE-CLR-2026-XXXX`):
+     - `total_hours_completed >= required_hours` AND `status != 'dropped'` AND all 4 evaluation requirements satisfied (including signed `INST-02` scan option) -> `requirement_met = 1`
+   - Analytical SQL Views: `vw_placement_progress`, `vw_employer_analytics`, and `vw_adviser_monitoring` + live **System Schema & ERD Inspector** inside the Coordinator view.
+
+### Entity-Relationship Diagram (ERD)
+![Practicly System ERD](database/practicly-erd.png)
 
 ---
 
-## 2. Quick Start & Running the System
+## 2. Quick Start & Running Locally
 
-### Option A: One-Click Windows Launcher
-Double-click or run [`start-system.bat`](./start-system.bat), which automatically starts XAMPP MySQL, initializes `ojt_tracking_db` if needed, starts the PHP API server on port `8000`, and launches the Vite React server on port `5173`.
-
-### Option B: Manual Commands
+### Option A: Portable SQLite + PHP + Vite (No MySQL Setup Needed)
 ```powershell
-# 1. Import schema and seed data into XAMPP MySQL
-C:\xampp\mysql\bin\mysql.exe -u root < database\schema_and_seed.sql
+# 1. Install frontend dependencies & build production assets into dist/
+npm install
+npm run build
 
-# 2. Start PHP REST API server (serves /api/* and production dist/ build)
-C:\xampp\php\php.exe -S 127.0.0.1:8000 backend\router.php
+# 2. Start the unified PHP API + static server (serves dist/ & /api/* on port 8000)
+$env:DB_DRIVER="sqlite"
+php -S 127.0.0.1:8000 backend/router.php
 
-# 3. Start Vite React development server
+# 3. Optional hot-reload Vite dev server on port 5173 (proxies /api to :8000)
 npm run dev
 ```
 
-- **Development URL**: http://127.0.0.1:5173
-- **Production Build URL**: http://127.0.0.1:8000
+### Option B: XAMPP MySQL / One-Click Windows Launcher
+Run [`start-system.bat`](start-system.bat), which starts XAMPP MySQL (`Port 3306`), initializes `ojt_tracking_db` from `database/schema_and_seed.sql` if missing, launches the PHP API server on `127.0.0.1:8000`, and starts Vite on `127.0.0.1:5173`.
+
+- **Production / Unified PHP URL**: http://127.0.0.1:8000
+- **Vite Development URL**: http://127.0.0.1:5173
+
+### Option C: Container / Vercel Deployment
+Configured via [`Dockerfile.vercel`](Dockerfile.vercel) and [`vercel.json`](vercel.json) (multi-stage Node 22 Vite build + PHP 8.3 SQLite runtime):
+```powershell
+vercel --prod
+```
 
 ---
 
-## 3. Demo Role Credentials
+## 3. Seeded Demo Accounts
 
-All pre-seeded accounts use the password: **`password123`** (verified against bcrypt `Users.password_hash`). You can also switch roles with one click from the Login screen or the top navigation bar.
+All seeded accounts (36 users across 26 students, 14 accredited HTEs, 6 faculty advisers, 3 HTE supervisors, and 1 system coordinator) default to password **`password123`** (users can also set a custom password or self-register as a Student or pending Adviser):
 
-| Username | Role | Linked Stakeholder | OJT / Demo State |
+| Username | Role | Stakeholder | Seeded Demo State |
 | :--- | :--- | :--- | :--- |
-| `admin` | `admin` | System Administrator | Full access to all 9 modules, user control, HTEs & placements |
-| `engr.delacruz` | `adviser` | Engr. Arlene R. Dela Cruz, MSc | OJT Coordinator supervising Kian, Emmanuel, and Sophia |
-| `engr.santos` | `adviser` | Engr. Marco Antonio V. Santos, PCpE | Faculty Adviser supervising Adrian Yadao & Miguel Delos Santos |
-| `kian.balanag` | `student` | Balanag, Kian H. (`2023-00108-MN-0`) | **Completed & Cleared** (304.00 / 300.00 hrs at Accenture + 2 Evals) |
-| `emmanuel.calangian` | `student` | Calangian, Emmanuel G. (`2023-00115-MN-0`) | **Completed & Cleared** (300.00 / 300.00 hrs at Pointwest + 2 Evals) |
-| `sophia.gutierrez` | `student` | Gutierrez, Sophia Margarete N. (`2023-00129-MN-0`) | **Ongoing — Near Completion** (284.00 / 300.00 hrs at Azeus, 16 hrs left) |
-| `adrian.yadao` | `student` | Yadao, Adrian E. (`2023-00142-MN-0`) | **Hours Met, Pending Evaluation** (302.50 / 300.00 hrs at Analog Devices) |
-| `miguel.delossantos` | `student` | Delos Santos, Miguel R. (`2023-00164-MN-0`) | **Ongoing** (192.00 / 300.00 hrs at Globe Telecom) |
-| `clarisse.villanueva` | `student` | Villanueva, Clarisse Anne T. (`2023-00188-MN-0`) | **Completed & Cleared** (310.00 / 300.00 hrs at Samsung R&D) |
+| `admin` | `admin` | System Coordinator | Full access to all 10 workspaces, user accounts, HTEs, placements & schema ERD |
+| `engr.delacruz` | `adviser` | Engr. Arlene R. Dela Cruz, MSc | Faculty Adviser supervising Balanag, Calangian, Gutierrez, Pascual & Robles |
+| `engr.santos` | `adviser` | Engr. Marco Antonio V. Santos, PCpE | Faculty Adviser supervising Yadao, Delos Santos & Reyes |
+| `supervisor.accenture` | `supervisor` | Accenture Inc. (Philippines) | HTE Supervisor reviewing Accenture interns |
+| `supervisor.analog` | `supervisor` | Analog Devices Philippines, Inc. | HTE Supervisor reviewing Analog Devices interns |
+| `kian.balanag` | `student` | Balanag, Kian H. (`2023-00108-MN-0`) | **Completed & Cleared** (`304.00 / 300.00 hrs` at Accenture + full evals) |
+| `emmanuel.calangian` | `student` | Calangian, Emmanuel G. (`2023-00115-MN-0`) | **Completed & Cleared** (`300.00 / 300.00 hrs` at Pointwest + full evals) |
+| `sophia.gutierrez` | `student` | Gutierrez, Sophia Margarete N. (`2023-00129-MN-0`) | **Ongoing** (`284.00 / 300.00 hrs` at Azeus Systems, `16 hrs` left) |
+| `adrian.yadao` | `student` | Yadao, Adrian E. (`2023-00142-MN-0`) | **Hours Met, Pending Eval** (`302.50 / 300.00 hrs` at Analog Devices) |
+| `miguel.delossantos` | `student` | Delos Santos, Miguel R. (`2023-00164-MN-0`) | **Ongoing** (`200.00 / 300.00 hrs` at Globe Telecom) |
+| `clarisse.villanueva` | `student` | Villanueva, Clarisse Anne T. (`2023-00188-MN-0`) | **Completed & Cleared** (`310.00 / 300.00 hrs` at Samsung R&D) |
