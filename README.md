@@ -1,90 +1,172 @@
-# Practicly — Internship / OJT Tracking & Employer Database System
+<div align="center">
+  <img src="public/system-logo.svg" alt="Practicly logo" width="56" height="56" />
+  <h1>Practicly</h1>
+  <p><strong>Manage student practicums in one shared workspace.</strong></p>
+  <p>Built for colleges and universities across any degree program. Coordinate daily DTR logs, supervisor sign-offs, and faculty clearances from day one.</p>
 
-**Metropolitan Institute of Technology (MIT)**  
-*College of Engineering — Department of Computer Engineering (Sta. Mesa, Manila)*  
-**Course:** Database Management System (BSCpE Software Development)  
-**Live Deployment:** [https://practicly-portal.vercel.app](https://practicly-portal.vercel.app)
+  <p>
+    <a href="https://practicly-portal.vercel.app">Live Workspace</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#workspaces">Workspaces</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#architecture">Architecture</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#database-schema">Database Schema</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#quick-start">Quick Start</a>
+  </p>
 
-### Prepared by Group 8
-| Member Name | Role | Primary Responsibilities |
-| :--- | :--- | :--- |
-| **Balanag, Kian H.** | Frontend Developer | Material Design 3 UI/UX, role-scoped workspaces, DTR/evaluation workflows, compliance & clearance views |
-| **Calangian, Emmanuel G.** | Backend Developer | Normalized relational schema, SQL views/triggers, PHP REST API, RBAC & HMAC token security |
-| **Gutierrez, Sophia Margarete N.** | Documentation Lead | System ERD specification, compliance & 4-instrument documentation, QA verification |
-| **Yadao, Adrian E.** | Backend Developer | Hours aggregation (`SUM`), multi-table clearance eligibility triggers, HTE partner analytics |
+  <p>
+    <img src="https://img.shields.io/badge/UI-Material%20Design%203-0B57D0?style=flat-square" alt="Material Design 3" />
+    <img src="https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite%205-1F2937?style=flat-square" alt="React 18 + Vite 5" />
+    <img src="https://img.shields.io/badge/API-PHP%208.3%20REST-4F5B93?style=flat-square" alt="PHP 8.3 REST" />
+    <img src="https://img.shields.io/badge/Database-SQLite%203%20%7C%20MySQL-0F766E?style=flat-square" alt="SQLite 3 | MySQL" />
+    <img src="https://img.shields.io/badge/Deploy-Vercel%20Container-111827?style=flat-square" alt="Vercel Container" />
+  </p>
 
----
-
-## 1. System Overview & Architecture
-
-**Practicly** centralizes student On-the-Job Training (OJT) placements, accredited Host Training Establishments (HTEs), Daily Time Records (DTRs), 360-degree evaluations, and clearance compliance reporting into a normalized relational database backed by a unified PHP REST API ([`backend/api/index.php`](backend/api/index.php)) and a Google Material Design 3 React (Vite) single-page application.
-
-### Key Implemented Features
-1. **Material Design 3 Interface & Clean Client Routing**:
-   - Built with React 18, Vite 5, custom SVG iconography, `@fontsource/inter` & `@fontsource/open-runde`, dark/light theme tokens, Material 3 modals, segmented filters, filter chips, sliders, and responsive desktop/mobile navigation.
-   - Clean path-based routing via [`src/utils/appRouter.js`](src/utils/appRouter.js) (`/dashboard`, `/timelogs`, `/evaluations`, `/compliance`, `/employers`, `/students`, `/adviser-monitoring`, `/placements`, `/admin`, `/database-erd`) with role-scoped guards and zero-login HTE verification links (`?verify=1`).
-2. **4-Role Access Control + Zero-Login HTE Verification**:
-   - **Student**, **HTE Supervisor**, **Faculty Adviser**, and **Coordinator (`admin`)** workspaces enforced server-side via HMAC-SHA256 stateless bearer tokens, bcrypt `Users.password_hash`, tenant-scoped queries, and `Cache-Control: no-store` headers.
-   - Faculty Advisers and Coordinators can generate signed verification links so external HTE supervisors can verify shifts and submit rubrics (`?verify=1`) without needing a portal password.
-3. **4-Stage DTR Pipeline & 360-Degree Evaluation Model**:
-   - Supports daily shift tracking, Supervisor HTE verification, Faculty Adviser DTR audit & physical signed-DTR comparison, and Coordinator clearance sign-off.
-   - Evaluates 4 instruments (`INST-01` Student -> HTE, `INST-02` Supervisor -> Student, `INST-03` Adviser -> HTE Audit, `INST-04` Student -> Adviser) plus weighted rubric scoring.
-4. **Automated Relational Database Triggers & Views**:
-   - Normalized 8 core tables (`Student`, `Employer`, `Adviser`, `Users`, `Placement`, `TimeLog`, `Evaluation`, `ComplianceReport`) plus runtime `AppSecret` key storage for HMAC signing.
-   - Dual driver support in [`backend/config/database.php`](backend/config/database.php): portable **SQLite 3** (`database/ojt_tracking.db`, seeded via [`database/schema_and_seed_sqlite.sql`](database/schema_and_seed_sqlite.sql)) and **MySQL / MariaDB** ([`database/schema_and_seed.sql`](database/schema_and_seed.sql)).
-   - Triggers (`trg_timelog_after_*`, `trg_evaluation_after_*`, `trg_placement_after_*`) automatically recompute non-flagged rendered hours, evaluation flags, mean rating, `Placement.status`, and clearance references (`MIT-CPE-CLR-2026-XXXX`):
-     - `total_hours_completed >= required_hours` AND `status != 'dropped'` AND all 4 evaluation requirements satisfied (including signed `INST-02` scan option) -> `requirement_met = 1`
-   - Analytical SQL Views: `vw_placement_progress`, `vw_employer_analytics`, and `vw_adviser_monitoring` + live **System Schema & ERD Inspector** inside the Coordinator view.
-
-### Entity-Relationship Diagram (ERD)
-![Practicly System ERD](database/practicly-erd.png)
+  <br />
+  <img src="public/hero-workspace.jpg" alt="Practicly workspace overview" width="820" />
+</div>
 
 ---
 
-## 2. Quick Start & Running Locally
+## Workspaces
 
-### Option A: Portable SQLite + PHP + Vite (No MySQL Setup Needed)
+Practicly separates permissions, views, and compliance workflows into four purpose-built workspaces backed by clean role-scoped routes:
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="public/role-student.png" alt="Student Intern workspace preview" width="100%" />
+      <h3>Student Intern</h3>
+      <p>Clock shifts with the live stopwatch, import attendance spreadsheets, and attach signed DTR PDFs while tracking real-time progress toward required practicum hours.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="public/role-supervisor.png" alt="Host Supervisor workspace preview" width="100%" />
+      <h3>Host Supervisor</h3>
+      <p>Approve logged trainee shifts and submit competency ratings via a direct HMAC-signed verification link (<code>?verify=1</code>) or an authenticated mentor account.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="public/role-adviser.png" alt="Faculty Adviser workspace preview" width="100%" />
+      <h3>Faculty Adviser</h3>
+      <p>Compare digital attendance against wet-signed scans side by side, conduct HTE quality audits (INST-03), review 360-degree forms, and endorse final clearance.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="public/role-coordinator.png" alt="Practicum Coordinator workspace preview" width="100%" />
+      <h3>Practicum Coordinator</h3>
+      <p>Maintain host organization MOAs, configure program hour targets, approve faculty accounts, export institutional clearance reports, and inspect the live database schema.</p>
+    </td>
+  </tr>
+</table>
+
+---
+
+## How a Practicum Term Runs
+
+Every attendance record and evaluation stays connected from onboarding through final clearance:
+
+| Stage | Milestone | Description |
+| :---: | :--- | :--- |
+| **1** | **Placement Setup** | Pair interns with an approved partner organization, host supervisor, faculty adviser, and program hour goal. |
+| **2** | **Attendance & DTR Filing** | Record daily shifts throughout the term and attach wet-signed physical timecards alongside digital shift logs. |
+| **3** | **Workplace Verification** | Host mentors review submitted attendance shifts and file mid-term and final competency evaluations without friction. |
+| **4** | **Cross-Audit & Clearance** | Faculty advisers verify logged hours against DTR scans, complete required evaluation forms, and issue official completion clearance. |
+
+---
+
+## Architecture
+
+### Frontend & Design System
+- **Google Material Design 3** components built with `@fontsource/inter`, `@fontsource/open-runde`, light/dark theme tokens, custom SVG iconography, M3 sliders, filter chips, segmented toolbars, and accessible modals.
+- **Client-Side Path Routing** ([`src/utils/appRouter.js`](src/utils/appRouter.js)) with role-based route guards and canonical tab aliases (`/dashboard`, `/timelogs`, `/evaluations`, `/compliance`, `/employers`, `/students`, `/adviser-monitoring`, `/placements`, `/admin`, `/database-erd`).
+
+### Backend, Security & RBAC
+- **Unified PHP REST Controller** ([`backend/api/index.php`](backend/api/index.php)) with strict `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy` headers.
+- **Stateless HMAC-SHA256 Auth & Verification Tokens**: Signed with an internal runtime key (`AppSecret`), paired with bcrypt `Users.password_hash` verification, tenant-scoped SQL queries, and strict role-based access enforcement (`401`/`403` isolation).
+- **Zero-Login HTE Portal (`?verify=1`)**: Scoped verification tokens let external host supervisors approve trainee logs and submit INST-02 evaluations directly without managing portal passwords.
+
+### Tech Stack
+- **Frontend**: React 18, Vite 5, Material Design 3 tokens & custom CSS
+- **Backend**: PHP 8.3 (built-in router for static bundle + `/api/*` REST endpoints)
+- **Database**: SQLite 3 (`database/ojt_tracking.db`) & MySQL / MariaDB (`database/schema_and_seed.sql`)
+- **Deployment**: Multi-stage Docker (`Dockerfile.vercel` — Node 22 build + PHP 8.3 runtime) on Vercel
+
+---
+
+## Database Schema
+
+Practicly runs on a normalized relational schema supporting both **SQLite 3** and **MySQL / MariaDB** ([`backend/config/database.php`](backend/config/database.php)):
+
+- **8 Core Entities + Runtime Key Store**: `Student`, `Employer`, `Adviser`, `Users`, `Placement`, `TimeLog`, `Evaluation`, `ComplianceReport`, and `AppSecret`.
+- **Automated Triggers**: `trg_timelog_after_*`, `trg_evaluation_after_*`, and `trg_placement_after_*` automatically recompute total rendered hours (excluding flagged shifts), check all 4 evaluation instruments (`INST-01` through `INST-04` or signed DTR/evaluation scans), update `Placement.status`, and generate clearance references when `total_hours_completed >= required_hours`.
+- **Analytical SQL Views**: `vw_placement_progress`, `vw_employer_analytics`, and `vw_adviser_monitoring`, plus an interactive schema & ERD inspector built into the Coordinator workspace.
+
+<div align="center">
+  <img src="database/practicly-erd.png" alt="Practicly complete entity-relationship diagram" width="900" />
+</div>
+
+---
+
+## Project Structure
+
+```text
+├── backend/
+│   ├── api/index.php                 # Unified REST API controller, RBAC & HMAC auth
+│   ├── config/database.php           # Dual SQLite 3 / MySQL PDO connector
+│   └── router.php                    # Serves /api/*, uploads, and SPA dist fallback
+├── database/
+│   ├── ojt_tracking.db               # Pre-seeded SQLite 3 database
+│   ├── schema_and_seed.sql           # MySQL / MariaDB schema, views & stored procedures
+│   ├── schema_and_seed_sqlite.sql    # SQLite 3 schema, triggers, views & seed data
+│   └── practicly-erd.png             # System Entity-Relationship Diagram
+├── public/                           # Brand icons, webmanifest, landing & role illustrations
+├── src/
+│   ├── components/                   # Material 3 UI primitives, modals & role views
+│   ├── styles/app.css                # Material Design 3 tokens & responsive layouts
+│   ├── utils/                        # Client router, API client & rubric helpers
+│   └── App.jsx                       # Application shell, landing experience & workspaces
+├── Dockerfile.vercel                 # Production container image (Node 22 + PHP 8.3)
+├── vercel.json                       # Vercel container deployment config
+└── vite.config.js                    # Vite build & /api dev proxy configuration
+```
+
+---
+
+## Quick Start
+
+### 1. Portable SQLite + PHP + Vite (Recommended)
 ```powershell
-# 1. Install frontend dependencies & build production assets into dist/
+# Install dependencies & build production bundle
 npm install
 npm run build
 
-# 2. Start the unified PHP API + static server (serves dist/ & /api/* on port 8000)
+# Start unified PHP API & SPA server on http://127.0.0.1:8000
 $env:DB_DRIVER="sqlite"
 php -S 127.0.0.1:8000 backend/router.php
 
-# 3. Optional hot-reload Vite dev server on port 5173 (proxies /api to :8000)
+# Optional: run Vite HMR dev server on http://127.0.0.1:5173 (proxies /api to :8000)
 npm run dev
 ```
 
-### Option B: XAMPP MySQL / One-Click Windows Launcher
-Run [`start-system.bat`](start-system.bat), which starts XAMPP MySQL (`Port 3306`), initializes `ojt_tracking_db` from `database/schema_and_seed.sql` if missing, launches the PHP API server on `127.0.0.1:8000`, and starts Vite on `127.0.0.1:5173`.
+### 2. Local MySQL / Windows One-Click Launcher
+Run [`start-system.bat`](start-system.bat) to start XAMPP MySQL (`3306`), initialize `ojt_tracking_db` from `database/schema_and_seed.sql` if needed, launch the PHP API on `127.0.0.1:8000`, and start Vite on `127.0.0.1:5173`.
 
-- **Production / Unified PHP URL**: http://127.0.0.1:8000
-- **Vite Development URL**: http://127.0.0.1:5173
-
-### Option C: Container / Vercel Deployment
-Configured via [`Dockerfile.vercel`](Dockerfile.vercel) and [`vercel.json`](vercel.json) (multi-stage Node 22 Vite build + PHP 8.3 SQLite runtime):
+### 3. Production Deployment (Vercel Container)
 ```powershell
 vercel --prod
 ```
 
 ---
 
-## 3. Seeded Demo Accounts
+## Demo Workspaces
 
-All seeded accounts (36 users across 26 students, 14 accredited HTEs, 6 faculty advisers, 3 HTE supervisors, and 1 system coordinator) default to password **`password123`** (users can also set a custom password or self-register as a Student or pending Adviser):
+The seeded database includes role accounts for evaluation (default demo password: `password123`). New students and faculty advisers can also self-register directly from the **Create an account** flow:
 
-| Username | Role | Stakeholder | Seeded Demo State |
-| :--- | :--- | :--- | :--- |
-| `admin` | `admin` | System Coordinator | Full access to all 10 workspaces, user accounts, HTEs, placements & schema ERD |
-| `engr.delacruz` | `adviser` | Engr. Arlene R. Dela Cruz, MSc | Faculty Adviser supervising Balanag, Calangian, Gutierrez, Pascual & Robles |
-| `engr.santos` | `adviser` | Engr. Marco Antonio V. Santos, PCpE | Faculty Adviser supervising Yadao, Delos Santos & Reyes |
-| `supervisor.accenture` | `supervisor` | Accenture Inc. (Philippines) | HTE Supervisor reviewing Accenture interns |
-| `supervisor.analog` | `supervisor` | Analog Devices Philippines, Inc. | HTE Supervisor reviewing Analog Devices interns |
-| `kian.balanag` | `student` | Balanag, Kian H. (`2023-00108-MN-0`) | **Completed & Cleared** (`304.00 / 300.00 hrs` at Accenture + full evals) |
-| `emmanuel.calangian` | `student` | Calangian, Emmanuel G. (`2023-00115-MN-0`) | **Completed & Cleared** (`300.00 / 300.00 hrs` at Pointwest + full evals) |
-| `sophia.gutierrez` | `student` | Gutierrez, Sophia Margarete N. (`2023-00129-MN-0`) | **Ongoing** (`284.00 / 300.00 hrs` at Azeus Systems, `16 hrs` left) |
-| `adrian.yadao` | `student` | Yadao, Adrian E. (`2023-00142-MN-0`) | **Hours Met, Pending Eval** (`302.50 / 300.00 hrs` at Analog Devices) |
-| `miguel.delossantos` | `student` | Delos Santos, Miguel R. (`2023-00164-MN-0`) | **Ongoing** (`200.00 / 300.00 hrs` at Globe Telecom) |
-| `clarisse.villanueva` | `student` | Villanueva, Clarisse Anne T. (`2023-00188-MN-0`) | **Completed & Cleared** (`310.00 / 300.00 hrs` at Samsung R&D) |
+| Role | Demo Username | Workspace Scope |
+| :--- | :--- | :--- |
+| **Practicum Coordinator** | `admin` | System-wide oversight, MOAs, placements, user approvals & schema inspector |
+| **Faculty Adviser** | `engr.delacruz` | Advisee monitoring, DTR scan audit, HTE quality audits & clearance endorsement |
+| **Host Supervisor** | `supervisor.accenture` | Assigned company trainees, shift approval & competency evaluations |
+| **Student Intern** | `clarisse.villanueva` | DTR time logging, signed PDF uploads, evaluations & clearance status |
