@@ -749,39 +749,33 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Synchronize URL path and document.title with active page, auth modal, or verify view
+  // Synchronize URL path with active page, auth modal, or verify view
   useEffect(() => {
     let targetUrl = '/';
-    let nextTitle = 'Practicly — Internship & OJT Tracking Platform';
 
     if (publicSupervisorPlacementId) {
       const ctx = getVerifyContext();
       const tok =
         ctx && String(ctx.placementId) === String(publicSupervisorPlacementId) ? ctx.token : null;
       targetUrl = getVerifyPath(publicSupervisorPlacementId, tok);
-      nextTitle = 'Supervisor Verification — Practicly';
     } else if (!currentUser) {
       if (authScreenOpen) {
         if (authMode === 'register') {
           targetUrl = '/register';
-          nextTitle = 'Create Account — Practicly';
         } else {
           const nextTab = pendingRedirectTabRef.current;
           targetUrl = nextTab ? `/login?next=${encodeURIComponent(nextTab)}` : '/login';
-          nextTitle = 'Sign In — Practicly';
         }
       } else {
         targetUrl = '/';
-        nextTitle = 'Practicly — Internship & OJT Tracking Platform';
       }
     } else {
       const resolvedTab = isTabAllowedForRole(currentUser.role, activeTab) ? activeTab : 'dashboard';
       targetUrl = getTabPath(resolvedTab);
-      nextTitle = `${TAB_TITLES[resolvedTab] || 'Portal'} — Practicly`;
     }
 
-    if (typeof document !== 'undefined') {
-      document.title = nextTitle;
+    if (typeof document !== 'undefined' && document.title !== 'Practicly') {
+      document.title = 'Practicly';
     }
 
     if (suppressUrlSyncRef.current) {
@@ -5894,7 +5888,7 @@ export default function App() {
                             value: 'all',
                             label: (
                               <span className="seg-filter-item">
-                                <span>All Records</span>
+                                <span>All</span>
                                 <span className="filter-pill-count">{timelogCounts.all}</span>
                               </span>
                             ),
@@ -5911,8 +5905,8 @@ export default function App() {
                           {
                             value: 'supervisor_verified',
                             label: (
-                              <span className="seg-filter-item">
-                                <span>Supervisor Verified</span>
+                              <span className="seg-filter-item" title="Verified by HTE Supervisor">
+                                <span>HTE Verified</span>
                                 <span className="filter-pill-count">{timelogCounts.supervisor_verified}</span>
                               </span>
                             ),
@@ -5920,8 +5914,8 @@ export default function App() {
                           {
                             value: 'approved',
                             label: (
-                              <span className="seg-filter-item">
-                                <span>Adviser Endorsed</span>
+                              <span className="seg-filter-item" title="Endorsed by Faculty Adviser">
+                                <span>Endorsed</span>
                                 <span className="filter-pill-count">{timelogCounts.approved}</span>
                               </span>
                             ),
