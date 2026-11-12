@@ -13,7 +13,7 @@
     &nbsp;&middot;&nbsp;
     <a href="#database-schema">Database Schema</a>
     &nbsp;&middot;&nbsp;
-    <a href="#quick-start">Quick Start</a>
+    <a href="#demo-workspaces">Demo Workspaces</a>
   </p>
 
   <p>
@@ -99,10 +99,6 @@ Practicly runs on a normalized relational schema supporting both **SQLite 3** an
 - **Automated Triggers**: `trg_timelog_after_*`, `trg_evaluation_after_*`, and `trg_placement_after_*` automatically recompute total rendered hours (excluding flagged shifts), check all 4 evaluation instruments (`INST-01` through `INST-04` or signed DTR/evaluation scans), update `Placement.status`, and generate clearance references when `total_hours_completed >= required_hours`.
 - **Analytical SQL Views**: `vw_placement_progress`, `vw_employer_analytics`, and `vw_adviser_monitoring`, plus an interactive schema & ERD inspector built into the Coordinator workspace.
 
-<div align="center">
-  <img src="database/practicly-erd.png" alt="Practicly complete entity-relationship diagram" width="900" />
-</div>
-
 ---
 
 ## Project Structure
@@ -126,32 +122,6 @@ Practicly runs on a normalized relational schema supporting both **SQLite 3** an
 ├── Dockerfile.vercel                 # Production container image (Node 22 + PHP 8.3)
 ├── vercel.json                       # Vercel container deployment config
 └── vite.config.js                    # Vite build & /api dev proxy configuration
-```
-
----
-
-## Quick Start
-
-### 1. Portable SQLite + PHP + Vite (Recommended)
-```powershell
-# Install dependencies & build production bundle
-npm install
-npm run build
-
-# Start unified PHP API & SPA server on http://127.0.0.1:8000
-$env:DB_DRIVER="sqlite"
-php -S 127.0.0.1:8000 backend/router.php
-
-# Optional: run Vite HMR dev server on http://127.0.0.1:5173 (proxies /api to :8000)
-npm run dev
-```
-
-### 2. Local MySQL / Windows One-Click Launcher
-Run [`start-system.bat`](start-system.bat) to start XAMPP MySQL (`3306`), initialize `ojt_tracking_db` from `database/schema_and_seed.sql` if needed, launch the PHP API on `127.0.0.1:8000`, and start Vite on `127.0.0.1:5173`.
-
-### 3. Production Deployment (Vercel Container)
-```powershell
-vercel --prod
 ```
 
 ---
