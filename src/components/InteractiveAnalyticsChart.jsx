@@ -221,8 +221,8 @@ export default function InteractiveAnalyticsChart({
             >
               <defs>
                 <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity="0.28" />
-                  <stop offset="100%" stopColor="#2563eb" stopOpacity="0.01" />
+                  <stop offset="0%" stopColor="var(--md-sys-color-primary, #0b57d0)" stopOpacity="0.24" />
+                  <stop offset="100%" stopColor="var(--md-sys-color-primary, #0b57d0)" stopOpacity="0.01" />
                 </linearGradient>
               </defs>
 
@@ -260,7 +260,7 @@ export default function InteractiveAnalyticsChart({
                 <path
                   d={pathD}
                   fill="none"
-                  stroke="var(--brand)"
+                  stroke="var(--md-sys-color-primary, #0b57d0)"
                   strokeWidth="2.4"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -283,8 +283,8 @@ export default function InteractiveAnalyticsChart({
                       cx={p.x}
                       cy={p.y}
                       r={isHovered ? 5.5 : 3.2}
-                      fill="#ffffff"
-                      stroke="var(--brand)"
+                      fill="var(--bg-surface, #ffffff)"
+                      stroke="var(--md-sys-color-primary, #0b57d0)"
                       strokeWidth={isHovered ? 2.5 : 1.8}
                       className="chart-dot"
                     />

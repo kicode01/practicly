@@ -9,6 +9,7 @@ import {
   IconBriefcase
 } from './Icons';
 import usePresence from '../utils/usePresence';
+import { getVerifyPath } from '../utils/appRouter';
 
 export default function SupervisorShareModal({
   isOpen,
@@ -21,9 +22,8 @@ export default function SupervisorShareModal({
 
   if (!rendered || !placement) return null;
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000';
-  const verifyTokenParam = placement.verify_token ? `&token=${encodeURIComponent(placement.verify_token)}` : '';
-  const verifyUrl = `${origin}/?verify=${placement.placement_id}${verifyTokenParam}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const verifyUrl = `${origin}${getVerifyPath(placement.placement_id, placement.verify_token || null)}`;
 
   const handleCopy = () => {
     if (navigator?.clipboard?.writeText) {

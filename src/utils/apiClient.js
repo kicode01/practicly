@@ -41,7 +41,8 @@ export function getVerifyContext() {
   if (typeof window !== 'undefined') {
     try {
       const params = new URLSearchParams(window.location.search);
-      const pid = params.get('verify');
+      const pathMatch = window.location.pathname.match(/^\/verify\/([^/]+)\/?$/i);
+      const pid = (pathMatch ? decodeURIComponent(pathMatch[1]) : null) || params.get('verify');
       const tok = params.get('token');
       if (pid && tok) {
         return { placementId: pid, token: tok };

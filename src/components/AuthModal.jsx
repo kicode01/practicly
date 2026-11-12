@@ -6,6 +6,7 @@ import {
   IconEye,
   IconEyeOff,
   IconCheckCircle,
+  IconCheck,
   IconAlert,
 } from './Icons';
 import { MaterialSelect } from './MaterialComponents';
@@ -284,26 +285,32 @@ export default function AuthModal({
                 <button
                   type="button"
                   role="radio"
-                  aria-checked={!isAdviserReg}
-                  className={`auth-role-switch-btn ${!isAdviserReg ? 'is-active' : ''}`}
+                  aria-checked={registerForm.role !== 'adviser'}
+                  className={`auth-role-switch-btn ${registerForm.role !== 'adviser' ? 'is-active' : ''}`}
                   onClick={() => {
                     setRegisterForm((prev) => ({ ...prev, role: 'student' }));
                     setLoginError('');
                   }}
                 >
-                  Student Intern
+                  <span className="m3-seg-check" aria-hidden="true">
+                    <IconCheck size={15} />
+                  </span>
+                  <span>Student Intern</span>
                 </button>
                 <button
                   type="button"
                   role="radio"
-                  aria-checked={isAdviserReg}
-                  className={`auth-role-switch-btn ${isAdviserReg ? 'is-active' : ''}`}
+                  aria-checked={registerForm.role === 'adviser'}
+                  className={`auth-role-switch-btn ${registerForm.role === 'adviser' ? 'is-active' : ''}`}
                   onClick={() => {
                     setRegisterForm((prev) => ({ ...prev, role: 'adviser' }));
                     setLoginError('');
                   }}
                 >
-                  Faculty Adviser
+                  <span className="m3-seg-check" aria-hidden="true">
+                    <IconCheck size={15} />
+                  </span>
+                  <span>Faculty Adviser</span>
                 </button>
               </div>
 

@@ -24,6 +24,9 @@ export function SegmentedControl({ items = [], value, onValueChange, className =
             className={`m3-seg-item ${isSelected ? 'active' : ''}`}
             onClick={() => onValueChange && onValueChange(itemVal)}
           >
+            <span className="m3-seg-check" aria-hidden="true">
+              <IconCheck size={14} />
+            </span>
             {itemLabel}
           </button>
         );
@@ -32,17 +35,68 @@ export function SegmentedControl({ items = [], value, onValueChange, className =
   );
 }
 
-export function Switch({ checked = false, onCheckedChange, disabled = false, className = '' }) {
+export function FilterChip({
+  selected = false,
+  onSelectedChange,
+  label,
+  title,
+  disabled = false,
+  className = '',
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      disabled={disabled}
+      title={title}
+      className={`m3-toolbar-filter-chip ${selected ? 'is-selected' : ''} ${className}`.trim()}
+      onClick={() => onSelectedChange && onSelectedChange(!selected)}
+    >
+      {selected && (
+        <span className="m3-toolbar-filter-chip-check" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </span>
+      )}
+      <span className="m3-toolbar-filter-chip-label">{label}</span>
+    </button>
+  );
+}
+
+export function Switch({ checked = false, onCheckedChange, disabled = false, className = '', ariaLabel }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       disabled={disabled}
       className={`m3-switch ${checked ? 'checked' : ''} ${className}`}
       onClick={() => onCheckedChange && onCheckedChange(!checked)}
     >
-      <span className="m3-switch-thumb" />
+      <span className="m3-switch-thumb" aria-hidden="true">
+        {checked && (
+          <svg
+            className="m3-switch-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </span>
     </button>
   );
 }
@@ -163,19 +217,25 @@ export function MaterialSelect({
       return;
     }
 
+    const containerEl = containerRef.current;
+    const isFieldSelect = Boolean(containerEl && containerEl.closest('.field'));
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
     const margin = 8;
-    const gap = 6;
-    const maxAllowedW = Math.min(viewportW - margin * 2, Math.max(760, Math.ceil(rect.width)));
-    const minW = Math.min(Math.max(rect.width, isSmall ? 180 : 220), maxAllowedW);
+    const gap = 4;
+    const maxAllowedW = Math.min(viewportW - margin * 2, isFieldSelect ? Math.round(rect.width) : 340);
+    const minW = isFieldSelect
+      ? Math.min(Math.round(rect.width), maxAllowedW)
+      : Math.min(Math.max(rect.width, isSmall ? 160 : 180), maxAllowedW);
 
     const measuredW = menuRef.current ? menuRef.current.offsetWidth : 0;
     const measuredH = menuRef.current ? menuRef.current.offsetHeight : 0;
-    const estimatedW = measuredW > 0
-      ? Math.min(Math.max(measuredW, minW), maxAllowedW)
-      : Math.min(Math.max(minW, Math.min(260, maxAllowedW)), maxAllowedW);
-    const estRowH = 38;
+    const estimatedW = isFieldSelect
+      ? maxAllowedW
+      : (measuredW > 0
+          ? Math.min(Math.max(measuredW, minW), maxAllowedW)
+          : minW);
+    const estRowH = 40;
     const estimatedH = measuredH > 0
       ? Math.min(measuredH, 420)
       : Math.min(Math.max(items.length, 1) * estRowH + 16, 420);
@@ -191,21 +251,20 @@ export function MaterialSelect({
       ? Math.max(margin, rect.top - renderedH - gap)
       : Math.min(viewportH - renderedH - margin, rect.bottom + gap);
 
-    const containerEl = containerRef.current;
     const inRightContext = Boolean(
       containerEl &&
-      containerEl.closest('.panel-toolbar, .panel-actions, .page-actions, .topbar-controls, td.text-right')
+      containerEl.closest('td.text-right, .topbar-controls')
     );
-    const shouldAlignRight =
-      align === 'right' ||
-      (align !== 'left' && (inRightContext || viewportW - rect.left < estimatedW + margin));
+    const shouldAlignRight = !isFieldSelect && (align === 'right' || (align !== 'left' && inRightContext));
 
-    let left = shouldAlignRight ? rect.right - estimatedW : rect.left;
-    left = Math.max(margin, Math.min(left, viewportW - estimatedW - margin));
+    const effectiveW = Math.min(estimatedW, maxAllowedW);
+    let left = shouldAlignRight ? rect.right - effectiveW : rect.left;
+    left = Math.max(margin, Math.min(left, viewportW - effectiveW - margin));
 
     setMenuPosition({
       top: Math.round(top),
       left: Math.round(left),
+      width: isFieldSelect ? Math.round(maxAllowedW) : null,
       minWidth: Math.round(minW),
       maxWidth: Math.round(maxAllowedW),
       maxHeight: Math.round(maxHeight),
@@ -332,6 +391,7 @@ export function MaterialSelect({
                   position: 'fixed',
                   top: `${menuPosition.top}px`,
                   left: `${menuPosition.left}px`,
+                  ...(menuPosition.width ? { width: `${menuPosition.width}px` } : {}),
                   minWidth: `${menuPosition.minWidth}px`,
                   maxWidth: `${menuPosition.maxWidth}px`,
                   maxHeight: `${menuPosition.maxHeight}px`,
@@ -425,6 +485,7 @@ export function Snackbar({ message, type = 'success', onClose, className = '' })
 
 export default {
   SegmentedControl,
+  FilterChip,
   Switch,
   Slider,
   Glass,

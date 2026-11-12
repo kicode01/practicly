@@ -235,14 +235,41 @@ export default function PublicSupervisorVerifyView({
 
   if (!placement) {
     return (
-      <div className="login-backdrop" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="auth-card" style={{ maxWidth: '480px', textAlign: 'center' }}>
-          <IconAlert size={36} style={{ color: 'var(--amber)', margin: '0 auto 12px' }} />
-          <h2>Placement Verification Link Not Found</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+      <div
+        className="public-verify-shell"
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '36px 28px',
+            border: '1px solid var(--border-default)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <IconAlert size={40} style={{ color: 'var(--amber, #d97706)', margin: '0 auto 14px', display: 'block' }} />
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px 0' }}>
+            Placement Verification Link Not Found
+          </h2>
+          <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
             The requested student placement reference could not be located or has expired.
           </p>
-          <button type="button" className="btn btn-primary" style={{ marginTop: '16px' }} onClick={onClose}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: '20px' }}
+            onClick={onClose}
+          >
             Go to Practicly Main Portal
           </button>
         </div>
@@ -535,7 +562,7 @@ export default function PublicSupervisorVerifyView({
                         {tl.approval_status !== 'flagged' && (
                           <button
                             type="button"
-                            className="btn btn-ghost-danger btn-xs"
+                            className="m3-inline-action m3-inline-action-danger"
                             disabled={placement.can_submit === false}
                             onClick={() => {
                               setSelectedLogToFlag(tl);

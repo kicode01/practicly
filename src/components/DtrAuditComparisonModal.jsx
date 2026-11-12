@@ -312,27 +312,25 @@ export default function DtrAuditComparisonModal({
                           {tl.approval_status !== 'approved' && (
                             <button
                               type="button"
-                              className="btn btn-secondary btn-xs"
-                              style={{ color: 'var(--color-success, #10b981)' }}
+                              className="m3-inline-action m3-inline-action-success"
                               onClick={() => onUpdateApproval && onUpdateApproval(tl, 'approved')}
                               title="Endorse this shift to Admin"
                             >
-                              <IconCheckCircle size={11} />
+                              <IconCheckCircle size={12} />
                               Endorse Shift
                             </button>
                           )}
                           {tl.approval_status !== 'flagged' && (
                             <button
                               type="button"
-                              className="btn btn-secondary btn-xs"
-                              style={{ color: 'var(--color-danger, #ef4444)' }}
+                              className="m3-inline-action m3-inline-action-danger"
                               onClick={() => {
                                 setSelectedLogToFlag(tl);
                                 setFlagModalOpen(true);
                               }}
                               title="Flag discrepancy with physical copy"
                             >
-                              <IconAlert size={11} />
+                              <IconAlert size={12} />
                               Flag Discrepancy
                             </button>
                           )}

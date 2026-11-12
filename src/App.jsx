@@ -59,11 +59,19 @@ import UserAccountModal from './components/UserAccountModal';
 import SuperviseStudentModal from './components/SuperviseStudentModal';
 import ConfirmDialog from './components/ConfirmDialog';
 import AuthModal from './components/AuthModal';
-import { SegmentedControl, Switch, MaterialSelect, Snackbar } from './components/MaterialComponents';
+import { SegmentedControl, FilterChip, Switch, MaterialSelect, Snackbar } from './components/MaterialComponents';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
 import { clearAllSessionSignatures } from './utils/sessionSignature';
 import { getInstrumentById, getPlacementInstrumentStatus } from './utils/evaluationRubrics';
-import { apiFetch, getStoredUserSession, setVerifyContext } from './utils/apiClient';
+import { apiFetch, getStoredUserSession, getVerifyContext, setVerifyContext } from './utils/apiClient';
+import {
+  getTabPath,
+  getVerifyPath,
+  isTabAllowedForRole,
+  parseAppLocation,
+  syncBrowserUrl,
+  TAB_TITLES,
+} from './utils/appRouter';
 import usePresence, { useSmoothSwitch } from './utils/usePresence';
 
 const DEMO_PRESETS = [
@@ -326,6 +334,12 @@ function WorkspaceSkeleton({ activeTab, role }) {
 }
 
 export default function App() {
+  const initialRouteRef = useRef(null);
+  if (initialRouteRef.current === null) {
+    initialRouteRef.current = parseAppLocation();
+  }
+  const initialRoute = initialRouteRef.current;
+
   const [currentUser, setCurrentUser] = useState(() => {
     const parsed = getStoredUserSession();
     if (!parsed) return null;
@@ -333,6 +347,16 @@ export default function App() {
     if (parsed.name) parsed.name = parsed.name.replace(/\bPUP\b/g, 'MIT');
     return parsed;
   });
+
+  const pendingRedirectTabRef = useRef(
+    !currentUser && initialRoute.kind === 'tab'
+      ? initialRoute.tab
+      : !currentUser && initialRoute.kind === 'auth'
+      ? initialRoute.nextTab || null
+      : null
+  );
+  const suppressUrlSyncRef = useRef(false);
+  const urlInitializedRef = useRef(false);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
@@ -343,8 +367,12 @@ export default function App() {
   const [regSuccessMessage, setRegSuccessMessage] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [showDemoAccounts, setShowDemoAccounts] = useState(false);
-  const [authScreenOpen, setAuthScreenOpen] = useState(false);
-  const [authMode, setAuthMode] = useState('login');
+  const [authScreenOpen, setAuthScreenOpen] = useState(
+    () => !currentUser && (initialRoute.kind === 'auth' || initialRoute.kind === 'tab')
+  );
+  const [authMode, setAuthMode] = useState(() =>
+    initialRoute.kind === 'auth' ? initialRoute.mode : 'login'
+  );
   const [landingPreviewTab, setLandingPreviewTab] = useState('student');
   const [landingPreviewPaused, setLandingPreviewPaused] = useState(false);
 
@@ -375,7 +403,24 @@ export default function App() {
     position_title: 'Practicum Intern',
   });
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (initialRoute.kind === 'tab' && currentUser && isTabAllowedForRole(currentUser.role, initialRoute.tab)) {
+      return initialRoute.tab;
+    }
+    if (
+      initialRoute.kind === 'auth' &&
+      currentUser &&
+      initialRoute.nextTab &&
+      isTabAllowedForRole(currentUser.role, initialRoute.nextTab)
+    ) {
+      return initialRoute.nextTab;
+    }
+    return 'dashboard';
+  });
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
   const mobileBackdropPresence = usePresence(mobileMenuOpen, 150);
   const portalTabSwitch = useSmoothSwitch(
     currentUser ? `${currentUser.role}:${activeTab}` : 'guest',
@@ -415,18 +460,11 @@ export default function App() {
   const [auditModalOpen, setAuditModalOpen] = useState(false);
   const [auditPlacement, setAuditPlacement] = useState(null);
   const [publicSupervisorPlacementId, setPublicSupervisorPlacementId] = useState(() => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const v = urlParams.get('verify');
-      const t = urlParams.get('token');
-      if (v) {
-        setVerifyContext(v, t || null);
-        return v;
-      }
-      return null;
-    } catch {
-      return null;
+    if (initialRoute.kind === 'verify' && initialRoute.placementId) {
+      setVerifyContext(initialRoute.placementId, initialRoute.token || null);
+      return initialRoute.placementId;
     }
+    return null;
   });
 
   // Live Clock-In / Clock-Out Timer for Student Portal
@@ -513,14 +551,7 @@ export default function App() {
   // Role Tab Guard: Prevents blank screens if an invalid tab is retained across role switches
   useEffect(() => {
     if (!currentUser) return;
-    const allowedTabs = {
-      student: new Set(['dashboard', 'timelogs', 'evaluations', 'employers']),
-      adviser: new Set(['dashboard', 'timelogs', 'evaluations', 'compliance', 'employers', 'students', 'adviser-monitoring']),
-      supervisor: new Set(['dashboard', 'timelogs', 'evaluations', 'employers', 'students']),
-      admin: new Set(['dashboard', 'compliance', 'adviser-monitoring', 'placements', 'students', 'employers', 'timelogs', 'evaluations', 'admin', 'database-erd']),
-    };
-    const validSet = allowedTabs[currentUser.role] || new Set(['dashboard']);
-    if (!validSet.has(activeTab)) {
+    if (!isTabAllowedForRole(currentUser.role, activeTab)) {
       setActiveTab('dashboard');
     }
   }, [currentUser?.role, activeTab]);
@@ -698,6 +729,140 @@ export default function App() {
     }
   }, []);
 
+  // Show one-time redirect notice when landing on a protected, unauthorized, or unknown URL
+  useEffect(() => {
+    if (initialRoute.kind === 'tab' && !currentUser) {
+      const label = TAB_TITLES[initialRoute.tab] || 'this page';
+      showNotice(`Please sign in to access ${label}.`, 'error');
+    } else if (
+      initialRoute.kind === 'tab' &&
+      currentUser &&
+      !isTabAllowedForRole(currentUser.role, initialRoute.tab)
+    ) {
+      showNotice('Access restricted for your role — redirected to Dashboard.', 'error');
+    } else if (initialRoute.kind === 'not_found') {
+      showNotice(
+        currentUser ? 'Page not found — redirected to Dashboard.' : 'Page not found — redirected to Home.',
+        'error'
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Synchronize URL path and document.title with active page, auth modal, or verify view
+  useEffect(() => {
+    let targetUrl = '/';
+    let nextTitle = 'Practicly — Internship & OJT Tracking Platform';
+
+    if (publicSupervisorPlacementId) {
+      const ctx = getVerifyContext();
+      const tok =
+        ctx && String(ctx.placementId) === String(publicSupervisorPlacementId) ? ctx.token : null;
+      targetUrl = getVerifyPath(publicSupervisorPlacementId, tok);
+      nextTitle = 'Supervisor Verification — Practicly';
+    } else if (!currentUser) {
+      if (authScreenOpen) {
+        if (authMode === 'register') {
+          targetUrl = '/register';
+          nextTitle = 'Create Account — Practicly';
+        } else {
+          const nextTab = pendingRedirectTabRef.current;
+          targetUrl = nextTab ? `/login?next=${encodeURIComponent(nextTab)}` : '/login';
+          nextTitle = 'Sign In — Practicly';
+        }
+      } else {
+        targetUrl = '/';
+        nextTitle = 'Practicly — Internship & OJT Tracking Platform';
+      }
+    } else {
+      const resolvedTab = isTabAllowedForRole(currentUser.role, activeTab) ? activeTab : 'dashboard';
+      targetUrl = getTabPath(resolvedTab);
+      nextTitle = `${TAB_TITLES[resolvedTab] || 'Portal'} — Practicly`;
+    }
+
+    if (typeof document !== 'undefined') {
+      document.title = nextTitle;
+    }
+
+    if (suppressUrlSyncRef.current) {
+      suppressUrlSyncRef.current = false;
+      urlInitializedRef.current = true;
+      return;
+    }
+
+    const useReplace = !urlInitializedRef.current;
+    urlInitializedRef.current = true;
+    syncBrowserUrl(targetUrl, { replace: useReplace });
+  }, [publicSupervisorPlacementId, currentUser, authScreenOpen, authMode, activeTab]);
+
+  // Browser Back / Forward navigation handler with guest, role, and 404 guards
+  useEffect(() => {
+    const handlePopState = () => {
+      const route = parseAppLocation();
+      suppressUrlSyncRef.current = true;
+
+      if (route.kind === 'verify') {
+        setVerifyContext(route.placementId, route.token || null);
+        setPublicSupervisorPlacementId(route.placementId);
+        return;
+      }
+
+      if (publicSupervisorPlacementId) {
+        setVerifyContext(null, null);
+        setPublicSupervisorPlacementId(null);
+      }
+
+      if (!currentUser) {
+        if (route.kind === 'auth') {
+          pendingRedirectTabRef.current = route.nextTab || null;
+          setAuthMode(route.mode);
+          setAuthScreenOpen(true);
+          return;
+        }
+        if (route.kind === 'tab') {
+          pendingRedirectTabRef.current = route.tab;
+          setAuthMode('login');
+          setAuthScreenOpen(true);
+          syncBrowserUrl(`/login?next=${encodeURIComponent(route.tab)}`, { replace: true });
+          return;
+        }
+        if (route.kind === 'not_found') {
+          setAuthScreenOpen(false);
+          syncBrowserUrl('/', { replace: true });
+          showNotice('Page not found — redirected to Home.', 'error');
+          return;
+        }
+        pendingRedirectTabRef.current = null;
+        setAuthScreenOpen(false);
+        return;
+      }
+
+      if (route.kind === 'tab') {
+        if (isTabAllowedForRole(currentUser.role, route.tab)) {
+          setActiveTab(route.tab);
+        } else {
+          setActiveTab('dashboard');
+          syncBrowserUrl('/dashboard', { replace: true });
+          showNotice('Access restricted for your role — redirected to Dashboard.', 'error');
+        }
+        return;
+      }
+
+      if (route.kind === 'not_found') {
+        setActiveTab('dashboard');
+        syncBrowserUrl('/dashboard', { replace: true });
+        showNotice('Page not found — redirected to Dashboard.', 'error');
+        return;
+      }
+
+      setActiveTab('dashboard');
+      syncBrowserUrl('/dashboard', { replace: true });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentUser, publicSupervisorPlacementId, showNotice]);
+
   const isFetchingRef = useRef(false);
 
   const fetchSystemData = useCallback(
@@ -728,6 +893,12 @@ export default function App() {
               system_info: prev.system_info || { engine: 'sqlite' },
             }));
           } else {
+            setData((prev) => ({
+              ...prev,
+              placements: [],
+              timelogs: [],
+              evaluations: [],
+            }));
             showNotice(json.error || 'Failed to load supervisor verification record.', 'error');
           }
         } else if (!sessionUser) {
@@ -754,7 +925,10 @@ export default function App() {
             clearAllSessionSignatures();
             localStorage.removeItem('mit_ojt_user');
             localStorage.removeItem('pup_ojt_user');
+            pendingRedirectTabRef.current = activeTabRef.current;
             setCurrentUser(null);
+            setAuthMode('login');
+            setAuthScreenOpen(true);
             showNotice('Session expired or invalidated. Please sign in again.', 'error');
             return;
           }
@@ -766,7 +940,7 @@ export default function App() {
           }
         }
       } catch {
-        showNotice('Cannot reach backend server on port 8000.', 'error');
+        showNotice('Unable to reach the application server. Check your connection and try again.', 'error');
       } finally {
         isFetchingRef.current = false;
         setLoading(false);
@@ -985,12 +1159,18 @@ export default function App() {
           token: json.token || json.user?.token,
           display_name: (json.user.display_name || json.user.name || '').replace(/\bPUP\b/g, 'MIT'),
         };
+        const requestedTab = pendingRedirectTabRef.current;
+        pendingRedirectTabRef.current = null;
+        const destinationTab =
+          !isInternalSwitch && requestedTab && isTabAllowedForRole(cleanUser.role, requestedTab)
+            ? requestedTab
+            : 'dashboard';
         setCurrentUser(cleanUser);
         localStorage.setItem('mit_ojt_user', JSON.stringify(cleanUser));
         localStorage.removeItem('pup_ojt_user');
         setAuthScreenOpen(false);
         setRegSuccessMessage('');
-        setActiveTab('dashboard');
+        setActiveTab(destinationTab);
         setMobileMenuOpen(false);
         setLoginPassword('');
         setShowLoginPassword(false);
@@ -1009,6 +1189,9 @@ export default function App() {
   const executeLogout = () => {
     clearAllSessionSignatures();
     setVerifyContext(null, null);
+    setPublicSupervisorPlacementId(null);
+    pendingRedirectTabRef.current = null;
+    urlInitializedRef.current = false;
     setCurrentUser(null);
     localStorage.removeItem('mit_ojt_user');
     localStorage.removeItem('pup_ojt_user');
@@ -1117,11 +1300,17 @@ export default function App() {
           token: json.token || json.user?.token,
           display_name: (json.user.display_name || json.user.name || '').replace(/\bPUP\b/g, 'MIT'),
         };
+        const requestedTab = pendingRedirectTabRef.current;
+        pendingRedirectTabRef.current = null;
+        const destinationTab =
+          requestedTab && isTabAllowedForRole(cleanUser.role, requestedTab)
+            ? requestedTab
+            : 'dashboard';
         setCurrentUser(cleanUser);
         localStorage.setItem('mit_ojt_user', JSON.stringify(cleanUser));
         localStorage.removeItem('pup_ojt_user');
         setAuthScreenOpen(false);
-        setActiveTab('dashboard');
+        setActiveTab(destinationTab);
         setMobileMenuOpen(false);
         await fetchSystemData(true);
         showNotice(`Welcome, ${cleanUser.display_name}! Your student portal is ready.`);
@@ -2615,7 +2804,7 @@ export default function App() {
     }
     const targetPlacement =
       data.placements.find((p) => String(p.placement_id) === String(publicSupervisorPlacementId)) ||
-      data.placements[0];
+      null;
     return (
       <PublicSupervisorVerifyView
         placement={targetPlacement}
@@ -2624,11 +2813,6 @@ export default function App() {
         onClose={() => {
           setVerifyContext(null, null);
           setPublicSupervisorPlacementId(null);
-          try {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          } catch {
-            // ignore
-          }
         }}
         onRefresh={() => fetchSystemData(false)}
       />
@@ -3046,6 +3230,7 @@ export default function App() {
         <AuthModal
           isOpen={authScreenOpen}
           onClose={() => {
+            pendingRedirectTabRef.current = null;
             setAuthScreenOpen(false);
             setLoginError('');
             setRegSuccessMessage('');
@@ -3229,12 +3414,11 @@ export default function App() {
             <div className="sidebar-user-signout">
               <button
                 type="button"
-                className="btn btn-ghost-danger"
+                className="m3-icon-btn m3-icon-btn-danger"
                 title="Sign out"
                 onClick={requestLogout}
-                style={{ padding: '6px' }}
               >
-                <IconLogOut size={14} />
+                <IconLogOut size={15} />
               </button>
             </div>
           </div>
@@ -3542,7 +3726,9 @@ export default function App() {
                 activeStage={
                   myPlacement.status === 'completed' || myPlacement.requirement_met
                     ? 4
-                    : myTimeLogs.some((tl) => tl.approval_status === 'supervisor_verified') || myPlacement.signed_dtr_filename
+                    : myTimeLogs.length > 0 && myTimeLogs.every((tl) => tl.approval_status === 'approved')
+                    ? 4
+                    : myTimeLogs.some((tl) => tl.approval_status === 'approved' || tl.approval_status === 'supervisor_verified') || myPlacement.signed_dtr_filename
                     ? 3
                     : myTimeLogs.some((tl) => tl.approval_status === 'pending')
                     ? 2
@@ -3614,7 +3800,7 @@ export default function App() {
                 </div>
 
                 <div className="panel">
-                  <div className="panel-header">
+                  <div className="panel-header panel-header-inline">
                     <div>
                       <div className="panel-title">Trainee Profile &amp; Contacts</div>
                       <div className="panel-desc">Student identity, host company &amp; adviser</div>
@@ -3798,16 +3984,15 @@ export default function App() {
                     <option value="completed">Completed</option>
                     <option value="dropped">Dropped</option>
                   </MaterialSelect>
-                  <div className="toolbar-scope-toggle" title="Toggle between assigned advisees and all university interns">
-                    <span className="scope-toggle-label">My Advisees Only</span>
-                    <Switch
-                      checked={adviserScopeOnly}
-                      onCheckedChange={(checked) => {
-                        setAdviserScopeOnly(checked);
-                        showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
-                      }}
-                    />
-                  </div>
+                  <FilterChip
+                    selected={adviserScopeOnly}
+                    label="My Advisees Only"
+                    title="Toggle between assigned advisees and all university interns"
+                    onSelectedChange={(checked) => {
+                      setAdviserScopeOnly(checked);
+                      showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
+                    }}
+                  />
                 </div>
 
                 <div className="table-wrap">
@@ -3863,7 +4048,7 @@ export default function App() {
                                 const studentDoneCount =
                                   (inst.inst01 ? 1 : 0) + (inst.inst04 ? 1 : 0);
                                 return (
-                                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                     <StatusChip variant={inst.inst02 ? 'success' : 'neutral'}>
                                       INST-02: {inst.inst02Online ? pl.employer_rating : inst.inst02Signed ? 'Scan' : '—'}
                                     </StatusChip>
@@ -3942,8 +4127,7 @@ export default function App() {
                                 {!isEligible && (
                                   <button
                                     type="button"
-                                    className="btn btn-ghost"
-                                    style={{ color: 'var(--success-fg)', fontWeight: 600 }}
+                                    className="m3-inline-action m3-inline-action-success"
                                     onClick={() => handleEndorseClearance(pl.placement_id)}
                                     disabled={syncing}
                                   >
@@ -4171,8 +4355,7 @@ export default function App() {
                               <div className="row-actions" style={{ justifyContent: 'flex-end', gap: '6px' }}>
                                 <button
                                   type="button"
-                                  className="btn btn-secondary btn-sm"
-                                  style={{ color: 'var(--success-fg)', borderColor: 'var(--success-border)' }}
+                                  className="m3-inline-action m3-inline-action-success"
                                   title="Verify hours and pass to Faculty Adviser"
                                   onClick={() => handleVerifySupervisorLog(tl, 'supervisor_verified')}
                                   disabled={syncing}
@@ -4182,7 +4365,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn btn-ghost-danger btn-sm"
+                                  className="m3-inline-action m3-inline-action-danger"
                                   title="Flag discrepancy for student correction"
                                   onClick={() => handleVerifySupervisorLog(tl, 'flagged')}
                                   disabled={syncing}
@@ -4471,7 +4654,7 @@ export default function App() {
                         <tr>
                           <th>Student</th>
                           <th>Host Company</th>
-                          <th>Progress (hrs)</th>
+                          <th>Progress</th>
                           <th>Status</th>
                           <th className="text-right">Actions</th>
                         </tr>
@@ -4756,11 +4939,11 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn btn-ghost-danger"
+                                  className="m3-icon-btn m3-icon-btn-danger"
                                   title="Delete student"
                                   onClick={() => requestDeleteStudent(st)}
                                 >
-                                  <IconTrash size={13} />
+                                  <IconTrash size={15} />
                                 </button>
                               </div>
                             </td>
@@ -5016,7 +5199,7 @@ export default function App() {
                                   value={emp.moa_status || 'active'}
                                   onChange={(e) => handleUpdateEmployerMoaStatus(emp, e.target.value)}
                                 >
-                                  <option value="active">MOA Active (until {emp.moa_validity})</option>
+                                  <option value="active">Active · {emp.moa_validity}</option>
                                   <option value="pending_renewal">Renewal Pending</option>
                                   <option value="expired">MOA Expired</option>
                                 </MaterialSelect>
@@ -5038,7 +5221,7 @@ export default function App() {
                                 ) : emp.moa_status === 'active' ? (
                                   <StatusChip variant="neutral">Accredited Partner</StatusChip>
                                 ) : (
-                                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>MOA Inactive</span>
+                                  <StatusChip variant="neutral">MOA Inactive</StatusChip>
                                 )
                               ) : currentUser.role === 'supervisor' ? (
                                 <div className="row-actions" style={{ justifyContent: 'flex-end', gap: '6px' }}>
@@ -5120,19 +5303,19 @@ export default function App() {
                                     <>
                                       <button
                                         type="button"
-                                        className="btn btn-ghost"
+                                        className="m3-icon-btn m3-icon-btn-primary"
+                                        title="Edit HTE"
                                         onClick={() => handleStartEditEmployer(emp)}
                                       >
-                                        <IconEdit size={13} />
-                                        Edit
+                                        <IconEdit size={15} />
                                       </button>
                                       <button
                                         type="button"
-                                        className="btn btn-ghost-danger"
+                                        className="m3-icon-btn m3-icon-btn-danger"
                                         title="Delete HTE"
                                         onClick={() => requestDeleteEmployer(emp)}
                                       >
-                                        <IconTrash size={13} />
+                                        <IconTrash size={15} />
                                       </button>
                                     </>
                                   )}
@@ -5403,11 +5586,11 @@ export default function App() {
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-ghost-danger"
+                                className="m3-icon-btn m3-icon-btn-danger"
                                 title="Delete placement"
                                 onClick={() => requestDeletePlacement(pl)}
                               >
-                                <IconTrash size={13} />
+                                <IconTrash size={15} />
                               </button>
                             </div>
                           </td>
@@ -5584,12 +5767,9 @@ export default function App() {
                         <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           Official Signed Physical DTR (Supervisor Sign-off)
                         </span>
-                        <span
-                          className={`badge ${myPlacement?.signed_dtr_filename ? 'badge-success' : 'badge-warning'}`}
-                          style={{ fontSize: '10.5px' }}
-                        >
+                        <StatusChip variant={myPlacement?.signed_dtr_filename ? 'success' : 'warning'}>
                           {myPlacement?.signed_dtr_filename ? 'Signed Copy on File' : 'Pending Physical Upload'}
-                        </span>
+                        </StatusChip>
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
                         {myPlacement?.signed_dtr_filename ? (
@@ -5650,13 +5830,57 @@ export default function App() {
               )}
 
               <div className="panel">
+                  <div className="panel-header panel-header-inline">
+                    <div>
+                      <div className="panel-title">Recorded Shift Logs</div>
+                      <div className="panel-desc">
+                        {currentUser.role === 'student'
+                          ? 'Chronological daily attendance entries and task accomplishments'
+                          : 'Filter shift entries by status, student, or advisory scope'}
+                      </div>
+                    </div>
+                    <div className="action-row-wrap">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          const targetPl =
+                            currentUser.role === 'student'
+                              ? myPlacement
+                              : data.placements.find(
+                                  (p) =>
+                                    String(p.placement_id) ===
+                                    String(
+                                      timelogPlacementFilter !== 'all'
+                                        ? timelogPlacementFilter
+                                        : logForm.placement_id
+                                    )
+                                ) || data.placements[0];
+                          if (targetPl) setSelectedDtrPlacement(targetPl);
+                        }}
+                        title="Print official CHED CMO 104 Daily Time Record"
+                      >
+                        <IconPrinter size={13} />
+                        Print Official DTR
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleExportTimeLogsCsv(filteredTimeLogs)}
+                        title="Download records as CSV spreadsheet"
+                      >
+                        <IconDownload size={13} />
+                        Export DTR CSV
+                      </button>
+                    </div>
+                  </div>
                   <div className="panel-toolbar dtr-panel-toolbar">
                     <div className="dtr-toolbar-left">
                       <div className="search-box">
                         <IconSearch size={14} />
                         <input
                           type="text"
-                          placeholder="Search date or description..."
+                          placeholder="Search logs or tasks..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -5721,74 +5945,42 @@ export default function App() {
                           setTimelogQuickFilter(val);
                         }}
                       />
-                      {currentUser.role !== 'student' && (
-                        <MaterialSelect
-                          className="select-sm"
-                          value={timelogPlacementFilter}
-                          onChange={(e) => setTimelogPlacementFilter(e.target.value)}
-                        >
-                          <option value="all">
-                            {currentUser.role === 'supervisor' ? 'All Company Interns' : 'All Students'}
-                          </option>
-                          {(currentUser.role === 'supervisor'
-                            ? supervisorPlacements
-                            : currentUser.role === 'adviser' && adviserScopeOnly
-                            ? data.placements.filter((p) => Number(p.adviser_id) === Number(currentUser.linked_id))
-                            : data.placements
-                          ).map((pl) => (
-                            <option key={pl.placement_id} value={pl.placement_id}>
-                              {pl.student_name}
-                            </option>
-                          ))}
-                        </MaterialSelect>
-                      )}
-                      {currentUser.role === 'adviser' && (
-                        <div className="toolbar-scope-toggle" title="Toggle between assigned advisees and all university interns">
-                          <span className="scope-toggle-label">My Advisees Only</span>
-                          <Switch
-                            checked={adviserScopeOnly}
-                            onCheckedChange={(checked) => {
-                              setAdviserScopeOnly(checked);
-                              showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
-                            }}
-                          />
+                      {(currentUser.role !== 'student' || currentUser.role === 'adviser') && (
+                        <div className="dtr-secondary-filters">
+                          {currentUser.role !== 'student' && (
+                            <MaterialSelect
+                              className="select-sm"
+                              value={timelogPlacementFilter}
+                              onChange={(e) => setTimelogPlacementFilter(e.target.value)}
+                            >
+                              <option value="all">
+                                {currentUser.role === 'supervisor' ? 'All Company Interns' : 'All Students'}
+                              </option>
+                              {(currentUser.role === 'supervisor'
+                                ? supervisorPlacements
+                                : currentUser.role === 'adviser' && adviserScopeOnly
+                                ? data.placements.filter((p) => Number(p.adviser_id) === Number(currentUser.linked_id))
+                                : data.placements
+                              ).map((pl) => (
+                                <option key={pl.placement_id} value={pl.placement_id}>
+                                  {pl.student_name}
+                                </option>
+                              ))}
+                            </MaterialSelect>
+                          )}
+                          {currentUser.role === 'adviser' && (
+                            <FilterChip
+                              selected={adviserScopeOnly}
+                              label="My Advisees Only"
+                              title="Toggle between assigned advisees and all university interns"
+                              onSelectedChange={(checked) => {
+                                setAdviserScopeOnly(checked);
+                                showNotice(checked ? 'Filtered to your assigned advisees' : 'Displaying all departmental students');
+                              }}
+                            />
+                          )}
                         </div>
                       )}
-                    </div>
-
-                    <div className="toolbar-actions dtr-toolbar-actions">
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => {
-                          const targetPl =
-                            currentUser.role === 'student'
-                              ? myPlacement
-                              : data.placements.find(
-                                  (p) =>
-                                    String(p.placement_id) ===
-                                    String(
-                                      timelogPlacementFilter !== 'all'
-                                        ? timelogPlacementFilter
-                                        : logForm.placement_id
-                                    )
-                                ) || data.placements[0];
-                          if (targetPl) setSelectedDtrPlacement(targetPl);
-                        }}
-                        title="Print official CHED CMO 104 Daily Time Record"
-                      >
-                        <IconPrinter size={13} />
-                        Print Official DTR
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleExportTimeLogsCsv(filteredTimeLogs)}
-                        title="Download records as CSV spreadsheet"
-                      >
-                        <IconDownload size={13} />
-                        Export DTR CSV
-                      </button>
                     </div>
                   </div>
 
@@ -5851,11 +6043,10 @@ export default function App() {
                                 </MaterialSelect>
                               ) : tl.approval_status === 'pending' ? (
                                 currentUser.role === 'adviser' ? (
-                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <button
                                       type="button"
-                                      className="btn btn-secondary btn-sm"
-                                      style={{ height: '22px', padding: '0 6px', fontSize: '11px', color: 'var(--success-fg)', borderColor: 'var(--success-border)' }}
+                                      className="m3-inline-action m3-inline-action-success"
                                       onClick={() => handleUpdateTimeLogApproval(tl, 'approved')}
                                       title="Directly endorse and credit student hours"
                                     >
@@ -5863,8 +6054,7 @@ export default function App() {
                                     </button>
                                     <button
                                       type="button"
-                                      className="btn btn-ghost-danger btn-sm"
-                                      style={{ height: '22px', padding: '0 5px', fontSize: '11px' }}
+                                      className="m3-inline-action m3-inline-action-danger"
                                       onClick={() => handleUpdateTimeLogApproval(tl, 'flagged')}
                                       title="Flag discrepancy"
                                     >
@@ -5872,11 +6062,10 @@ export default function App() {
                                     </button>
                                   </div>
                                 ) : currentUser.role === 'supervisor' ? (
-                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <button
                                       type="button"
-                                      className="btn btn-secondary btn-sm"
-                                      style={{ height: '22px', padding: '0 6px', fontSize: '11px', color: 'var(--success-fg)', borderColor: 'var(--success-border)' }}
+                                      className="m3-inline-action m3-inline-action-success"
                                       onClick={() => handleUpdateTimeLogApproval(tl, 'supervisor_verified')}
                                       title="Verify and submit to Faculty Adviser"
                                     >
@@ -5884,8 +6073,7 @@ export default function App() {
                                     </button>
                                     <button
                                       type="button"
-                                      className="btn btn-ghost-danger btn-sm"
-                                      style={{ height: '22px', padding: '0 5px', fontSize: '11px' }}
+                                      className="m3-inline-action m3-inline-action-danger"
                                       onClick={() => handleUpdateTimeLogApproval(tl, 'flagged')}
                                       title="Flag discrepancy"
                                     >
@@ -5897,11 +6085,10 @@ export default function App() {
                                 )
                               ) : tl.approval_status === 'supervisor_verified' ? (
                                 currentUser.role === 'adviser' ? (
-                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <button
                                       type="button"
-                                      className="btn btn-secondary btn-sm"
-                                      style={{ height: '22px', padding: '0 6px', fontSize: '11px', color: 'var(--primary)', borderColor: 'var(--primary)' }}
+                                      className="m3-inline-action m3-inline-action-primary"
                                       onClick={() => handleUpdateTimeLogApproval(tl, 'approved')}
                                       title="Endorse and grant academic credit"
                                     >
@@ -5909,8 +6096,7 @@ export default function App() {
                                     </button>
                                     <button
                                       type="button"
-                                      className="btn btn-ghost-danger btn-sm"
-                                      style={{ height: '22px', padding: '0 5px', fontSize: '11px' }}
+                                      className="m3-inline-action m3-inline-action-danger"
                                       onClick={() => handleUpdateTimeLogApproval(tl, 'flagged')}
                                       title="Flag discrepancy"
                                     >
@@ -5932,21 +6118,13 @@ export default function App() {
                               <div className="row-actions">
                                 {currentUser.role === 'student' && (tl.approval_status === 'approved' || tl.approval_status === 'supervisor_verified') ? (
                                   <span
-                                    style={{
-                                      fontSize: '11px',
-                                      color: 'var(--text-muted)',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '3px',
-                                      padding: '2px 6px',
-                                      background: 'var(--bg-subtle)',
-                                      borderRadius: 'var(--radius-pill)',
-                                      border: '1px solid var(--border-default)',
-                                    }}
+                                    style={{ cursor: 'default' }}
                                     title="Attendance record has been officially signed off and locked for academic integrity."
                                   >
-                                    <IconShieldCheck size={12} style={{ color: 'var(--success-fg)' }} />
-                                    Locked
+                                    <StatusChip variant="neutral">
+                                      <IconShieldCheck size={12} style={{ color: '#137333' }} />
+                                      Locked
+                                    </StatusChip>
                                   </span>
                                 ) : (
                                   <>
@@ -5959,7 +6137,7 @@ export default function App() {
                                       return (
                                         <button
                                           type="button"
-                                          className={`btn ${hasDoc ? 'btn-tonal' : 'btn-ghost'}`}
+                                          className={`m3-icon-btn ${hasDoc ? 'm3-icon-btn-tonal' : 'm3-icon-btn-primary'}`}
                                           title={
                                             hasDoc
                                               ? `Audit signed DTR (${rowPl.signed_dtr_filename})`
@@ -5967,25 +6145,25 @@ export default function App() {
                                           }
                                           onClick={() => openAuditModal(rowPl)}
                                         >
-                                          <IconShieldCheck size={13} />
+                                          <IconShieldCheck size={15} />
                                         </button>
                                       );
                                     })()}
                                     <button
                                       type="button"
-                                      className="btn btn-ghost"
+                                      className="m3-icon-btn m3-icon-btn-primary"
                                       title={tl.approval_status === 'flagged' ? 'Re-edit flagged entry' : 'Edit entry'}
                                       onClick={() => handleStartEditTimeLog(tl)}
                                     >
-                                      <IconEdit size={13} />
+                                      <IconEdit size={15} />
                                     </button>
                                     <button
                                       type="button"
-                                      className="btn btn-ghost-danger"
+                                      className="m3-icon-btn m3-icon-btn-danger"
                                       title="Delete entry"
                                       onClick={() => requestDeleteTimeLog(tl)}
                                     >
-                                      <IconTrash size={13} />
+                                      <IconTrash size={15} />
                                     </button>
                                   </>
                                 )}
@@ -6061,18 +6239,18 @@ export default function App() {
                               </div>
                               <div className="panel-body">
                                 <div className="equal-grid">
-                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                  <div className="m3-checklist-card">
                                     <div>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-01</span>
+                                        <span className="m3-inst-code">INST-01</span>
                                         <StatusChip variant={instStatus.inst01 ? 'success' : 'warning'}>
                                           {instStatus.inst01 ? `Submitted (${myPlacement.student_supervisor_rating}/5.0)` : 'Action Required'}
                                         </StatusChip>
                                       </div>
-                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '8px' }}>
                                         Student &rarr; HTE Supervisor
                                       </div>
-                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.45 }}>
                                         Rate workplace mentorship &amp; training quality from your Host Company supervisor.
                                       </div>
                                     </div>
@@ -6092,10 +6270,10 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                  <div className="m3-checklist-card">
                                     <div>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-02</span>
+                                        <span className="m3-inst-code">INST-02</span>
                                         <StatusChip variant={instStatus.inst02 ? 'success' : 'neutral'}>
                                           {instStatus.inst02Online
                                             ? `Online (${myPlacement.employer_rating}/5.0)`
@@ -6104,10 +6282,10 @@ export default function App() {
                                             : 'Pending Supervisor'}
                                         </StatusChip>
                                       </div>
-                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '8px' }}>
                                         Supervisor &rarr; Trainee &amp; School
                                       </div>
-                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.45 }}>
                                         Submitted online by your supervisor via the shareable portal link, or upload a wet-ink signed scan.
                                       </div>
                                     </div>
@@ -6127,38 +6305,38 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                  <div className="m3-checklist-card">
                                     <div>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-03</span>
+                                        <span className="m3-inst-code">INST-03</span>
                                         <StatusChip variant={instStatus.inst03 ? 'success' : 'neutral'}>
                                           {instStatus.inst03 ? `Completed (${myPlacement.adviser_rating}/5.0)` : 'Pending Adviser'}
                                         </StatusChip>
                                       </div>
-                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '8px' }}>
                                         Faculty Adviser &rarr; HTE Quality Audit
                                       </div>
-                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.45 }}>
                                         Submitted by your Faculty Practicum Adviser ({myPlacement.adviser_name}) upon auditing your placement.
                                       </div>
                                     </div>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
                                       Adviser-exclusive institutional audit instrument
                                     </div>
                                   </div>
 
-                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                  <div className="m3-checklist-card">
                                     <div>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-04</span>
+                                        <span className="m3-inst-code">INST-04</span>
                                         <StatusChip variant={instStatus.inst04 ? 'success' : 'warning'}>
                                           {instStatus.inst04 ? `Submitted (${myPlacement.student_adviser_rating}/5.0)` : 'Action Required'}
                                         </StatusChip>
                                       </div>
-                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '8px' }}>
                                         Student &rarr; Faculty OJT Adviser
                                       </div>
-                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.45 }}>
                                         Evaluate faculty supervision, monitoring responsiveness, and academic guidance.
                                       </div>
                                     </div>
@@ -6198,12 +6376,9 @@ export default function App() {
                                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
                                       Signed Physical INST-02 Evaluation Copy (Paper Alternative)
                                     </span>
-                                    <span
-                                      className={`badge ${myPlacement?.signed_eval_filename ? 'badge-success' : 'badge-warning'}`}
-                                      style={{ fontSize: '10.5px' }}
-                                    >
+                                    <StatusChip variant={myPlacement?.signed_eval_filename ? 'success' : 'warning'}>
                                       {myPlacement?.signed_eval_filename ? 'Signed Scan on File' : 'Optional Paper Fallback'}
-                                    </span>
+                                    </StatusChip>
                                   </div>
                                   <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
                                     {myPlacement?.signed_eval_filename ? (
@@ -6293,22 +6468,22 @@ export default function App() {
                                   </div>
                                   <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     <div className="field-grid-3">
-                                      <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
+                                      <div className="m3-domain-tile">
                                         <div className="kv-label">{instMeta ? 'Domain I' : 'Technical'}</div>
                                         <div className="kv-value mono">{ev.technical_score} / 5.00</div>
                                       </div>
-                                      <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
+                                      <div className="m3-domain-tile">
                                         <div className="kv-label">{instMeta ? 'Domain II' : 'Work Ethic'}</div>
                                         <div className="kv-value mono">{ev.attitude_score} / 5.00</div>
                                       </div>
-                                      <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
+                                      <div className="m3-domain-tile">
                                         <div className="kv-label">{instMeta ? 'Domain III' : 'Attendance'}</div>
                                         <div className="kv-value mono">{ev.attendance_score} / 5.00</div>
                                       </div>
                                     </div>
                                     <div>
                                       <div className="kv-label">Evaluator Remarks</div>
-                                      <p style={{ fontSize: '12.5px', color: '#374151', marginTop: '4px', lineHeight: 1.55 }}>
+                                      <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.55 }}>
                                         &ldquo;{ev.comments}&rdquo;
                                       </p>
                                     </div>
@@ -6502,7 +6677,7 @@ export default function App() {
                                   </td>
                                   <td>
                                     <div className="row-title">{ev.evaluator_name}</div>
-                                    <div className="row-sub" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div className="m3-eval-meta">
                                       <span>{ev.evaluator_type}</span>
                                       {ev.instrument_type && (
                                         <span
@@ -6510,9 +6685,10 @@ export default function App() {
                                             fontSize: '10px',
                                             fontWeight: 600,
                                             padding: '2px 6px',
-                                            borderRadius: '4px',
-                                            background: 'var(--bg-surface-elevated, #f1f5f9)',
-                                            border: '1px solid var(--border-default)',
+                                            borderRadius: '8px',
+                                            background: 'var(--md-sys-color-surface-container-low)',
+                                            border: '1px solid var(--md-sys-color-outline-variant)',
+                                            color: 'var(--text-secondary)',
                                           }}
                                         >
                                           {ev.instrument_type === 'supervisor_to_student'
@@ -6531,12 +6707,12 @@ export default function App() {
                                   <td className="text-right mono tabular-nums" style={{ fontWeight: 600 }}>
                                     {Number(ev.rating).toFixed(2)}
                                   </td>
-                                  <td style={{ maxWidth: '280px', color: '#374151' }}>{ev.comments}</td>
+                                  <td style={{ maxWidth: '280px', color: 'var(--text-secondary)' }}>{ev.comments}</td>
                                   <td className="text-right">
                                     <div className="row-actions">
                                       <button
                                         type="button"
-                                        className="btn btn-ghost"
+                                        className="m3-icon-btn m3-icon-btn-primary"
                                         title="Open Official Rubrics & Print Form"
                                         onClick={() => {
                                           setForcedEvalInstrumentId(null);
@@ -6546,23 +6722,23 @@ export default function App() {
                                           setOfficialEvalModalOpen(true);
                                         }}
                                       >
-                                        <IconPrinter size={13} />
+                                        <IconPrinter size={15} />
                                       </button>
                                       <button
                                         type="button"
-                                        className="btn btn-ghost"
+                                        className="m3-icon-btn m3-icon-btn-primary"
                                         title="Edit evaluation"
                                         onClick={() => handleStartEditEvaluation(ev)}
                                       >
-                                        <IconEdit size={13} />
+                                        <IconEdit size={15} />
                                       </button>
                                       <button
                                         type="button"
-                                        className="btn btn-ghost-danger"
+                                        className="m3-icon-btn m3-icon-btn-danger"
                                         title="Delete evaluation"
                                         onClick={() => requestDeleteEvaluation(ev)}
                                       >
-                                        <IconTrash size={13} />
+                                        <IconTrash size={15} />
                                       </button>
                                     </div>
                                   </td>
@@ -6677,22 +6853,23 @@ export default function App() {
                           </button>
                           <button
                             type="button"
-                            className="btn btn-ghost"
+                            className="m3-icon-btn m3-icon-btn-primary"
+                            title="Edit adviser"
                             onClick={() => handleStartEditAdviser(adv)}
                           >
-                            <IconEdit size={12} />
+                            <IconEdit size={15} />
                           </button>
                           <button
                             type="button"
-                            className="btn btn-ghost-danger"
+                            className="m3-icon-btn m3-icon-btn-danger"
                             title="Delete adviser"
                             onClick={() => requestDeleteAdviser(adv)}
                           >
-                            <IconTrash size={12} />
+                            <IconTrash size={15} />
                           </button>
                         </div>
                       </div>
-                      <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#111827', margin: '2px 0' }}>
+                      <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', margin: '2px 0' }}>
                         {adv.full_name}
                       </div>
                       <span className="metric-foot">
@@ -6856,7 +7033,7 @@ export default function App() {
                               const inst = getPlacementInstrumentStatus(pl);
                               const studCount = (inst.inst01 ? 1 : 0) + (inst.inst04 ? 1 : 0);
                               return (
-                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                   <StatusChip variant={inst.inst02 ? 'success' : 'neutral'}>
                                     INST-02: {inst.inst02Online ? pl.employer_rating : inst.inst02Signed ? 'Scan' : '—'}
                                   </StatusChip>
@@ -6916,8 +7093,7 @@ export default function App() {
                               {Number(pl.requirement_met) !== 1 && (
                                 <button
                                   type="button"
-                                  className="btn btn-ghost"
-                                  style={{ color: '#15803d', fontWeight: 500 }}
+                                  className="m3-inline-action m3-inline-action-success"
                                   onClick={() => handleEndorseClearance(pl.placement_id)}
                                   disabled={syncing}
                                 >
@@ -6983,7 +7159,7 @@ export default function App() {
                     <IconSearch size={14} />
                     <input
                       type="text"
-                      placeholder="Filter clearance reports by student, reference code, or company..."
+                      placeholder="Filter by student, reference code, or company..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -6994,13 +7170,11 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Clearance Ref</th>
                         <th>Student</th>
                         <th>Host Company</th>
-                        <th className="text-right">Rendered Hours</th>
-                        <th>Hours Requirement</th>
-                        <th>Evaluation</th>
-                        <th>Status</th>
+                        <th>Training Hours</th>
+                        <th>Evaluations</th>
+                        <th>Status &amp; Reference</th>
                         <th className="no-print text-right">Actions</th>
                       </tr>
                     </thead>
@@ -7028,13 +7202,6 @@ export default function App() {
 
                           return (
                             <tr key={cr.report_id}>
-                              <td className="mono">
-                                {cr.clearance_reference ? (
-                                  <span style={{ color: '#15803d', fontWeight: 600 }}>{cr.clearance_reference}</span>
-                                ) : (
-                                  <span style={{ color: '#9ca3af' }}>—</span>
-                                )}
-                              </td>
                               <td>
                                 <div className="row-title">{cr.student_name}</div>
                                 <div className="row-sub mono">
@@ -7045,83 +7212,94 @@ export default function App() {
                                 <div className="row-title">{cr.company_name}</div>
                                 <div className="row-sub">Adviser: {cr.adviser_name}</div>
                               </td>
-                              <td className="text-right mono tabular-nums">
-                                {Number(cr.total_hours_completed).toFixed(2)} / {Number(cr.required_hours).toFixed(0)} hrs
+                              <td>
+                                <div className="m3-cell-stack">
+                                  <span className="mono tabular-nums" style={{ fontSize: '12px', fontWeight: 600 }}>
+                                    {Number(cr.total_hours_completed).toFixed(1)} / {Number(cr.required_hours).toFixed(0)} hrs
+                                  </span>
+                                  {hoursMet ? (
+                                    <StatusChip variant="success">Met ({cr.completion_percentage}%)</StatusChip>
+                                  ) : (
+                                    <StatusChip variant="warning">
+                                      {Number(cr.hours_remaining).toFixed(1)} hrs short
+                                    </StatusChip>
+                                  )}
+                                </div>
                               </td>
                               <td>
-                                {hoursMet ? (
-                                  <StatusChip variant="success">Met ({cr.completion_percentage}%)</StatusChip>
-                                ) : (
-                                  <StatusChip variant="warning">
-                                    {Number(cr.hours_remaining).toFixed(1)} hrs short
-                                  </StatusChip>
-                                )}
+                                <div className="m3-cell-stack">
+                                  {evalMet ? (
+                                    <StatusChip variant="success">
+                                      4/4 ({cr.average_rating}/5.0)
+                                    </StatusChip>
+                                  ) : (
+                                    <StatusChip variant={instStatus.completedCount > 0 ? 'warning' : 'neutral'}>
+                                      {instStatus.completedCount}/4 Instruments
+                                    </StatusChip>
+                                  )}
+                                  {cr.signed_eval_filename && (
+                                    <div className="row-sub">Signed INST-02 scan</div>
+                                  )}
+                                </div>
                               </td>
                               <td>
-                                {evalMet ? (
-                                  <StatusChip variant="success">
-                                    4/4 Verified ({cr.average_rating}/5.0)
-                                  </StatusChip>
-                                ) : (
-                                  <StatusChip variant={instStatus.completedCount > 0 ? 'warning' : 'neutral'}>
-                                    {instStatus.completedCount}/4 Instruments
-                                  </StatusChip>
-                                )}
-                                {cr.signed_eval_filename && (
-                                  <div className="row-sub" style={{ marginTop: '3px' }}>
-                                    Signed INST-02 scan on file
-                                  </div>
-                                )}
-                              </td>
-                              <td>
-                                {isEligible ? (
-                                  <StatusChip variant="success">Cleared</StatusChip>
-                                ) : cr.placement_status === 'dropped' ? (
-                                  <StatusChip variant="danger">Dropped</StatusChip>
-                                ) : (
-                                  <StatusChip variant="warning">Incomplete</StatusChip>
-                                )}
+                                <div className="m3-cell-stack">
+                                  {isEligible ? (
+                                    <StatusChip variant="success">Cleared</StatusChip>
+                                  ) : cr.placement_status === 'dropped' ? (
+                                    <StatusChip variant="danger">Dropped</StatusChip>
+                                  ) : (
+                                    <StatusChip variant="warning">Incomplete</StatusChip>
+                                  )}
+                                  {cr.clearance_reference && (
+                                    <div className="row-sub mono" style={{ color: 'var(--success-fg)', fontWeight: 600 }}>
+                                      {cr.clearance_reference}
+                                    </div>
+                                  )}
+                                </div>
                               </td>
                               <td className="no-print text-right">
-                                <div className="row-actions">
+                                <div className="row-actions row-actions-compact">
                                   {!isEligible && (
                                     <button
                                       type="button"
-                                      className="btn btn-primary btn-sm"
+                                      className="m3-inline-action m3-inline-action-success"
                                       onClick={() => handleEndorseClearance(cr.placement_id)}
                                       disabled={syncing}
+                                      title="Endorse and grant practicum clearance"
                                     >
-                                      <IconCheckCircle size={12} />
-                                      Endorse &amp; Clear
+                                      Endorse
                                     </button>
                                   )}
                                   {cr.signed_eval_filename && (
                                     <button
                                       type="button"
-                                      className="btn btn-tonal btn-sm"
+                                      className="m3-inline-action m3-inline-action-primary"
                                       onClick={() => {
                                         setSignedEvalPlacement(cr);
                                         setSignedEvalModalOpen(true);
                                       }}
                                       title={`View signed INST-02 scan: ${cr.signed_eval_filename}`}
                                     >
-                                      Signed INST-02
+                                      Scan
                                     </button>
                                   )}
                                   <button
                                     type="button"
                                     className="btn btn-ghost"
                                     onClick={() => jumpToEvaluatePlacement(cr)}
+                                    title="Evaluate placement"
                                   >
-                                    Evaluate
+                                    Eval
                                   </button>
                                   <button
                                     type="button"
-                                    className="btn btn-secondary btn-sm"
+                                    className="btn btn-secondary btn-xs"
                                     onClick={() => handleOpenClearanceCertificate(cr)}
+                                    title="View or print Clearance Certificate"
                                   >
-                                    <IconPrinter size={13} />
-                                    Certificate
+                                    <IconPrinter size={12} />
+                                    Cert
                                   </button>
                                 </div>
                               </td>
@@ -7269,11 +7447,11 @@ export default function App() {
                               {u.user_id !== 1 && Number(u.user_id) !== Number(currentUser?.user_id) && (
                                 <button
                                   type="button"
-                                  className="btn btn-ghost-danger"
+                                  className="m3-icon-btn m3-icon-btn-danger"
                                   title="Delete user"
                                   onClick={() => requestDeleteUser(u)}
                                 >
-                                  <IconTrash size={13} />
+                                  <IconTrash size={15} />
                                 </button>
                               )}
                             </div>
