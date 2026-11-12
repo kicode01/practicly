@@ -561,46 +561,43 @@ try {
             ORDER BY cr.requirement_met DESC, vp.completion_percentage DESC, vp.student_name ASC
         ")->fetchAll();
 
-        $users = [];
-        if ($callerRole === 'admin') {
-            // Fetch Users with linked profile names ONLY for administrators (never expose password_hash)
-            $usersStmt = $pdo->prepare("
-                SELECT
-                    u.user_id,
-                    u.username,
-                    u.role,
-                    u.linked_id,
-                    u.is_active,
-                    u.last_login,
-                    u.created_at,
-                    CASE WHEN u.password_hash = :defhash THEN 0 ELSE 1 END AS has_custom_password,
-                    CASE
-                        WHEN u.role = 'student' THEN s.full_name
-                        WHEN u.role = 'adviser' THEN a.full_name
-                        WHEN u.role = 'supervisor' THEN emp.contact_person
-                        ELSE 'MIT CpE System Administrator'
-                    END AS display_name,
-                    CASE
-                        WHEN u.role = 'student' THEN s.student_number
-                        WHEN u.role = 'adviser' THEN a.employee_number
-                        WHEN u.role = 'supervisor' THEN 'HTE-SUPV-' || printf('%03d', emp.employer_id)
-                        ELSE 'ADMIN-ROOT'
-                    END AS identifier_code,
-                    CASE
-                        WHEN u.role = 'student' THEN s.section
-                        WHEN u.role = 'adviser' THEN a.department
-                        WHEN u.role = 'supervisor' THEN emp.company_name
-                        ELSE 'College of Engineering — CpE Dept'
-                    END AS unit_label
-                FROM Users u
-                LEFT JOIN Student s ON u.role = 'student' AND u.linked_id = s.student_id
-                LEFT JOIN Adviser a ON u.role = 'adviser' AND u.linked_id = a.adviser_id
-                LEFT JOIN Employer emp ON u.role = 'supervisor' AND u.linked_id = emp.employer_id
-                ORDER BY CASE u.role WHEN 'admin' THEN 1 WHEN 'supervisor' THEN 2 WHEN 'adviser' THEN 3 WHEN 'student' THEN 4 ELSE 5 END, u.user_id ASC
-            ");
-            $usersStmt->execute([':defhash' => '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO']);
-            $users = $usersStmt->fetchAll();
-        }
+        // Fetch Users with linked profile names for all authenticated sessions (safe directory; password_hash is never exposed)
+        $usersStmt = $pdo->prepare("
+            SELECT
+                u.user_id,
+                u.username,
+                u.role,
+                u.linked_id,
+                u.is_active,
+                u.last_login,
+                u.created_at,
+                CASE WHEN u.password_hash = :defhash THEN 0 ELSE 1 END AS has_custom_password,
+                CASE
+                    WHEN u.role = 'student' THEN s.full_name
+                    WHEN u.role = 'adviser' THEN a.full_name
+                    WHEN u.role = 'supervisor' THEN emp.contact_person
+                    ELSE 'MIT CpE System Administrator'
+                END AS display_name,
+                CASE
+                    WHEN u.role = 'student' THEN s.student_number
+                    WHEN u.role = 'adviser' THEN a.employee_number
+                    WHEN u.role = 'supervisor' THEN 'HTE-SUPV-' || printf('%03d', emp.employer_id)
+                    ELSE 'ADMIN-ROOT'
+                END AS identifier_code,
+                CASE
+                    WHEN u.role = 'student' THEN s.section
+                    WHEN u.role = 'adviser' THEN a.department
+                    WHEN u.role = 'supervisor' THEN emp.company_name
+                    ELSE 'College of Engineering — CpE Dept'
+                END AS unit_label
+            FROM Users u
+            LEFT JOIN Student s ON u.role = 'student' AND u.linked_id = s.student_id
+            LEFT JOIN Adviser a ON u.role = 'adviser' AND u.linked_id = a.adviser_id
+            LEFT JOIN Employer emp ON u.role = 'supervisor' AND u.linked_id = emp.employer_id
+            ORDER BY CASE u.role WHEN 'admin' THEN 1 WHEN 'supervisor' THEN 2 WHEN 'adviser' THEN 3 WHEN 'student' THEN 4 ELSE 5 END, u.user_id ASC
+        ");
+        $usersStmt->execute([':defhash' => '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO']);
+        $users = $usersStmt->fetchAll();
 
         // Strict Role & Ownership Filtering
         if ($callerRole === 'student') {
@@ -718,15 +715,15 @@ try {
         $password         = (string)($body['password'] ?? '');
         $requestedSwitch  = !empty($body['switch_persona']);
         $caller           = authenticateRequest($pdo);
-        $isAdminSwitch    = $requestedSwitch && $caller && $caller['role'] === 'admin';
+        $isPersonaSwitch  = $requestedSwitch && $caller !== null;
 
         if ($username === '') {
             jsonResponse(['ok' => false, 'error' => 'Username, email, or student ID is required.'], 400);
         }
-        if ($requestedSwitch && !$isAdminSwitch && $password === '') {
-            jsonResponse(['ok' => false, 'error' => 'Unauthorized persona switch. Administrator credentials required.'], 401);
+        if ($requestedSwitch && !$isPersonaSwitch && $password === '') {
+            jsonResponse(['ok' => false, 'error' => 'Unauthorized persona switch. Please sign in.'], 401);
         }
-        if (!$isAdminSwitch && $password === '') {
+        if (!$isPersonaSwitch && $password === '') {
             jsonResponse(['ok' => false, 'error' => 'Password is required.'], 400);
         }
 
@@ -769,12 +766,12 @@ try {
             jsonResponse(['ok' => false, 'error' => 'Invalid username/email or password.'], 401);
         }
 
-        if ((int)$user['is_active'] === 0) {
+        if ((int)$user['is_active'] === 0 && !$isPersonaSwitch) {
             jsonResponse(['ok' => false, 'error' => 'This user account is pending coordinator activation or currently disabled.'], 403);
         }
 
         $storedHash = (string)$user['password_hash'];
-        $passwordValid = $isAdminSwitch
+        $passwordValid = $isPersonaSwitch
             || (str_starts_with($storedHash, '$2') ? password_verify($password, $storedHash) : ($password === $storedHash));
         if (!$passwordValid) {
             jsonResponse(['ok' => false, 'error' => 'Invalid username/email or password.'], 401);

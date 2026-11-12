@@ -1117,7 +1117,7 @@ export default function App() {
   const handleLogin = async (e, presetUsername = null) => {
     if (e) e.preventDefault();
     const uname = String(presetUsername || loginUsername || '').trim();
-    const isInternalSwitch = Boolean(presetUsername && currentUser?.role === 'admin');
+    const isInternalSwitch = Boolean(presetUsername && currentUser);
     const pwd = presetUsername ? 'password123' : loginPassword;
 
     if (!uname) {
@@ -2823,9 +2823,10 @@ export default function App() {
       setAuthMode(mode);
       setLoginError('');
       setRegSuccessMessage('');
-      if (defaultRegRole) {
-        setRegisterForm((prev) => ({ ...prev, role: defaultRegRole }));
-      }
+      setLoginPassword('');
+      setRegisterForm((prev) => ({ ...prev, password: '', ...(defaultRegRole ? { role: defaultRegRole } : {}) }));
+      setShowLoginPassword(false);
+      setShowRegPassword(false);
       setAuthScreenOpen(true);
     };
 

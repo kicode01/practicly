@@ -80,6 +80,10 @@ export default function AuthModal({
   const switchToMode = (nextMode) => {
     setAuthMode(nextMode);
     setLoginError('');
+    setLoginPassword('');
+    setRegisterForm((prev) => ({ ...prev, password: '' }));
+    setShowLoginPassword(false);
+    setShowRegPassword(false);
     if (nextMode === 'register') {
       setRegSuccessMessage('');
     }
@@ -189,7 +193,7 @@ export default function AuthModal({
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter your password"
-                    autoComplete="current-password"
+                    autoComplete="off"
                     required
                   />
                   <button
@@ -448,7 +452,7 @@ export default function AuthModal({
                       onChange={(e) =>
                         setRegisterForm({ ...registerForm, password: e.target.value })
                       }
-                      autoComplete="new-password"
+                      autoComplete="off"
                       required
                     />
                     <button

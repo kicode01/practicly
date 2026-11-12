@@ -63,6 +63,7 @@ export default function PersonaSwitcher({
         role: u.role,
         identifier_code: u.identifier_code || u.username,
         unit_label: (u.unit_label || '').replace(/\bPUP\b/g, 'MIT'),
+        is_active: u.is_active !== undefined ? Number(u.is_active) : 1,
       }));
     }
     return demoPresets.map((p) => ({
@@ -71,13 +72,13 @@ export default function PersonaSwitcher({
       role: p.role,
       identifier_code: p.username,
       unit_label: p.unit || (p.role === 'supervisor' ? 'Host Training Establishment' : 'Computer Engineering'),
+      is_active: 1,
     }));
   }, [users, demoPresets]);
 
-  // Legitimate internal system roles: student, adviser, admin
+  // Legitimate internal system roles: student, adviser, supervisor, admin
   const filteredUsers = useMemo(() => {
     return userList.filter((u) => {
-      if (u.role === 'supervisor') return false; // External contact
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (!search.trim()) return true;
       const q = search.toLowerCase();
@@ -97,6 +98,8 @@ export default function PersonaSwitcher({
         return 'Student Intern';
       case 'adviser':
         return 'Faculty Adviser';
+      case 'supervisor':
+        return 'HTE Supervisor';
       case 'admin':
         return 'Practicum Coordinator';
       default:
@@ -110,6 +113,8 @@ export default function PersonaSwitcher({
         return <IconStudent size={size} />;
       case 'adviser':
         return <IconSupervisor size={size} />;
+      case 'supervisor':
+        return <IconSupervisor size={size} />;
       case 'admin':
         return <IconShieldCheck size={size} />;
       default:
@@ -119,6 +124,7 @@ export default function PersonaSwitcher({
 
   const studentCount = userList.filter((u) => u.role === 'student').length;
   const adviserCount = userList.filter((u) => u.role === 'adviser').length;
+  const supervisorCount = userList.filter((u) => u.role === 'supervisor').length;
   const adminCount = userList.filter((u) => u.role === 'admin').length;
 
   return (
@@ -220,7 +226,7 @@ export default function PersonaSwitcher({
               className={`m3-filter-chip ${roleFilter === 'all' ? 'is-active' : ''}`}
               onClick={() => setRoleFilter('all')}
             >
-              All ({userList.filter((u) => u.role !== 'supervisor').length})
+              All ({userList.length})
             </button>
             <button
               type="button"
@@ -235,6 +241,13 @@ export default function PersonaSwitcher({
               onClick={() => setRoleFilter('adviser')}
             >
               Advisers ({adviserCount})
+            </button>
+            <button
+              type="button"
+              className={`m3-filter-chip ${roleFilter === 'supervisor' ? 'is-active' : ''}`}
+              onClick={() => setRoleFilter('supervisor')}
+            >
+              Supervisors ({supervisorCount})
             </button>
             <button
               type="button"
@@ -279,6 +292,20 @@ export default function PersonaSwitcher({
                           <span className={`m3-role-chip m3-role-${u.role}`}>
                             {getRoleLabel(u.role)}
                           </span>
+                          {u.is_active === 0 && (
+                            <span
+                              className="m3-role-chip"
+                              style={{
+                                background: '#fef3c7',
+                                color: '#92400e',
+                                border: '1px solid #fde68a',
+                                fontSize: '10px',
+                                padding: '1px 6px',
+                              }}
+                            >
+                              Inactive / Pending
+                            </span>
+                          )}
                         </div>
                         <div className="m3-persona-row-sub">
                           <span className="mono">{u.username}</span>
