@@ -275,7 +275,7 @@ export default function EvaluationEntryModal({
                     step="0.05"
                     min="1"
                     max="5"
-                    className="input score-input mono tabular-nums"
+                    className="input score-input tabular-nums"
                     value={evalForm.technical_score}
                     onChange={(e) => setEvalForm({ ...evalForm, technical_score: e.target.value })}
                     required
@@ -303,7 +303,7 @@ export default function EvaluationEntryModal({
                     step="0.05"
                     min="1"
                     max="5"
-                    className="input score-input mono tabular-nums"
+                    className="input score-input tabular-nums"
                     value={evalForm.attitude_score}
                     onChange={(e) => setEvalForm({ ...evalForm, attitude_score: e.target.value })}
                     required
@@ -331,7 +331,7 @@ export default function EvaluationEntryModal({
                     step="0.05"
                     min="1"
                     max="5"
-                    className="input score-input mono tabular-nums"
+                    className="input score-input tabular-nums"
                     value={evalForm.attendance_score}
                     onChange={(e) => setEvalForm({ ...evalForm, attendance_score: e.target.value })}
                     required
@@ -345,7 +345,7 @@ export default function EvaluationEntryModal({
                   <div className="score-composite-label">Weighted Composite Rating</div>
                   <div className="score-composite-status">{ratingLabel}</div>
                 </div>
-                <div className={`score-composite-value mono ${ratingBadgeClass}`}>
+                <div className={`score-composite-value tabular-nums ${ratingBadgeClass}`}>
                   {previewComposite} / 5.00
                 </div>
               </div>

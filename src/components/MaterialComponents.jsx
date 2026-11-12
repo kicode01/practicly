@@ -102,14 +102,28 @@ export function Switch({ checked = false, onCheckedChange, disabled = false, cla
 }
 
 export function Slider({ min = 1, max = 5, step = 0.5, value = 3, onValueChange, className = '' }) {
+  const safeMin = Number(min);
+  const safeMax = Number(max);
+  const numVal = Number.isFinite(Number(value)) ? Number(value) : safeMin;
+  const clamped = Math.min(safeMax, Math.max(safeMin, numVal));
+  const pct = safeMax > safeMin ? (clamped - safeMin) / (safeMax - safeMin) : 0;
+
   return (
-    <div className={`m3-slider-wrap ${className}`}>
+    <div
+      className={`m3-slider-wrap ${className}`.trim()}
+      style={{ '--m3-slider-pct': pct }}
+    >
+      <div className="m3-slider-track-active" aria-hidden="true" />
+      <div className="m3-slider-track-inactive" aria-hidden="true">
+        {pct < 0.96 && <span className="m3-slider-stop-dot" />}
+      </div>
+      <div className="m3-slider-handle" aria-hidden="true" />
       <input
         type="range"
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={clamped}
         className="m3-slider-input"
         onChange={(e) => onValueChange && onValueChange(Number(e.target.value))}
       />
