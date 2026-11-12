@@ -443,6 +443,7 @@ export default function AuthModal({
                     <input
                       type={showRegPassword ? 'text' : 'password'}
                       className="input"
+                      placeholder="Create a password"
                       value={registerForm.password}
                       onChange={(e) =>
                         setRegisterForm({ ...registerForm, password: e.target.value })

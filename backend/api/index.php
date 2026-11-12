@@ -807,15 +807,14 @@ try {
         $email         = trim((string)($body['email'] ?? ''));
         $contactNumber = trim((string)($body['contact_number'] ?? ''));
         $username      = trim((string)($body['username'] ?? ''));
-        $hasPasswordKey = array_key_exists('password', $body);
-        $rawPassword   = $hasPasswordKey ? (string)$body['password'] : 'password123';
-        $password      = trim($rawPassword) === '' && $hasPasswordKey ? '' : $rawPassword;
+        $rawPassword   = array_key_exists('password', $body) ? (string)$body['password'] : '';
+        $password      = $rawPassword;
 
         if ($fullName === '' || $email === '' || $username === '') {
             jsonResponse(['ok' => false, 'error' => 'Full name, institutional email, and username are required.'], 400);
         }
-        if ($hasPasswordKey && trim($rawPassword) === '') {
-            jsonResponse(['ok' => false, 'error' => 'Password cannot be empty or whitespace.'], 400);
+        if (trim($rawPassword) === '') {
+            jsonResponse(['ok' => false, 'error' => 'Password is required and cannot be empty or whitespace.'], 400);
         }
 
         $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u)');

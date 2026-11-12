@@ -397,7 +397,7 @@ export default function App() {
     email: '',
     contact_number: '',
     username: '',
-    password: 'password123',
+    password: '',
     employer_id: '',
     adviser_id: '1',
     position_title: 'Practicum Intern',
@@ -1285,7 +1285,7 @@ export default function App() {
           email: '',
           contact_number: '',
           username: '',
-          password: 'password123',
+          password: '',
         }));
         showNotice('Adviser account request submitted for coordinator activation.');
       } else {
@@ -1306,6 +1306,8 @@ export default function App() {
         setAuthScreenOpen(false);
         setActiveTab(destinationTab);
         setMobileMenuOpen(false);
+        setRegisterForm((prev) => ({ ...prev, password: '' }));
+        setShowRegPassword(false);
         await fetchSystemData(true);
         showNotice(`Welcome, ${cleanUser.display_name}! Your student portal is ready.`);
       }
