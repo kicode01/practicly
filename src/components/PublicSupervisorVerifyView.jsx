@@ -289,7 +289,7 @@ export default function PublicSupervisorVerifyView({
                 Host Training Establishment (HTE) Attendance Verification Portal
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Verified Host Workplace Portal · Any Academic Institution
+                Verified Host Workplace Portal · Metropolitan Institute of Technology
               </div>
             </div>
           </div>
