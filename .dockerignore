@@ -5,3 +5,4 @@ dist
 *.log
 database/*.db-wal
 database/*.db-shm
+brag-output

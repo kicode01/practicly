@@ -25,7 +25,9 @@
   </p>
 
   <br />
-  <img src="public/hero-workspace.jpg" alt="Practicly workspace overview" width="820" />
+  <a href="https://practicly-portal.vercel.app">
+    <img src="public/practicly-demo.gif" alt="Practicly — Manage student practicums in one shared workspace" width="820" />
+  </a>
 </div>
 
 ---
