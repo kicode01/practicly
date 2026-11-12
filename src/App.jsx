@@ -196,18 +196,8 @@ function WorkspaceSkeleton({ activeTab, role }) {
           </div>
         </>
       ) : isSplitFormTab ? (
-        /* Full-Width Table Skeleton with Top Filter Pills (TimeLogs & Evaluations) */
+        /* Full-Width Table Skeleton with Inline Toolbar Filter (TimeLogs & Evaluations) */
         <>
-          <div className="filter-pill-bar" style={{ marginBottom: '14px' }}>
-            {[1, 2, 3, 4, 5].map((p) => (
-              <div
-                key={p}
-                className="sk-shimmer"
-                style={{ width: p === 1 ? '90px' : '130px', height: '30px', borderRadius: '999px' }}
-              />
-            ))}
-          </div>
-
           <div className="panel">
             <div className="panel-toolbar">
               <div className="sk-shimmer sk-search" />
@@ -6036,86 +6026,95 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* MATERIAL DESIGN 3 (M3) EVALUATION FILTER */}
-                  <div className="filter-pill-bar m3-filter-wrap">
-                    <SegmentedControl
-                      items={[
-                        {
-                          value: 'all',
-                          label: (
-                            <span className="seg-filter-item">
-                              <span>All Evaluations</span>
-                              <span className="filter-pill-count">{evalCounts.all}</span>
-                            </span>
-                          ),
-                        },
-                        {
-                          value: 'employer',
-                          label: (
-                            <span className="seg-filter-item">
-                              <span>Supervisor Ratings</span>
-                              <span className="filter-pill-count">{evalCounts.employer}</span>
-                            </span>
-                          ),
-                        },
-                        {
-                          value: 'adviser',
-                          label: (
-                            <span className="seg-filter-item">
-                              <span>Adviser Endorsements</span>
-                              <span className="filter-pill-count">{evalCounts.adviser}</span>
-                            </span>
-                          ),
-                        },
-                        {
-                          value: 'student',
-                          label: (
-                            <span className="seg-filter-item">
-                              <span>Student Feedback</span>
-                              <span className="filter-pill-count">{evalCounts.student}</span>
-                            </span>
-                          ),
-                        },
-                      ]}
-                      value={evalQuickFilter}
-                      onValueChange={(val) => {
-                        setEvalQuickFilter(val);
-                      }}
-                    />
-                  </div>
-
               <div className="panel">
-                      <div className="panel-header">
-                        <div>
-                          <div className="panel-title">Submitted Evaluations</div>
-                          <div className="panel-desc">All recorded 360-degree rubrics, supervisor, and adviser ratings</div>
-                        </div>
-                      </div>
-                      <div className="panel-toolbar">
-                        <div className="search-box">
-                          <IconSearch size={14} />
-                          <input
-                            type="text"
-                            placeholder="Search evaluations by student, evaluator, or remarks..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div className="table-wrap">
-                        <table className="table">
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Student</th>
-                              <th>Evaluator</th>
-                              <th className="text-right">Score</th>
-                              <th>Remarks</th>
-                              <th className="text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredEvaluations.map((ev) => (
+                <div className="panel-header">
+                  <div>
+                    <div className="panel-title">Submitted Evaluations</div>
+                    <div className="panel-desc">All recorded 360-degree rubrics, supervisor, and adviser ratings</div>
+                  </div>
+                </div>
+                <div className="panel-toolbar dtr-panel-toolbar">
+                  <div className="dtr-toolbar-left">
+                    <div className="search-box">
+                      <IconSearch size={14} />
+                      <input
+                        type="text"
+                        placeholder="Search student or evaluator..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {/* MATERIAL DESIGN 3 (M3) EVALUATION FILTER INSIDE TABLE TOOLBAR */}
+                    <div className="table-filter-pills m3-filter-wrap">
+                      <SegmentedControl
+                        className="dtr-status-segmented"
+                        items={[
+                          {
+                            value: 'all',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>All Evaluations</span>
+                                <span className="filter-pill-count">{evalCounts.all}</span>
+                              </span>
+                            ),
+                          },
+                          {
+                            value: 'employer',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>Supervisor Ratings</span>
+                                <span className="filter-pill-count">{evalCounts.employer}</span>
+                              </span>
+                            ),
+                          },
+                          {
+                            value: 'adviser',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>Adviser Endorsements</span>
+                                <span className="filter-pill-count">{evalCounts.adviser}</span>
+                              </span>
+                            ),
+                          },
+                          {
+                            value: 'student',
+                            label: (
+                              <span className="seg-filter-item">
+                                <span>Student Feedback</span>
+                                <span className="filter-pill-count">{evalCounts.student}</span>
+                              </span>
+                            ),
+                          },
+                        ]}
+                        value={evalQuickFilter}
+                        onValueChange={(val) => {
+                          setEvalQuickFilter(val);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Student</th>
+                        <th>Evaluator</th>
+                        <th className="text-right">Score</th>
+                        <th>Remarks</th>
+                        <th className="text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEvaluations.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '28px', color: 'var(--text-muted)' }}>
+                            No evaluations match the selected filter or search query.
+                          </td>
+                        </tr>
+                      ) : filteredEvaluations.map((ev) => (
                                 <tr
                                   key={ev.eval_id}
                                   className={Number(editingEvalId) === Number(ev.eval_id) ? 'is-editing' : ''}
