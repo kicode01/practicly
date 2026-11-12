@@ -485,7 +485,7 @@ export default function App() {
       student: new Set(['dashboard', 'timelogs', 'evaluations', 'employers']),
       adviser: new Set(['dashboard', 'timelogs', 'evaluations', 'compliance', 'employers', 'students', 'adviser-monitoring']),
       supervisor: new Set(['dashboard', 'timelogs', 'evaluations', 'employers', 'students']),
-      admin: new Set(['dashboard', 'compliance', 'adviser-monitoring', 'placements', 'students', 'employers', 'timelogs', 'evaluations', 'users', 'database-erd']),
+      admin: new Set(['dashboard', 'compliance', 'adviser-monitoring', 'placements', 'students', 'employers', 'timelogs', 'evaluations', 'admin', 'database-erd']),
     };
     const validSet = allowedTabs[currentUser.role] || new Set(['dashboard']);
     if (!validSet.has(activeTab)) {
