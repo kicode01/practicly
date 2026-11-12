@@ -37,24 +37,20 @@ Practicly separates permissions, views, and compliance workflows into four purpo
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="public/role-student.png" alt="Student Intern workspace preview" width="100%" />
       <h3>Student Intern</h3>
       <p>Clock shifts with the live stopwatch, import attendance spreadsheets, and attach signed DTR PDFs while tracking real-time progress toward required practicum hours.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="public/role-supervisor.png" alt="Host Supervisor workspace preview" width="100%" />
       <h3>Host Supervisor</h3>
       <p>Approve logged trainee shifts and submit competency ratings via a direct HMAC-signed verification link (<code>?verify=1</code>) or an authenticated mentor account.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="public/role-adviser.png" alt="Faculty Adviser workspace preview" width="100%" />
       <h3>Faculty Adviser</h3>
       <p>Compare digital attendance against wet-signed scans side by side, conduct HTE quality audits (INST-03), review 360-degree forms, and endorse final clearance.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="public/role-coordinator.png" alt="Practicum Coordinator workspace preview" width="100%" />
       <h3>Practicum Coordinator</h3>
       <p>Maintain host organization MOAs, configure program hour targets, approve faculty accounts, export institutional clearance reports, and inspect the live database schema.</p>
     </td>
