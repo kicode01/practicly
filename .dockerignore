@@ -1,0 +1,8 @@
+node_modules
+.git
+.vercel
+dist
+null
+*.log
+database/*.db-wal
+database/*.db-shm

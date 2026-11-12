@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { apiFetch } from '../utils/apiClient';
 import {
   IconBriefcase,
   IconClock,
@@ -27,6 +28,7 @@ export default function PublicSupervisorVerifyView({
   const [portalTab, setPortalTab] = useState('dtr');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [actionError, setActionError] = useState('');
   const [flagModalOpen, setFlagModalOpen] = useState(false);
   const [selectedLogToFlag, setSelectedLogToFlag] = useState(null);
   const [flagReason, setFlagReason] = useState('Please verify and correct the recorded shift hours.');
@@ -111,7 +113,7 @@ export default function PublicSupervisorVerifyView({
     setEvalSaving(true);
     setEvalSavedNotice('');
     try {
-      const res = await fetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -133,15 +135,16 @@ export default function PublicSupervisorVerifyView({
       });
       const json = await res.json();
       if (json.ok) {
+        setActionError('');
         setEvalSavedNotice(
           `INST-02 evaluation ${json.updated ? 'updated' : 'submitted'} successfully (${evalComposite.toFixed(2)} / 5.00).`
         );
         if (onRefresh) onRefresh();
       } else {
-        alert(json.error || 'Failed to save supervisor evaluation.');
+        setActionError(json.error || 'Failed to save supervisor evaluation.');
       }
     } catch (err) {
-      alert('Failed to submit INST-02 evaluation: ' + err.message);
+      setActionError('Failed to submit INST-02 evaluation: ' + err.message);
     } finally {
       setEvalSaving(false);
     }
@@ -171,7 +174,7 @@ export default function PublicSupervisorVerifyView({
     if (!placement) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/timelogs/approve-all', {
+      const res = await apiFetch('/api/timelogs/approve-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,13 +184,14 @@ export default function PublicSupervisorVerifyView({
       });
       const json = await res.json();
       if (json.ok) {
+        setActionError('');
         setVerificationSuccess(true);
         if (onRefresh) onRefresh();
       } else {
-        alert(json.error || 'Failed to submit supervisor verification.');
+        setActionError(json.error || 'Failed to submit supervisor verification.');
       }
     } catch (err) {
-      alert('Error verifying logs: ' + err.message);
+      setActionError('Error verifying logs: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -198,7 +202,7 @@ export default function PublicSupervisorVerifyView({
     if (!selectedLogToFlag) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/timelogs/${selectedLogToFlag.log_id}`, {
+      const res = await apiFetch(`/api/timelogs/${selectedLogToFlag.log_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -209,14 +213,15 @@ export default function PublicSupervisorVerifyView({
       });
       const json = await res.json();
       if (json.ok) {
+        setActionError('');
         setFlagModalOpen(false);
         setSelectedLogToFlag(null);
         if (onRefresh) onRefresh();
       } else {
-        alert(json.error || 'Failed to flag log entry.');
+        setActionError(json.error || 'Failed to flag log entry.');
       }
     } catch (err) {
-      alert('Error: ' + err.message);
+      setActionError('Error flagging log entry: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -267,6 +272,46 @@ export default function PublicSupervisorVerifyView({
             </button>
           </div>
         </header>
+
+        {/* READ-ONLY PREVIEW NOTICE WHEN NO SIGNED TOKEN OR AUTH */}
+        {placement.can_submit === false && (
+          <div
+            className="no-print"
+            style={{
+              padding: '12px 16px',
+              marginBottom: '14px',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '12.5px',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <IconAlert size={16} style={{ color: 'var(--warning-fg)', flexShrink: 0 }} />
+            <span>
+              <strong>Read-Only Preview:</strong> Verification actions require a valid signed verification link token from the trainee or Faculty Adviser (or an active HTE Supervisor / Adviser login).
+            </span>
+          </div>
+        )}
+
+        {/* INLINE ERROR BANNER */}
+        {actionError && (
+          <div className="modal-inline-error no-print" role="alert">
+            <IconAlert size={16} />
+            <span style={{ flex: 1 }}>{actionError}</span>
+            <button
+              type="button"
+              className="modal-inline-error-close"
+              onClick={() => setActionError('')}
+              aria-label="Dismiss error"
+            >
+              <IconClose size={13} />
+            </button>
+          </div>
+        )}
 
         {/* SUCCESS BANNER */}
         {verificationSuccess && (
@@ -351,7 +396,7 @@ export default function PublicSupervisorVerifyView({
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="action-row-wrap">
             <button
               type="button"
               className={`btn btn-sm ${portalTab === 'dtr' ? 'btn-primary' : 'btn-secondary'}`}
@@ -408,7 +453,7 @@ export default function PublicSupervisorVerifyView({
               type="button"
               className="btn btn-primary btn-sm"
               onClick={handleVerifyAll}
-              disabled={isSubmitting || pendingCount === 0}
+              disabled={placement.can_submit === false || isSubmitting || pendingCount === 0}
             >
               <IconShieldCheck size={14} />
               {isSubmitting
@@ -481,6 +526,7 @@ export default function PublicSupervisorVerifyView({
                           <button
                             type="button"
                             className="btn btn-ghost-danger btn-xs"
+                            disabled={placement.can_submit === false}
                             onClick={() => {
                               setSelectedLogToFlag(tl);
                               setFlagModalOpen(true);
@@ -542,10 +588,6 @@ export default function PublicSupervisorVerifyView({
                   </div>
                 </div>
                 <span className="status-chip success">{evalInterp.label}</span>
-                <button type="button" className="btn btn-secondary btn-sm no-print" onClick={() => window.print()}>
-                  <IconPrinter size={14} />
-                  Print INST-02
-                </button>
               </div>
             </div>
 
@@ -578,7 +620,7 @@ export default function PublicSupervisorVerifyView({
                   {section.title}
                 </div>
                 <div className="table-wrap">
-                  <table className="table">
+                  <table className="table official-rubric-table">
                     <thead>
                       <tr>
                         <th style={{ width: '40px' }}>#</th>
@@ -656,7 +698,7 @@ export default function PublicSupervisorVerifyView({
                 <IconPrinter size={14} />
                 Print Copy for Filing
               </button>
-              <button type="submit" className="btn btn-primary btn-sm" disabled={evalSaving}>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={placement.can_submit === false || evalSaving}>
                 <IconCheckCircle size={14} />
                 {evalSaving
                   ? 'Submitting...'

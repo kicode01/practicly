@@ -13,7 +13,6 @@ import {
   IconBuilding,
   IconDatabase,
   IconAlert,
-  IconEdit,
   IconLink,
   IconUpload,
 } from './Icons';
@@ -29,12 +28,10 @@ export default function RoleHeroBanner({
   onOpenOfficialEval,
   onOpenDtrModal,
   onOpenClearanceModal,
-  onVerifyAllSupervisor,
   onApproveAllAdviser,
   onNavigateTab,
   onExportCsv,
   onOpenDtrAudit,
-  onEditProfile,
   onShareSupervisorLink,
   onUploadSignedDtr,
   onOpenDtrTransfer,
@@ -89,20 +86,6 @@ export default function RoleHeroBanner({
               <span className="gws-meta-item">
                 Adviser: <strong>{placement.adviser_name}</strong>
               </span>
-              {onEditProfile && (
-                <>
-                  <span className="gws-meta-sep" aria-hidden="true">·</span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost gws-inline-edit-btn"
-                    onClick={onEditProfile}
-                    title="Edit contact number or section"
-                  >
-                    <IconEdit size={12} />
-                    Edit profile
-                  </button>
-                </>
-              )}
             </div>
           </div>
 
@@ -256,18 +239,8 @@ export default function RoleHeroBanner({
           <div className="gws-alert-banner is-warning">
             <IconAlert size={16} className="gws-alert-icon text-amber" />
             <span className="gws-alert-text">
-              <strong>{supervisorPendingCount} pending attendance {supervisorPendingCount === 1 ? 'log' : 'logs'}</strong> awaiting workplace verification before academic endorsement.
+              <strong>{supervisorPendingCount} pending attendance {supervisorPendingCount === 1 ? 'log' : 'logs'}</strong> awaiting workplace verification before academic endorsement — review them in the Stage 1 queue below.
             </span>
-            {onVerifyAllSupervisor && (
-              <button
-                type="button"
-                className="btn btn-primary btn-xs"
-                onClick={onVerifyAllSupervisor}
-              >
-                <IconCheckCircle size={13} />
-                Verify All ({supervisorPendingCount})
-              </button>
-            )}
           </div>
         )}
 

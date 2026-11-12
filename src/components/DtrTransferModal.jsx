@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { SegmentedControl, Button, MaterialSelect } from './MaterialComponents';
+import { apiFetch } from '../utils/apiClient';
 import {
   IconClose,
   IconDownload,
@@ -33,6 +34,7 @@ export default function DtrTransferModal({
   const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationPushed, setVerificationPushed] = useState(false);
+  const [transferError, setTransferError] = useState('');
   const fileInputRef = useRef(null);
 
   // Document proof state (Signed HR DTR)
@@ -105,7 +107,7 @@ export default function DtrTransferModal({
     const student = p?.student_name || 'BSCpE Practicum Intern';
     const num = p?.student_number || '2023-00108-MN-0';
     const supervisor = p?.company_contact_person || 'Engr. Industry Supervisor';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300" style="background:#ffffff; font-family:system-ui,sans-serif;">
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300" style="background:#ffffff; font-family:'Inter','Open Runde',sans-serif;">
       <rect x="8" y="8" width="584" height="284" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
       <rect x="18" y="18" width="564" height="42" rx="4" fill="#0f172a"/>
       <text x="300" y="44" fill="#ffffff" font-size="13.5" font-weight="700" text-anchor="middle" letter-spacing="1">CERTIFICATE OF PRACTICUM ATTENDANCE &amp; DTR</text>
@@ -268,7 +270,7 @@ export default function DtrTransferModal({
     if (parsedRows.length === 0) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/timelogs', {
+      const res = await apiFetch('/api/timelogs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -279,13 +281,14 @@ export default function DtrTransferModal({
       });
       const json = await res.json();
       if (json.ok) {
+        setTransferError('');
         if (onSuccess) onSuccess(json.message);
         setActiveTab('audit');
       } else {
-        alert(json.error || 'Failed to transfer DTR batch records.');
+        setTransferError(json.error || 'Failed to transfer DTR batch records.');
       }
     } catch (err) {
-      alert('Error transferring DTR batch: ' + err.message);
+      setTransferError('Error transferring DTR batch: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -324,7 +327,7 @@ export default function DtrTransferModal({
     if (!activePlacement) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/timelogs/approve-all', {
+      const res = await apiFetch('/api/timelogs/approve-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -334,13 +337,14 @@ export default function DtrTransferModal({
       });
       const json = await res.json();
       if (json.ok) {
+        setTransferError('');
         if (onSuccess) onSuccess('Official DTR verified & endorsed! Student required hours marked completed.');
         onClose();
       } else {
-        alert(json.error || 'Failed to endorse DTR.');
+        setTransferError(json.error || 'Failed to endorse DTR.');
       }
     } catch (err) {
-      alert('Error endorsing DTR: ' + err.message);
+      setTransferError('Error endorsing DTR: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -404,9 +408,27 @@ export default function DtrTransferModal({
               { value: 'audit', label: '3. Adviser Audit & Endorsement' },
             ]}
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={(nextTab) => {
+              setTransferError('');
+              setActiveTab(nextTab);
+            }}
           />
         </div>
+
+        {transferError && (
+          <div className="modal-inline-error" role="alert" style={{ margin: '6px 24px 0' }}>
+            <IconAlert size={16} />
+            <span style={{ flex: 1 }}>{transferError}</span>
+            <button
+              type="button"
+              className="modal-inline-error-close"
+              onClick={() => setTransferError('')}
+              aria-label="Dismiss error"
+            >
+              <IconClose size={13} />
+            </button>
+          </div>
+        )}
 
         <div className="modal-body modal-entry-body">
           {/* TAB 1: EXCEL / CSV BATCH TRANSFER */}
@@ -500,7 +522,7 @@ export default function DtrTransferModal({
                 </div>
                 <textarea
                   className="input"
-                  style={{ width: '100%', minHeight: '68px', fontSize: '11.5px', fontFamily: 'monospace' }}
+                  style={{ width: '100%', minHeight: '68px', fontSize: '11.5px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}
                   placeholder="Paste rows copied from Excel here (tab-delimited or comma-separated: Date | Time In | Time Out | Break | Task)..."
                   value={csvText}
                   onChange={(e) => {

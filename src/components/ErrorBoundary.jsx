@@ -41,7 +41,7 @@ export default class ErrorBoundary extends React.Component {
             justifyContent: 'center',
             background: 'var(--bg-canvas, #f8fafc)',
             padding: '24px',
-            fontFamily: 'var(--font-sans, Inter, sans-serif)',
+            fontFamily: 'var(--font-sans, "Inter", "Open Runde", sans-serif)',
           }}
         >
           <div
@@ -99,7 +99,8 @@ export default class ErrorBoundary extends React.Component {
                   background: 'var(--bg-subtle, #f1f5f9)',
                   borderRadius: '12px',
                   fontSize: '12px',
-                  fontFamily: 'monospace',
+                  fontFamily: 'var(--font-sans, "Inter", "Open Runde", sans-serif)',
+                  fontVariantNumeric: 'tabular-nums',
                   color: '#475569',
                   textAlign: 'left',
                   marginBottom: '20px',

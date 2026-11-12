@@ -13,8 +13,14 @@ error_reporting(E_ALL);
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Verify-Token, X-Verify-Placement, X-Requested-With');
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -74,6 +80,211 @@ function computeHoursFromTimes(string $timeIn, string $timeOut, int $breakMinute
     return round($netMinutes / 60, 2);
 }
 
+function base64UrlEncode(string $data): string
+{
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function base64UrlDecode(string $data): string|false
+{
+    $pad = strlen($data) % 4;
+    if ($pad > 0) {
+        $data .= str_repeat('=', 4 - $pad);
+    }
+    return base64_decode(strtr($data, '-_', '+/'), true);
+}
+
+function getHeaderValue(string $headerName): string
+{
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $headerName));
+    if (!empty($_SERVER[$serverKey])) {
+        return trim((string)$_SERVER[$serverKey]);
+    }
+    $redirectKey = 'REDIRECT_' . $serverKey;
+    if (!empty($_SERVER[$redirectKey])) {
+        return trim((string)$_SERVER[$redirectKey]);
+    }
+    if (function_exists('getallheaders')) {
+        foreach (getallheaders() as $k => $v) {
+            if (strcasecmp((string)$k, $headerName) === 0) {
+                return trim((string)$v);
+            }
+        }
+    }
+    return '';
+}
+
+function getAppSecret(PDO $pdo): string
+{
+    static $cachedSecret = null;
+    if ($cachedSecret !== null) {
+        return $cachedSecret;
+    }
+
+    $pdo->exec('CREATE TABLE IF NOT EXISTS AppSecret (id INTEGER PRIMARY KEY, secret TEXT NOT NULL)');
+    $row = $pdo->query('SELECT secret FROM AppSecret WHERE id = 1 LIMIT 1')->fetchColumn();
+    if (is_string($row) && strlen($row) >= 32) {
+        $cachedSecret = $row;
+        return $cachedSecret;
+    }
+
+    $secret = bin2hex(random_bytes(32));
+    $stmt = $pdo->prepare('INSERT INTO AppSecret (id, secret) VALUES (1, :sec)');
+    try {
+        $stmt->execute([':sec' => $secret]);
+    } catch (Throwable $e) {
+        $existing = $pdo->query('SELECT secret FROM AppSecret WHERE id = 1 LIMIT 1')->fetchColumn();
+        if (is_string($existing) && strlen($existing) >= 32) {
+            $cachedSecret = $existing;
+            return $cachedSecret;
+        }
+    }
+    $cachedSecret = $secret;
+    return $cachedSecret;
+}
+
+function issueAuthToken(PDO $pdo, array $user): string
+{
+    $secret = getAppSecret($pdo);
+    $payload = [
+        'uid' => (int)$user['user_id'],
+        'role' => (string)$user['role'],
+        'exp' => time() + (86400 * 7),
+    ];
+    $encoded = base64UrlEncode((string)json_encode($payload));
+    $sig = base64UrlEncode(hash_hmac('sha256', $encoded, $secret, true));
+    return $encoded . '.' . $sig;
+}
+
+function generateVerifyToken(PDO $pdo, int $placementId): string
+{
+    $secret = getAppSecret($pdo);
+    return substr(hash_hmac('sha256', 'verify:placement:' . $placementId, $secret), 0, 32);
+}
+
+function isValidVerifyToken(PDO $pdo, int $placementId, string $token): bool
+{
+    if ($placementId <= 0 || $token === '') {
+        return false;
+    }
+    return hash_equals(generateVerifyToken($pdo, $placementId), $token);
+}
+
+function authenticateRequest(PDO $pdo): ?array
+{
+    static $resolved = false;
+    static $cachedUser = null;
+    if ($resolved) {
+        return $cachedUser;
+    }
+    $resolved = true;
+
+    $rawHeader = getHeaderValue('Authorization');
+    $token = '';
+    if (stripos($rawHeader, 'Bearer ') === 0) {
+        $token = trim(substr($rawHeader, 7));
+    }
+    if ($token === '') {
+        $token = getHeaderValue('X-Auth-Token');
+    }
+    if ($token === '' || strpos($token, '.') === false) {
+        return null;
+    }
+
+    [$encoded, $sig] = explode('.', $token, 2);
+    if ($encoded === '' || $sig === '') {
+        return null;
+    }
+
+    $secret = getAppSecret($pdo);
+    $expected = base64UrlEncode(hash_hmac('sha256', $encoded, $secret, true));
+    if (!hash_equals($expected, $sig)) {
+        return null;
+    }
+
+    $json = base64UrlDecode($encoded);
+    if ($json === false) {
+        return null;
+    }
+    $payload = json_decode($json, true);
+    if (!is_array($payload) || empty($payload['uid']) || empty($payload['exp'])) {
+        return null;
+    }
+    if ((int)$payload['exp'] < time()) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT user_id, username, role, linked_id, is_active FROM Users WHERE user_id = :uid LIMIT 1');
+    $stmt->execute([':uid' => (int)$payload['uid']]);
+    $user = $stmt->fetch();
+    if (!$user || (int)$user['is_active'] !== 1) {
+        return null;
+    }
+
+    $cachedUser = $user;
+    return $cachedUser;
+}
+
+function requireAuth(PDO $pdo, array $allowedRoles = []): array
+{
+    $user = authenticateRequest($pdo);
+    if (!$user) {
+        jsonResponse(['ok' => false, 'error' => 'Authentication required. Please sign in to continue.'], 401);
+    }
+    if ($allowedRoles !== [] && !in_array($user['role'], $allowedRoles, true)) {
+        jsonResponse(['ok' => false, 'error' => 'Forbidden: your role (' . $user['role'] . ') cannot perform this action.'], 403);
+    }
+    return $user;
+}
+
+function getVerifiedPlacementFromRequest(PDO $pdo, ?int $expectedPlacementId = null): ?int
+{
+    $token = trim((string)(getHeaderValue('X-Verify-Token') ?: ($_GET['token'] ?? '')));
+    $pidRaw = getHeaderValue('X-Verify-Placement') ?: ($_GET['verify'] ?? ($_GET['placement_id'] ?? ''));
+    $pid = is_numeric($pidRaw) ? (int)$pidRaw : ($expectedPlacementId ?? 0);
+    if ($expectedPlacementId !== null && $pid !== $expectedPlacementId) {
+        return null;
+    }
+    if ($pid > 0 && isValidVerifyToken($pdo, $pid, $token)) {
+        return $pid;
+    }
+    return null;
+}
+
+function getPlacementOwners(PDO $pdo, int $placementId): ?array
+{
+    $stmt = $pdo->prepare('SELECT placement_id, student_id, employer_id, adviser_id FROM Placement WHERE placement_id = :pid LIMIT 1');
+    $stmt->execute([':pid' => $placementId]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function assertEntityExists(PDO $pdo, string $table, string $pkColumn, int $id, string $label): void
+{
+    $stmt = $pdo->prepare("SELECT 1 FROM {$table} WHERE {$pkColumn} = :id LIMIT 1");
+    $stmt->execute([':id' => $id]);
+    if (!$stmt->fetchColumn()) {
+        jsonResponse(['ok' => false, 'error' => "Referenced {$label} (#{$id}) does not exist."], 400);
+    }
+}
+
+function validateLinkedIdForRole(PDO $pdo, string $role, ?int $linkedId): void
+{
+    if ($linkedId === null) {
+        return;
+    }
+    if ($linkedId <= 0) {
+        jsonResponse(['ok' => false, 'error' => 'linked_id must be a positive record identifier.'], 400);
+    }
+    if ($role === 'student') {
+        assertEntityExists($pdo, 'Student', 'student_id', $linkedId, 'Student');
+    } elseif ($role === 'adviser') {
+        assertEntityExists($pdo, 'Adviser', 'adviser_id', $linkedId, 'Adviser');
+    } elseif ($role === 'supervisor') {
+        assertEntityExists($pdo, 'Employer', 'employer_id', $linkedId, 'Employer/HTE');
+    }
+}
+
 try {
     $pdo = Database::getConnection();
 } catch (Throwable $e) {
@@ -101,9 +312,110 @@ $subAction  = $segments[1] ?? null;
 
 try {
     // =========================================================================
-    // 1. BOOTSTRAP / FULL SYSTEM STATE (Optimized Multi-Table Aggregations)
+    // 0A. PUBLIC CATALOG FOR SIGN-IN & REGISTRATION (NO PII / NO AUTH NEEDED)
+    // =========================================================================
+    if ($method === 'GET' && $resource === 'public-catalog') {
+        $employers = $pdo->query("
+            SELECT employer_id, company_name, industry, moa_status
+            FROM Employer
+            ORDER BY company_name ASC
+        ")->fetchAll();
+        $advisers = $pdo->query("
+            SELECT adviser_id, full_name, department
+            FROM Adviser
+            ORDER BY full_name ASC
+        ")->fetchAll();
+        $placementCount = (int)$pdo->query("SELECT COUNT(*) FROM Placement")->fetchColumn();
+        $firstPlacementId = (int)($pdo->query("SELECT placement_id FROM Placement ORDER BY placement_id ASC LIMIT 1")->fetchColumn() ?: 1);
+
+        jsonResponse([
+            'ok'                 => true,
+            'employers'          => $employers,
+            'advisers'           => $advisers,
+            'first_placement_id' => $firstPlacementId,
+            'counts'             => [
+                'employers'  => count($employers),
+                'advisers'   => count($advisers),
+                'placements' => $placementCount,
+            ],
+        ]);
+    }
+
+    // =========================================================================
+    // 0B. PUBLIC / SCOPED SUPERVISOR VERIFICATION PORTAL (GET /api/verify/{id})
+    // =========================================================================
+    if ($method === 'GET' && $resource === 'verify') {
+        $targetPid = $resourceId ?: (int)($_GET['placement_id'] ?? $_GET['verify'] ?? 1);
+        if ($targetPid <= 0) {
+            $targetPid = 1;
+        }
+        Database::syncCompliance($pdo, $targetPid);
+
+        $pStmt = $pdo->prepare('SELECT * FROM vw_placement_progress WHERE placement_id = :pid LIMIT 1');
+        $pStmt->execute([':pid' => $targetPid]);
+        $placement = $pStmt->fetch();
+        if (!$placement) {
+            jsonResponse(['ok' => false, 'error' => 'Placement verification link not found.'], 404);
+        }
+
+        $caller = authenticateRequest($pdo);
+        $verifiedPid = getVerifiedPlacementFromRequest($pdo, $targetPid);
+        $canSubmit = ($verifiedPid === $targetPid)
+            || ($caller && in_array($caller['role'], ['admin', 'adviser'], true))
+            || ($caller && $caller['role'] === 'supervisor' && (int)$caller['linked_id'] === (int)$placement['employer_id']);
+
+        $placement['can_submit'] = $canSubmit;
+        if ($canSubmit) {
+            $placement['verify_token'] = generateVerifyToken($pdo, $targetPid);
+        } else {
+            // Read-only anonymous preview: redact personal email & raw base64 document blobs
+            $placement['student_email'] = null;
+            $placement['signed_dtr_data'] = null;
+            $placement['signed_eval_data'] = null;
+        }
+
+        $tlStmt = $pdo->prepare("
+            SELECT tl.*, s.full_name AS student_name, s.student_number, e.company_name
+            FROM TimeLog tl
+            INNER JOIN Placement p ON tl.placement_id = p.placement_id
+            INNER JOIN Student s ON p.student_id = s.student_id
+            INNER JOIN Employer e ON p.employer_id = e.employer_id
+            WHERE tl.placement_id = :pid
+            ORDER BY tl.date DESC, tl.log_id DESC
+        ");
+        $tlStmt->execute([':pid' => $targetPid]);
+        $timelogs = $tlStmt->fetchAll();
+
+        $evStmt = $pdo->prepare("
+            SELECT ev.*, s.full_name AS student_name, e.company_name
+            FROM Evaluation ev
+            INNER JOIN Placement p ON ev.placement_id = p.placement_id
+            INNER JOIN Student s ON p.student_id = s.student_id
+            INNER JOIN Employer e ON p.employer_id = e.employer_id
+            WHERE ev.placement_id = :pid
+              AND (ev.instrument_type = 'supervisor_to_student' OR ev.evaluator_type = 'employer')
+            ORDER BY ev.date_evaluated DESC, ev.eval_id DESC
+        ");
+        $evStmt->execute([':pid' => $targetPid]);
+        $evaluations = $evStmt->fetchAll();
+
+        jsonResponse([
+            'ok'          => true,
+            'can_submit'  => $canSubmit,
+            'placement'   => $placement,
+            'timelogs'    => $timelogs,
+            'evaluations' => $evaluations,
+        ]);
+    }
+
+    // =========================================================================
+    // 1. BOOTSTRAP / FULL SYSTEM STATE (AUTHENTICATED & ROLE-SCOPED)
     // =========================================================================
     if ($method === 'GET' && in_array($resource, ['bootstrap', 'dashboard', ''], true)) {
+        $caller = requireAuth($pdo);
+        $callerRole = (string)$caller['role'];
+        $callerLinkedId = $caller['linked_id'] !== null ? (int)$caller['linked_id'] : null;
+
         // Ensure all compliance reports are synchronized
         Database::syncAllCompliance($pdo);
 
@@ -249,40 +561,73 @@ try {
             ORDER BY cr.requirement_met DESC, vp.completion_percentage DESC, vp.student_name ASC
         ")->fetchAll();
 
-        // Fetch Users with linked profile names
-        $users = $pdo->query("
-            SELECT
-                u.user_id,
-                u.username,
-                u.role,
-                u.linked_id,
-                u.is_active,
-                u.last_login,
-                u.created_at,
-                CASE
-                    WHEN u.role = 'student' THEN s.full_name
-                    WHEN u.role = 'adviser' THEN a.full_name
-                    WHEN u.role = 'supervisor' THEN emp.contact_person
-                    ELSE 'MIT CpE System Administrator'
-                END AS display_name,
-                CASE
-                    WHEN u.role = 'student' THEN s.student_number
-                    WHEN u.role = 'adviser' THEN a.employee_number
-                    WHEN u.role = 'supervisor' THEN 'HTE-SUPV-' || printf('%03d', emp.employer_id)
-                    ELSE 'ADMIN-ROOT'
-                END AS identifier_code,
-                CASE
-                    WHEN u.role = 'student' THEN s.section
-                    WHEN u.role = 'adviser' THEN a.department
-                    WHEN u.role = 'supervisor' THEN emp.company_name
-                    ELSE 'College of Engineering — CpE Dept'
-                END AS unit_label
-            FROM Users u
-            LEFT JOIN Student s ON u.role = 'student' AND u.linked_id = s.student_id
-            LEFT JOIN Adviser a ON u.role = 'adviser' AND u.linked_id = a.adviser_id
-            LEFT JOIN Employer emp ON u.role = 'supervisor' AND u.linked_id = emp.employer_id
-            ORDER BY CASE u.role WHEN 'admin' THEN 1 WHEN 'supervisor' THEN 2 WHEN 'adviser' THEN 3 WHEN 'student' THEN 4 ELSE 5 END, u.user_id ASC
-        ")->fetchAll();
+        $users = [];
+        if ($callerRole === 'admin') {
+            // Fetch Users with linked profile names ONLY for administrators (never expose password_hash)
+            $usersStmt = $pdo->prepare("
+                SELECT
+                    u.user_id,
+                    u.username,
+                    u.role,
+                    u.linked_id,
+                    u.is_active,
+                    u.last_login,
+                    u.created_at,
+                    CASE WHEN u.password_hash = :defhash THEN 0 ELSE 1 END AS has_custom_password,
+                    CASE
+                        WHEN u.role = 'student' THEN s.full_name
+                        WHEN u.role = 'adviser' THEN a.full_name
+                        WHEN u.role = 'supervisor' THEN emp.contact_person
+                        ELSE 'MIT CpE System Administrator'
+                    END AS display_name,
+                    CASE
+                        WHEN u.role = 'student' THEN s.student_number
+                        WHEN u.role = 'adviser' THEN a.employee_number
+                        WHEN u.role = 'supervisor' THEN 'HTE-SUPV-' || printf('%03d', emp.employer_id)
+                        ELSE 'ADMIN-ROOT'
+                    END AS identifier_code,
+                    CASE
+                        WHEN u.role = 'student' THEN s.section
+                        WHEN u.role = 'adviser' THEN a.department
+                        WHEN u.role = 'supervisor' THEN emp.company_name
+                        ELSE 'College of Engineering — CpE Dept'
+                    END AS unit_label
+                FROM Users u
+                LEFT JOIN Student s ON u.role = 'student' AND u.linked_id = s.student_id
+                LEFT JOIN Adviser a ON u.role = 'adviser' AND u.linked_id = a.adviser_id
+                LEFT JOIN Employer emp ON u.role = 'supervisor' AND u.linked_id = emp.employer_id
+                ORDER BY CASE u.role WHEN 'admin' THEN 1 WHEN 'supervisor' THEN 2 WHEN 'adviser' THEN 3 WHEN 'student' THEN 4 ELSE 5 END, u.user_id ASC
+            ");
+            $usersStmt->execute([':defhash' => '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO']);
+            $users = $usersStmt->fetchAll();
+        }
+
+        // Strict Role & Ownership Filtering
+        if ($callerRole === 'student') {
+            $placements = array_values(array_filter($placements, fn($p) => (int)$p['student_id'] === $callerLinkedId));
+            $allowedPids = array_flip(array_map(fn($p) => (int)$p['placement_id'], $placements));
+            $students = array_values(array_filter($students, fn($s) => (int)$s['student_id'] === $callerLinkedId));
+            $timelogs = array_values(array_filter($timelogs, fn($t) => isset($allowedPids[(int)$t['placement_id']])));
+            $evaluations = array_values(array_filter($evaluations, fn($ev) => isset($allowedPids[(int)$ev['placement_id']])));
+            $complianceReports = array_values(array_filter($complianceReports, fn($cr) => isset($allowedPids[(int)$cr['placement_id']])));
+        } elseif ($callerRole === 'supervisor') {
+            $placements = array_values(array_filter($placements, fn($p) => (int)$p['employer_id'] === $callerLinkedId));
+            $allowedPids = array_flip(array_map(fn($p) => (int)$p['placement_id'], $placements));
+            $allowedSids = array_flip(array_map(fn($p) => (int)$p['student_id'], $placements));
+            $students = array_values(array_filter($students, fn($s) => isset($allowedSids[(int)$s['student_id']])));
+            $timelogs = array_values(array_filter($timelogs, fn($t) => isset($allowedPids[(int)$t['placement_id']])));
+            $evaluations = array_values(array_filter(
+                $evaluations,
+                fn($ev) => isset($allowedPids[(int)$ev['placement_id']]) && $ev['evaluator_type'] === 'employer'
+            ));
+            $complianceReports = array_values(array_filter($complianceReports, fn($cr) => isset($allowedPids[(int)$cr['placement_id']])));
+        }
+
+        // Attach signed verification link token for authorized placements
+        foreach ($placements as &$plItem) {
+            $plItem['verify_token'] = generateVerifyToken($pdo, (int)$plItem['placement_id']);
+        }
+        unset($plItem);
 
         // Compute Executive Summary KPIs
         $totalHoursRendered = 0.0;
@@ -368,12 +713,21 @@ try {
     // 2. AUTHENTICATION MODULE (POST /api/login)
     // =========================================================================
     if ($method === 'POST' && $resource === 'login') {
-        $body     = getJsonBody();
-        $username = trim((string)($body['username'] ?? ''));
-        $password = (string)($body['password'] ?? '');
+        $body             = getJsonBody();
+        $username         = trim((string)($body['username'] ?? ''));
+        $password         = (string)($body['password'] ?? '');
+        $requestedSwitch  = !empty($body['switch_persona']);
+        $caller           = authenticateRequest($pdo);
+        $isAdminSwitch    = $requestedSwitch && $caller && $caller['role'] === 'admin';
 
         if ($username === '') {
-            jsonResponse(['ok' => false, 'error' => 'Username is required.'], 400);
+            jsonResponse(['ok' => false, 'error' => 'Username, email, or student ID is required.'], 400);
+        }
+        if ($requestedSwitch && !$isAdminSwitch && $password === '') {
+            jsonResponse(['ok' => false, 'error' => 'Unauthorized persona switch. Administrator credentials required.'], 401);
+        }
+        if (!$isAdminSwitch && $password === '') {
+            jsonResponse(['ok' => false, 'error' => 'Password is required.'], 400);
         }
 
         $stmt = $pdo->prepare("
@@ -401,33 +755,41 @@ try {
             LEFT JOIN Student s ON u.role = 'student' AND u.linked_id = s.student_id
             LEFT JOIN Adviser a ON u.role = 'adviser' AND u.linked_id = a.adviser_id
             LEFT JOIN Employer emp ON u.role = 'supervisor' AND u.linked_id = emp.employer_id
-            WHERE u.username = :uname
+            WHERE LOWER(TRIM(u.username)) = LOWER(:uname)
+               OR (u.role = 'student' AND (LOWER(TRIM(s.email)) = LOWER(:uname) OR LOWER(TRIM(s.student_number)) = LOWER(:uname)))
+               OR (u.role = 'adviser' AND (LOWER(TRIM(a.email)) = LOWER(:uname) OR LOWER(TRIM(a.employee_number)) = LOWER(:uname)))
+               OR (u.role = 'supervisor' AND LOWER(TRIM(emp.email)) = LOWER(:uname))
+            ORDER BY CASE WHEN LOWER(TRIM(u.username)) = LOWER(:uname) THEN 0 ELSE 1 END
             LIMIT 1
         ");
         $stmt->execute([':uname' => $username]);
         $user = $stmt->fetch();
 
         if (!$user) {
-            jsonResponse(['ok' => false, 'error' => 'Invalid username or password.'], 401);
+            jsonResponse(['ok' => false, 'error' => 'Invalid username/email or password.'], 401);
         }
 
         if ((int)$user['is_active'] === 0) {
             jsonResponse(['ok' => false, 'error' => 'This user account is currently deactivated.'], 403);
         }
 
-        $passwordValid = password_verify($password, $user['password_hash']) || $password === 'password123';
+        $storedHash = (string)$user['password_hash'];
+        $passwordValid = $isAdminSwitch
+            || (str_starts_with($storedHash, '$2') ? password_verify($password, $storedHash) : ($password === $storedHash));
         if (!$passwordValid) {
-            jsonResponse(['ok' => false, 'error' => 'Invalid username or password.'], 401);
+            jsonResponse(['ok' => false, 'error' => 'Invalid username/email or password.'], 401);
         }
 
         $pdo->prepare('UPDATE Users SET last_login = NOW() WHERE user_id = :uid')
             ->execute([':uid' => $user['user_id']]);
 
+        $token = issueAuthToken($pdo, $user);
         unset($user['password_hash']);
 
         jsonResponse([
-            'ok'   => true,
-            'user' => $user,
+            'ok'    => true,
+            'token' => $token,
+            'user'  => $user,
         ]);
     }
 
@@ -454,25 +816,30 @@ try {
             $password = 'password123';
         }
 
-        $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE username = :u');
+        $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u)');
         $checkUser->execute([':u' => $username]);
         if ((int)$checkUser->fetchColumn() > 0) {
             jsonResponse(['ok' => false, 'error' => 'That username is already taken.'], 409);
         }
 
-        $checkStu = $pdo->prepare('SELECT COUNT(*) FROM Student WHERE student_number = :sn OR email = :em');
+        $checkStu = $pdo->prepare('SELECT COUNT(*) FROM Student WHERE LOWER(TRIM(student_number)) = LOWER(:sn) OR LOWER(TRIM(email)) = LOWER(:em)');
         $checkStu->execute([':sn' => $studentNumber, ':em' => $email]);
         if ((int)$checkStu->fetchColumn() > 0) {
             jsonResponse(['ok' => false, 'error' => 'Student number or email is already registered.'], 409);
         }
 
+        $program   = trim((string)($body['program'] ?? 'BS Computer Engineering')) ?: 'BS Computer Engineering';
+        $yearLevel = trim((string)($body['year_level'] ?? '4th Year')) ?: '4th Year';
+
         $stmt = $pdo->prepare("
             INSERT INTO Student (student_number, full_name, program, year_level, section, email, contact_number)
-            VALUES (:snum, :fname, 'BS Computer Engineering', '4th Year', :sec, :em, :cnum)
+            VALUES (:snum, :fname, :prog, :yr, :sec, :em, :cnum)
         ");
         $stmt->execute([
             ':snum'  => $studentNumber,
             ':fname' => $fullName,
+            ':prog'  => $program,
+            ':yr'    => $yearLevel,
             ':sec'   => $section,
             ':em'    => $email,
             ':cnum'  => $contactNumber !== '' ? $contactNumber : '0917-555-0100',
@@ -493,7 +860,9 @@ try {
 
         if (!empty($body['employer_id'])) {
             $empId = (int)$body['employer_id'];
-            $advId = !empty($body['adviser_id']) ? (int)$body['adviser_id'] : 1;
+            $advId = !empty($body['adviser_id'])
+                ? (int)$body['adviser_id']
+                : (int)($pdo->query('SELECT adviser_id FROM Adviser ORDER BY adviser_id ASC LIMIT 1')->fetchColumn() ?: 1);
             $pos   = trim((string)($body['position_title'] ?? 'Computer Engineering Intern'));
             $pStmt = $pdo->prepare("
                 INSERT INTO Placement (student_id, employer_id, adviser_id, academic_term, position_title, start_date, end_date, required_hours, status)
@@ -511,19 +880,21 @@ try {
             Database::syncCompliance($pdo, $newPlacementId);
         }
 
+        $regUserPayload = [
+            'user_id'         => $newUserId,
+            'username'        => $username,
+            'role'            => 'student',
+            'linked_id'       => $newStudentId,
+            'is_active'       => 1,
+            'display_name'    => $fullName,
+            'identifier_code' => $studentNumber,
+            'unit_label'      => $section,
+        ];
         jsonResponse([
             'ok'      => true,
             'message' => 'Student account registered and signed in.',
-            'user'    => [
-                'user_id'         => $newUserId,
-                'username'        => $username,
-                'role'            => 'student',
-                'linked_id'       => $newStudentId,
-                'is_active'       => 1,
-                'display_name'    => $fullName,
-                'identifier_code' => $studentNumber,
-                'unit_label'      => $section,
-            ],
+            'token'   => issueAuthToken($pdo, $regUserPayload),
+            'user'    => $regUserPayload,
         ], 201);
     }
 
@@ -542,6 +913,31 @@ try {
             $fromStatus = !empty($body['from_status']) && in_array($body['from_status'], ['approved', 'supervisor_verified', 'pending', 'flagged'], true)
                 ? $body['from_status']
                 : null;
+
+            $caller = authenticateRequest($pdo);
+            $verifiedPid = getVerifiedPlacementFromRequest($pdo, $placementId);
+
+            if ($verifiedPid !== null && !$caller) {
+                // Signed supervisor verify link can ONLY supervisor-verify that single placement
+                $placementId = $verifiedPid;
+                $targetStatus = 'supervisor_verified';
+                $adviserId = null;
+                $employerId = null;
+            } else {
+                $caller = requireAuth($pdo, ['admin', 'adviser', 'supervisor']);
+                if ($caller['role'] === 'supervisor') {
+                    $targetStatus = 'supervisor_verified';
+                    $adviserId = null;
+                    if ($placementId) {
+                        $owners = getPlacementOwners($pdo, $placementId);
+                        if (!$owners || (int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                            jsonResponse(['ok' => false, 'error' => 'Forbidden: this placement belongs to another company.'], 403);
+                        }
+                    } else {
+                        $employerId = (int)$caller['linked_id'];
+                    }
+                }
+            }
 
             if ($placementId) {
                 if ($fromStatus) {
@@ -619,6 +1015,7 @@ try {
         }
 
         if ($method === 'POST') {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student']);
             $body = getJsonBody();
 
             // Bulk DTR Transfer Handler (Excel / CSV parsed batch)
@@ -627,9 +1024,18 @@ try {
                 if ($placementId <= 0) {
                     jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required for batch DTR transfer.'], 400);
                 }
+                $owners = getPlacementOwners($pdo, $placementId);
+                if (!$owners) {
+                    jsonResponse(['ok' => false, 'error' => 'Placement record not found.'], 404);
+                }
+                if ($caller['role'] === 'student' && (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: you can only transfer DTR logs for your own placement.'], 403);
+                }
 
                 $inserted = 0;
-                $defaultStatus = trim((string)($body['approval_status'] ?? 'pending'));
+                $defaultStatus = $caller['role'] === 'student'
+                    ? 'pending'
+                    : trim((string)($body['approval_status'] ?? 'pending'));
 
                 $pdo->beginTransaction();
                 try {
@@ -667,7 +1073,9 @@ try {
                         $breakMins = isset($log['break_minutes']) ? (int)$log['break_minutes'] : 60;
                         $explicitHrs = isset($log['hours_rendered']) && $log['hours_rendered'] !== '' ? (float)$log['hours_rendered'] : null;
                         $taskDesc = trim((string)($log['task_description'] ?? 'Daily engineering practicum deliverables and technical tasks.'));
-                        $logStatus = !empty($log['approval_status']) ? trim((string)$log['approval_status']) : $defaultStatus;
+                        $logStatus = $caller['role'] === 'student'
+                            ? 'pending'
+                            : (!empty($log['approval_status']) ? trim((string)$log['approval_status']) : $defaultStatus);
 
                         $hrs = computeHoursFromTimes($timeIn, $timeOut, $breakMins, $explicitHrs);
                         if ($hrs <= 0) $hrs = 8.00;
@@ -715,6 +1123,17 @@ try {
 
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+            $owners = getPlacementOwners($pdo, $placementId);
+            if (!$owners) {
+                jsonResponse(['ok' => false, 'error' => 'Referenced placement record does not exist.'], 404);
+            }
+            if ($caller['role'] === 'student') {
+                if ((int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: students may only log hours under their own placement.'], 403);
+                }
+                // Students cannot self-approve their own hours
+                $approval = 'pending';
             }
 
             $hoursRendered = computeHoursFromTimes($timeIn, $timeOut, $breakMins, $explicitHrs);
@@ -784,16 +1203,68 @@ try {
                 jsonResponse(['ok' => false, 'error' => 'Time log not found.'], 404);
             }
 
-            $placementId = (int)($body['placement_id'] ?? $existing['placement_id']);
-            $date        = trim((string)($body['date'] ?? $existing['date']));
-            $timeIn      = trim((string)($body['time_in'] ?? $existing['time_in']));
-            $timeOut     = trim((string)($body['time_out'] ?? $existing['time_out']));
-            $breakMins   = isset($body['break_minutes']) ? (int)$body['break_minutes'] : (int)$existing['break_minutes'];
-            $explicitHrs = isset($body['hours_rendered']) && $body['hours_rendered'] !== '' ? (float)$body['hours_rendered'] : null;
-            $taskDesc    = trim((string)($body['task_description'] ?? $existing['task_description']));
-            $approval    = $body['approval_status'] ?? $existing['approval_status'];
+            $oldPlacementId = (int)$existing['placement_id'];
+            $owners = getPlacementOwners($pdo, $oldPlacementId);
+            $caller = authenticateRequest($pdo);
+            $verifiedPid = getVerifiedPlacementFromRequest($pdo, $oldPlacementId);
 
-            $hoursRendered = computeHoursFromTimes($timeIn, $timeOut, $breakMins, $explicitHrs);
+            if ($verifiedPid !== null && !$caller) {
+                // Signed verification link: only allow supervisor_verified or flagged on this log
+                $placementId   = $oldPlacementId;
+                $date          = (string)$existing['date'];
+                $timeIn        = (string)$existing['time_in'];
+                $timeOut       = (string)$existing['time_out'];
+                $breakMins     = (int)$existing['break_minutes'];
+                $hoursRendered = (float)$existing['hours_rendered'];
+                $taskDesc      = trim((string)($body['task_description'] ?? $existing['task_description']));
+                $reqApp        = (string)($body['approval_status'] ?? 'flagged');
+                $approval      = in_array($reqApp, ['supervisor_verified', 'flagged'], true) ? $reqApp : 'flagged';
+            } else {
+                $caller = requireAuth($pdo, ['admin', 'adviser', 'supervisor', 'student']);
+                if ($caller['role'] === 'supervisor') {
+                    if (!$owners || (int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: this log belongs to another company.'], 403);
+                    }
+                    $placementId   = $oldPlacementId;
+                    $date          = (string)$existing['date'];
+                    $timeIn        = (string)$existing['time_in'];
+                    $timeOut       = (string)$existing['time_out'];
+                    $breakMins     = (int)$existing['break_minutes'];
+                    $hoursRendered = (float)$existing['hours_rendered'];
+                    $taskDesc      = trim((string)($body['task_description'] ?? $existing['task_description']));
+                    $reqApp        = (string)($body['approval_status'] ?? 'supervisor_verified');
+                    if (!in_array($reqApp, ['supervisor_verified', 'flagged', 'pending'], true)) {
+                        jsonResponse(['ok' => false, 'error' => 'Supervisors can set supervisor_verified or flagged status only.'], 403);
+                    }
+                    $approval = $reqApp;
+                } elseif ($caller['role'] === 'student') {
+                    if (!$owners || (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: you can only edit your own time logs.'], 403);
+                    }
+                    $placementId   = $oldPlacementId;
+                    $date          = trim((string)($body['date'] ?? $existing['date']));
+                    $timeIn        = trim((string)($body['time_in'] ?? $existing['time_in']));
+                    $timeOut       = trim((string)($body['time_out'] ?? $existing['time_out']));
+                    $breakMins     = isset($body['break_minutes']) ? (int)$body['break_minutes'] : (int)$existing['break_minutes'];
+                    $explicitHrs   = isset($body['hours_rendered']) && $body['hours_rendered'] !== '' ? (float)$body['hours_rendered'] : null;
+                    $taskDesc      = trim((string)($body['task_description'] ?? $existing['task_description']));
+                    $approval      = 'pending';
+                    $hoursRendered = computeHoursFromTimes($timeIn, $timeOut, $breakMins, $explicitHrs);
+                } else {
+                    $placementId   = (int)($body['placement_id'] ?? $existing['placement_id']);
+                    $date          = trim((string)($body['date'] ?? $existing['date']));
+                    $timeIn        = trim((string)($body['time_in'] ?? $existing['time_in']));
+                    $timeOut       = trim((string)($body['time_out'] ?? $existing['time_out']));
+                    $breakMins     = isset($body['break_minutes']) ? (int)$body['break_minutes'] : (int)$existing['break_minutes'];
+                    $explicitHrs   = isset($body['hours_rendered']) && $body['hours_rendered'] !== '' ? (float)$body['hours_rendered'] : null;
+                    $taskDesc      = trim((string)($body['task_description'] ?? $existing['task_description']));
+                    $appCand       = (string)($body['approval_status'] ?? $existing['approval_status']);
+                    $approval      = in_array($appCand, ['approved', 'pending', 'supervisor_verified', 'flagged'], true)
+                        ? $appCand
+                        : $existing['approval_status'];
+                    $hoursRendered = computeHoursFromTimes($timeIn, $timeOut, $breakMins, $explicitHrs);
+                }
+            }
 
             // Prevent duplicate key collision if date/placement changed to an existing date
             $dupStmt = $pdo->prepare('DELETE FROM TimeLog WHERE placement_id = :pid AND date = :dt AND log_id != :id');
@@ -823,6 +1294,9 @@ try {
                 ':id'   => $resourceId,
             ]);
 
+            if ($oldPlacementId !== $placementId) {
+                Database::syncCompliance($pdo, $oldPlacementId);
+            }
             Database::syncCompliance($pdo, $placementId);
 
             jsonResponse([
@@ -832,11 +1306,18 @@ try {
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student']);
             $stmt = $pdo->prepare('SELECT placement_id FROM TimeLog WHERE log_id = :id');
             $stmt->execute([':id' => $resourceId]);
             $row = $stmt->fetch();
             if (!$row) {
                 jsonResponse(['ok' => false, 'error' => 'Time log not found.'], 404);
+            }
+            if ($caller['role'] === 'student') {
+                $owners = getPlacementOwners($pdo, (int)$row['placement_id']);
+                if (!$owners || (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: students may only delete their own time logs.'], 403);
+                }
             }
 
             $pdo->prepare('DELETE FROM TimeLog WHERE log_id = :id')->execute([':id' => $resourceId]);
@@ -893,6 +1374,41 @@ try {
 
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+            $owners = getPlacementOwners($pdo, $placementId);
+            if (!$owners) {
+                jsonResponse(['ok' => false, 'error' => 'Referenced placement record does not exist.'], 404);
+            }
+
+            $caller = authenticateRequest($pdo);
+            $verifiedPid = getVerifiedPlacementFromRequest($pdo, $placementId);
+            if ($verifiedPid !== null && !$caller) {
+                if ($instrumentType !== 'supervisor_to_student' || $evaluatorType !== 'employer') {
+                    jsonResponse(['ok' => false, 'error' => 'Verification link can only submit INST-02 Supervisor evaluations.'], 403);
+                }
+            } else {
+                $caller = requireAuth($pdo, ['admin', 'adviser', 'supervisor', 'student']);
+                if ($caller['role'] === 'student') {
+                    if ((int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: students may only evaluate their own placement.'], 403);
+                    }
+                    if (!in_array($instrumentType, ['student_to_supervisor', 'student_to_adviser'], true)) {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: students cannot submit supervisor or adviser evaluations.'], 403);
+                    }
+                    $evaluatorType = 'student';
+                } elseif ($caller['role'] === 'supervisor') {
+                    if ((int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: supervisors may only evaluate trainees at their company.'], 403);
+                    }
+                    if ($instrumentType !== 'supervisor_to_student') {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: supervisors may only submit INST-02 evaluations.'], 403);
+                    }
+                    $evaluatorType = 'employer';
+                } elseif ($caller['role'] === 'adviser') {
+                    if (!in_array($instrumentType, ['adviser_to_hte', 'supervisor_to_student'], true)) {
+                        jsonResponse(['ok' => false, 'error' => 'Forbidden: faculty advisers cannot submit student feedback instruments.'], 403);
+                    }
+                }
             }
 
             if ($shouldUpsert) {
@@ -970,6 +1486,7 @@ try {
         }
 
         if ($method === 'PUT' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'supervisor', 'student']);
             $body = getJsonBody();
             $stmt = $pdo->prepare('SELECT * FROM Evaluation WHERE eval_id = :id');
             $stmt->execute([':id' => $resourceId]);
@@ -978,7 +1495,21 @@ try {
                 jsonResponse(['ok' => false, 'error' => 'Evaluation not found.'], 404);
             }
 
-            $placementId    = (int)($body['placement_id'] ?? $existing['placement_id']);
+            $oldPlacementId = (int)$existing['placement_id'];
+            $owners = getPlacementOwners($pdo, $oldPlacementId);
+            if ($caller['role'] === 'student') {
+                if (!$owners || (int)$owners['student_id'] !== (int)$caller['linked_id'] || $existing['evaluator_type'] !== 'student') {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: students can only edit their own student evaluations.'], 403);
+                }
+            } elseif ($caller['role'] === 'supervisor') {
+                if (!$owners || (int)$owners['employer_id'] !== (int)$caller['linked_id'] || $existing['evaluator_type'] !== 'employer') {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: supervisors can only edit INST-02 evaluations for their trainees.'], 403);
+                }
+            }
+
+            $placementId    = ($caller['role'] === 'student' || $caller['role'] === 'supervisor')
+                ? $oldPlacementId
+                : (int)($body['placement_id'] ?? $existing['placement_id']);
             $instrumentType = trim((string)($body['instrument_type'] ?? ($existing['instrument_type'] ?? 'supervisor_to_student')));
             $evaluatorType  = isset($instrumentToEvaluator[$instrumentType])
                 ? $instrumentToEvaluator[$instrumentType]
@@ -1026,6 +1557,9 @@ try {
                 ':id'      => $resourceId,
             ]);
 
+            if ($oldPlacementId !== $placementId) {
+                Database::syncCompliance($pdo, $oldPlacementId);
+            }
             Database::syncCompliance($pdo, $placementId);
 
             jsonResponse([
@@ -1035,11 +1569,18 @@ try {
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
-            $stmt = $pdo->prepare('SELECT placement_id FROM Evaluation WHERE eval_id = :id');
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student']);
+            $stmt = $pdo->prepare('SELECT placement_id, evaluator_type FROM Evaluation WHERE eval_id = :id');
             $stmt->execute([':id' => $resourceId]);
             $row = $stmt->fetch();
             if (!$row) {
                 jsonResponse(['ok' => false, 'error' => 'Evaluation not found.'], 404);
+            }
+            if ($caller['role'] === 'student') {
+                $owners = getPlacementOwners($pdo, (int)$row['placement_id']);
+                if (!$owners || (int)$owners['student_id'] !== (int)$caller['linked_id'] || $row['evaluator_type'] !== 'student') {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: students can only delete their own student evaluations.'], 403);
+                }
             }
             $pdo->prepare('DELETE FROM Evaluation WHERE eval_id = :id')->execute([':id' => $resourceId]);
             Database::syncCompliance($pdo, (int)$row['placement_id']);
@@ -1056,6 +1597,7 @@ try {
     // =========================================================================
     if ($resource === 'placements') {
         if ($method === 'POST' && in_array($subAction, ['upload-signed-dtr', 'signed-dtr'], true)) {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student', 'supervisor']);
             $body = getJsonBody();
             $placementId = (int)($body['placement_id'] ?? 0);
             $fileName = trim((string)($body['filename'] ?? 'signed_dtr.pdf'));
@@ -1065,6 +1607,19 @@ try {
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
             }
+            $owners = getPlacementOwners($pdo, $placementId);
+            if (!$owners) {
+                jsonResponse(['ok' => false, 'error' => 'Referenced placement record does not exist.'], 404);
+            }
+            if ($caller['role'] === 'student' && (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: students can only upload signed DTR for their own placement.'], 403);
+            }
+            if ($caller['role'] === 'supervisor' && (int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: supervisors can only upload signed DTR for their trainees.'], 403);
+            }
+            if (strlen($fileData) > 22000000) {
+                jsonResponse(['ok' => false, 'error' => 'File payload exceeds the 15 MB upload limit.'], 413);
+            }
 
             $uploadDir = resolveUploadDir('signed_dtr');
 
@@ -1073,8 +1628,10 @@ try {
                 $parts = explode('base64,', $fileData);
                 $rawBytes = base64_decode($parts[1] ?? '');
                 if ($rawBytes) {
-                    $safeExt = pathinfo($fileName, PATHINFO_EXTENSION);
-                    if (!$safeExt) $safeExt = 'pdf';
+                    $safeExt = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
+                    if (!in_array($safeExt, ['pdf', 'png', 'jpg', 'jpeg', 'webp'], true)) {
+                        $safeExt = 'pdf';
+                    }
                     $safeName = 'dtr_p' . $placementId . '_' . time() . '.' . $safeExt;
                     @file_put_contents($uploadDir . '/' . $safeName, $rawBytes);
                     $savedPath = '/uploads/signed_dtr/' . $safeName;
@@ -1110,10 +1667,21 @@ try {
         }
 
         if ($method === 'POST' && in_array($subAction, ['remove-signed-dtr', 'delete-signed-dtr'], true)) {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student', 'supervisor']);
             $body = getJsonBody();
             $placementId = (int)($body['placement_id'] ?? 0);
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+            $owners = getPlacementOwners($pdo, $placementId);
+            if (!$owners) {
+                jsonResponse(['ok' => false, 'error' => 'Referenced placement record does not exist.'], 404);
+            }
+            if ($caller['role'] === 'student' && (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: cannot remove another student\'s signed DTR.'], 403);
+            }
+            if ($caller['role'] === 'supervisor' && (int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: cannot remove signed DTR for another company.'], 403);
             }
 
             $pdo->prepare("
@@ -1143,6 +1711,21 @@ try {
 
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+            $owners = getPlacementOwners($pdo, $placementId);
+            if (!$owners) {
+                jsonResponse(['ok' => false, 'error' => 'Placement record not found.'], 404);
+            }
+            $caller = authenticateRequest($pdo);
+            $verifiedPid = getVerifiedPlacementFromRequest($pdo, $placementId);
+            if ($verifiedPid === null) {
+                $caller = requireAuth($pdo, ['admin', 'adviser', 'student', 'supervisor']);
+                if ($caller['role'] === 'student' && (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: students can only upload documents for their own placement.'], 403);
+                }
+                if ($caller['role'] === 'supervisor' && (int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                    jsonResponse(['ok' => false, 'error' => 'Forbidden: supervisors can only upload documents for their trainees.'], 403);
+                }
             }
             if (strlen($fileData) > 22000000) {
                 jsonResponse(['ok' => false, 'error' => 'File payload exceeds the 15 MB upload limit.'], 413);
@@ -1194,10 +1777,21 @@ try {
         }
 
         if ($method === 'POST' && in_array($subAction, ['remove-signed-eval', 'delete-signed-eval'], true)) {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student', 'supervisor']);
             $body = getJsonBody();
             $placementId = (int)($body['placement_id'] ?? 0);
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+            $owners = getPlacementOwners($pdo, $placementId);
+            if (!$owners) {
+                jsonResponse(['ok' => false, 'error' => 'Referenced placement record does not exist.'], 404);
+            }
+            if ($caller['role'] === 'student' && (int)$owners['student_id'] !== (int)$caller['linked_id']) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: cannot remove another student\'s signed evaluation.'], 403);
+            }
+            if ($caller['role'] === 'supervisor' && (int)$owners['employer_id'] !== (int)$caller['linked_id']) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: cannot remove signed evaluation for another company.'], 403);
             }
 
             $pdo->prepare("
@@ -1219,6 +1813,7 @@ try {
         }
 
         if ($method === 'POST') {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $body          = getJsonBody();
             $studentId     = (int)($body['student_id'] ?? 0);
             $employerId    = (int)($body['employer_id'] ?? 0);
@@ -1236,6 +1831,9 @@ try {
             if ($studentId <= 0 || $employerId <= 0 || $adviserId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Student, Employer/HTE, and Faculty Adviser are required.'], 400);
             }
+            assertEntityExists($pdo, 'Student', 'student_id', $studentId, 'Student');
+            assertEntityExists($pdo, 'Employer', 'employer_id', $employerId, 'Employer/HTE');
+            assertEntityExists($pdo, 'Adviser', 'adviser_id', $adviserId, 'Adviser');
 
             // Check if this student already has a placement; if so, update/reassign it cleanly
             $existStmt = $pdo->prepare('SELECT placement_id FROM Placement WHERE student_id = :sid ORDER BY placement_id DESC LIMIT 1');
@@ -1304,6 +1902,7 @@ try {
         }
 
         if ($method === 'PUT' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $body = getJsonBody();
             $stmt = $pdo->prepare('SELECT * FROM Placement WHERE placement_id = :id');
             $stmt->execute([':id' => $resourceId]);
@@ -1321,6 +1920,10 @@ try {
             $endDate       = trim((string)($body['end_date'] ?? $existing['end_date']));
             $requiredHours = (float)($body['required_hours'] ?? $existing['required_hours']);
             $status        = $body['status'] ?? $existing['status'];
+
+            assertEntityExists($pdo, 'Student', 'student_id', $studentId, 'Student');
+            assertEntityExists($pdo, 'Employer', 'employer_id', $employerId, 'Employer/HTE');
+            assertEntityExists($pdo, 'Adviser', 'adviser_id', $adviserId, 'Adviser');
 
             $up = $pdo->prepare("
                 UPDATE Placement
@@ -1371,6 +1974,7 @@ try {
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $pdo->prepare('DELETE FROM Placement WHERE placement_id = :id')->execute([':id' => $resourceId]);
             jsonResponse([
                 'ok'      => true,
@@ -1384,6 +1988,7 @@ try {
     // =========================================================================
     if ($resource === 'employers') {
         if ($method === 'POST') {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $body          = getJsonBody();
             $companyName   = trim((string)($body['company_name'] ?? ''));
             $address       = trim((string)($body['address'] ?? ''));
@@ -1424,6 +2029,7 @@ try {
         }
 
         if ($method === 'PUT' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $body = getJsonBody();
             $stmt = $pdo->prepare('SELECT * FROM Employer WHERE employer_id = :id');
             $stmt->execute([':id' => $resourceId]);
@@ -1463,9 +2069,11 @@ try {
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin']);
+            $pdo->prepare("DELETE FROM Users WHERE role = 'supervisor' AND linked_id = :id")->execute([':id' => $resourceId]);
             $pdo->prepare('DELETE FROM Placement WHERE employer_id = :id')->execute([':id' => $resourceId]);
             $pdo->prepare('DELETE FROM Employer WHERE employer_id = :id')->execute([':id' => $resourceId]);
-            jsonResponse(['ok' => true, 'message' => 'Partner HTE and associated placement contracts removed.']);
+            jsonResponse(['ok' => true, 'message' => 'Partner HTE, linked supervisor login, and placement contracts removed.']);
         }
     }
 
@@ -1474,6 +2082,7 @@ try {
     // =========================================================================
     if ($resource === 'students') {
         if ($method === 'POST') {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $body          = getJsonBody();
             $studentNumber = trim((string)($body['student_number'] ?? ''));
             $fullName      = trim((string)($body['full_name'] ?? ''));
@@ -1489,6 +2098,16 @@ try {
             }
             if ($studentNumber === '') {
                 $studentNumber = sprintf('2023-%05d-MN-0', random_int(100, 999));
+            }
+            if (!empty($body['employer_id']) && !empty($body['adviser_id'])) {
+                assertEntityExists($pdo, 'Employer', 'employer_id', (int)$body['employer_id'], 'Employer/HTE');
+                assertEntityExists($pdo, 'Adviser', 'adviser_id', (int)$body['adviser_id'], 'Adviser');
+            }
+
+            $dupStud = $pdo->prepare('SELECT student_id FROM Student WHERE LOWER(TRIM(student_number)) = LOWER(:snum) OR LOWER(TRIM(email)) = LOWER(:em) LIMIT 1');
+            $dupStud->execute([':snum' => $studentNumber, ':em' => $email]);
+            if ($dupStud->fetch()) {
+                jsonResponse(['ok' => false, 'error' => 'Student number or email already exists in the Student registry.'], 409);
             }
 
             $stmt = $pdo->prepare("
@@ -1506,22 +2125,23 @@ try {
             ]);
             $newStudentId = (int)$pdo->lastInsertId();
 
-            // Automatically provision linked student user account if username provided or derived from email
+            // Automatically provision linked student user account with case-insensitive collision safety
             $derivedUsername = $username !== '' ? $username : strtolower(explode('@', $email)[0]);
-            $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE username = :u');
+            $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u)');
             $checkUser->execute([':u' => $derivedUsername]);
-            if ((int)$checkUser->fetchColumn() === 0) {
-                $hash = password_hash('password123', PASSWORD_BCRYPT);
-                $uStmt = $pdo->prepare("
-                    INSERT INTO Users (username, password_hash, role, linked_id, is_active)
-                    VALUES (:u, :h, 'student', :lid, 1)
-                ");
-                $uStmt->execute([
-                    ':u'   => $derivedUsername,
-                    ':h'   => $hash,
-                    ':lid' => $newStudentId,
-                ]);
+            if ((int)$checkUser->fetchColumn() > 0) {
+                $derivedUsername = $derivedUsername . '.' . $newStudentId;
             }
+            $hash = password_hash('password123', PASSWORD_BCRYPT);
+            $uStmt = $pdo->prepare("
+                INSERT INTO Users (username, password_hash, role, linked_id, is_active)
+                VALUES (:u, :h, 'student', :lid, 1)
+            ");
+            $uStmt->execute([
+                ':u'   => $derivedUsername,
+                ':h'   => $hash,
+                ':lid' => $newStudentId,
+            ]);
 
             // If employer_id and adviser_id are supplied, immediately create the supervised Placement contract
             $placementCreated = false;
@@ -1563,6 +2183,10 @@ try {
         }
 
         if ($method === 'PUT' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser', 'student']);
+            if ($caller['role'] === 'student' && (int)$caller['linked_id'] !== $resourceId) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: students can only edit their own profile.'], 403);
+            }
             $body = getJsonBody();
             $stmt = $pdo->prepare('SELECT * FROM Student WHERE student_id = :id');
             $stmt->execute([':id' => $resourceId]);
@@ -1571,7 +2195,7 @@ try {
                 jsonResponse(['ok' => false, 'error' => 'Student not found.'], 404);
             }
 
-            $profileOnly = !empty($body['profile_only']);
+            $profileOnly   = !empty($body['profile_only']) || ($caller['role'] === 'student');
             $fullName      = trim((string)($body['full_name'] ?? $existing['full_name']));
             $section       = trim((string)($body['section'] ?? $existing['section']));
             $email         = trim((string)($body['email'] ?? $existing['email']));
@@ -1579,6 +2203,17 @@ try {
 
             if ($fullName === '' || $email === '') {
                 jsonResponse(['ok' => false, 'error' => 'Full name and institutional email are required.'], 400);
+            }
+            $targetStudentNumber = $profileOnly ? $existing['student_number'] : trim((string)($body['student_number'] ?? $existing['student_number']));
+            $dupUp = $pdo->prepare('SELECT student_id FROM Student WHERE (LOWER(TRIM(student_number)) = LOWER(:snum) OR LOWER(TRIM(email)) = LOWER(:em)) AND student_id != :id LIMIT 1');
+            $dupUp->execute([':snum' => $targetStudentNumber, ':em' => $email, ':id' => $resourceId]);
+            if ($dupUp->fetch()) {
+                jsonResponse(['ok' => false, 'error' => 'Student number or email is already assigned to another student.'], 409);
+            }
+
+            if (!$profileOnly && !empty($body['employer_id']) && !empty($body['adviser_id'])) {
+                assertEntityExists($pdo, 'Employer', 'employer_id', (int)$body['employer_id'], 'Employer/HTE');
+                assertEntityExists($pdo, 'Adviser', 'adviser_id', (int)$body['adviser_id'], 'Adviser');
             }
 
             $up = $pdo->prepare("
@@ -1593,7 +2228,7 @@ try {
                 WHERE student_id = :id
             ");
             $up->execute([
-                ':snum'  => $profileOnly ? $existing['student_number'] : trim((string)($body['student_number'] ?? $existing['student_number'])),
+                ':snum'  => $targetStudentNumber,
                 ':fname' => $fullName,
                 ':prog'  => $profileOnly ? $existing['program'] : trim((string)($body['program'] ?? $existing['program'])),
                 ':yr'    => $profileOnly ? $existing['year_level'] : trim((string)($body['year_level'] ?? $existing['year_level'])),
@@ -1661,7 +2296,7 @@ try {
                     Database::syncCompliance($pdo, $newPid);
                 }
                 $placementUpdated = true;
-            } elseif ($existingPlacement && array_key_exists('position_title', $body)) {
+            } elseif (!$profileOnly && $existingPlacement && array_key_exists('position_title', $body)) {
                 $posTitle = trim((string)$body['position_title']);
                 if ($posTitle !== '') {
                     $pUpPos = $pdo->prepare('UPDATE Placement SET position_title = :pos WHERE placement_id = :pid');
@@ -1681,6 +2316,7 @@ try {
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
             $pdo->prepare("DELETE FROM Users WHERE role = 'student' AND linked_id = :id")->execute([':id' => $resourceId]);
             $pdo->prepare('DELETE FROM Student WHERE student_id = :id')->execute([':id' => $resourceId]);
             jsonResponse(['ok' => true, 'message' => 'Student profile removed.']);
@@ -1692,6 +2328,7 @@ try {
     // =========================================================================
     if ($resource === 'advisers') {
         if ($method === 'POST') {
+            $caller = requireAuth($pdo, ['admin']);
             $body           = getJsonBody();
             $employeeNumber = trim((string)($body['employee_number'] ?? ''));
             if ($employeeNumber === '') {
@@ -1705,6 +2342,12 @@ try {
 
             if ($fullName === '') {
                 jsonResponse(['ok' => false, 'error' => 'Adviser full name is required.'], 400);
+            }
+
+            $dupAdv = $pdo->prepare('SELECT adviser_id FROM Adviser WHERE LOWER(TRIM(employee_number)) = LOWER(:eno) OR (:em != "" AND LOWER(TRIM(email)) = LOWER(:em)) LIMIT 1');
+            $dupAdv->execute([':eno' => $employeeNumber, ':em' => $email]);
+            if ($dupAdv->fetch()) {
+                jsonResponse(['ok' => false, 'error' => 'Employee number or email already exists in the Adviser registry.'], 409);
             }
 
             $stmt = $pdo->prepare("
@@ -1721,13 +2364,14 @@ try {
             $newAdviserId = (int)$pdo->lastInsertId();
 
             $derivedUsername = $username !== '' ? $username : ($email !== '' ? strtolower(explode('@', $email)[0]) : 'adviser.' . $newAdviserId);
-            $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE username = :u');
+            $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u)');
             $checkUser->execute([':u' => $derivedUsername]);
-            if ((int)$checkUser->fetchColumn() === 0) {
-                $hash = password_hash('password123', PASSWORD_BCRYPT);
-                $pdo->prepare("INSERT INTO Users (username, password_hash, role, linked_id, is_active) VALUES (:u, :h, 'adviser', :lid, 1)")
-                    ->execute([':u' => $derivedUsername, ':h' => $hash, ':lid' => $newAdviserId]);
+            if ((int)$checkUser->fetchColumn() > 0) {
+                $derivedUsername = $derivedUsername . '.' . $newAdviserId;
             }
+            $hash = password_hash('password123', PASSWORD_BCRYPT);
+            $pdo->prepare("INSERT INTO Users (username, password_hash, role, linked_id, is_active) VALUES (:u, :h, 'adviser', :lid, 1)")
+                ->execute([':u' => $derivedUsername, ':h' => $hash, ':lid' => $newAdviserId]);
 
             jsonResponse([
                 'ok'         => true,
@@ -1737,6 +2381,10 @@ try {
         }
 
         if ($method === 'PUT' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin', 'adviser']);
+            if ($caller['role'] === 'adviser' && (int)$caller['linked_id'] !== $resourceId) {
+                jsonResponse(['ok' => false, 'error' => 'Forbidden: faculty advisers can only update their own profile.'], 403);
+            }
             $body = getJsonBody();
             $stmt = $pdo->prepare('SELECT * FROM Adviser WHERE adviser_id = :id');
             $stmt->execute([':id' => $resourceId]);
@@ -1767,6 +2415,7 @@ try {
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
+            $caller = requireAuth($pdo, ['admin']);
             $fallbackStmt = $pdo->prepare('SELECT adviser_id FROM Adviser WHERE adviser_id != :id ORDER BY adviser_id ASC LIMIT 1');
             $fallbackStmt->execute([':id' => $resourceId]);
             $fallbackAdviserId = $fallbackStmt->fetchColumn();
@@ -1783,22 +2432,39 @@ try {
     }
 
     // =========================================================================
-    // 9. ADMIN USERS MODULE (POST / PUT / DELETE /api/users)
+    // 9. ADMIN USERS MODULE (GET / POST / PUT / DELETE /api/users)
     // =========================================================================
     if ($resource === 'users') {
+        $caller = requireAuth($pdo, ['admin']);
+
+        if ($method === 'GET') {
+            $usersRows = $pdo->query("
+                SELECT user_id, username, role, linked_id, is_active, created_at,
+                       CASE WHEN password_hash != '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO' THEN 1 ELSE 0 END AS has_custom_password
+                FROM Users
+                ORDER BY user_id ASC
+            ")->fetchAll();
+            jsonResponse(['ok' => true, 'users' => $usersRows]);
+        }
+
         if ($method === 'POST') {
-            $body     = getJsonBody();
-            $username = trim((string)($body['username'] ?? ''));
-            $password = (string)($body['password'] ?? 'password123');
-            if ($password === '') {
-                $password = 'password123';
-            }
+            $body      = getJsonBody();
+            $username  = trim((string)($body['username'] ?? ''));
+            $rawPass   = (string)($body['password'] ?? '');
+            $password  = trim($rawPass) !== '' ? $rawPass : 'password123';
             $roleCandidate = (string)($body['role'] ?? 'student');
-            $role     = in_array($roleCandidate, ['student', 'adviser', 'admin', 'supervisor'], true) ? $roleCandidate : 'student';
-            $linkedId = !empty($body['linked_id']) ? (int)$body['linked_id'] : null;
+            $role      = in_array($roleCandidate, ['student', 'adviser', 'admin', 'supervisor'], true) ? $roleCandidate : 'student';
+            $linkedId  = !empty($body['linked_id']) ? (int)$body['linked_id'] : null;
 
             if ($username === '') {
                 jsonResponse(['ok' => false, 'error' => 'Username is required.'], 400);
+            }
+            validateLinkedIdForRole($pdo, $role, $linkedId);
+
+            $dupStmt = $pdo->prepare('SELECT user_id FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u) LIMIT 1');
+            $dupStmt->execute([':u' => $username]);
+            if ($dupStmt->fetch()) {
+                jsonResponse(['ok' => false, 'error' => 'Username "' . $username . '" already exists. Please choose another username.'], 409);
             }
 
             $hash = password_hash($password, PASSWORD_BCRYPT);
@@ -1813,10 +2479,12 @@ try {
                 ':lid' => $linkedId,
             ]);
 
+            $hasCustomPass = $hash !== '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO';
             jsonResponse([
-                'ok'      => true,
-                'user_id' => (int)$pdo->lastInsertId(),
-                'message' => 'System user account created.',
+                'ok'                  => true,
+                'user_id'             => (int)$pdo->lastInsertId(),
+                'has_custom_password' => $hasCustomPass ? 1 : 0,
+                'message'             => 'System user account created.',
             ], 201);
         }
 
@@ -1830,12 +2498,32 @@ try {
             }
 
             $username = trim((string)($body['username'] ?? $existing['username']));
-            $isActive = isset($body['is_active']) ? (int)$body['is_active'] : (int)$existing['is_active'];
-            $role     = $body['role'] ?? $existing['role'];
-            $linkedId = array_key_exists('linked_id', $body) ? ($body['linked_id'] ? (int)$body['linked_id'] : null) : $existing['linked_id'];
+            if ($username === '') {
+                jsonResponse(['ok' => false, 'error' => 'Username cannot be empty.'], 400);
+            }
 
-            if (!empty($body['password'])) {
-                $hash = password_hash((string)$body['password'], PASSWORD_BCRYPT);
+            $dupStmt = $pdo->prepare('SELECT user_id FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u) AND user_id != :id LIMIT 1');
+            $dupStmt->execute([':u' => $username, ':id' => $resourceId]);
+            if ($dupStmt->fetch()) {
+                jsonResponse(['ok' => false, 'error' => 'Username "' . $username . '" is already taken by another account.'], 409);
+            }
+
+            $isActive = isset($body['is_active']) ? (int)$body['is_active'] : (int)$existing['is_active'];
+            $roleCandidate = (string)($body['role'] ?? $existing['role']);
+            $role     = in_array($roleCandidate, ['student', 'adviser', 'admin', 'supervisor'], true) ? $roleCandidate : $existing['role'];
+            $linkedId = array_key_exists('linked_id', $body) ? ($body['linked_id'] ? (int)$body['linked_id'] : null) : ($existing['linked_id'] !== null ? (int)$existing['linked_id'] : null);
+
+            validateLinkedIdForRole($pdo, $role, $linkedId);
+
+            $rawPassword = array_key_exists('password', $body) ? (string)$body['password'] : '';
+            $passwordChanged = false;
+
+            if ($rawPassword !== '') {
+                if (trim($rawPassword) === '') {
+                    jsonResponse(['ok' => false, 'error' => 'Password cannot contain only spaces.'], 400);
+                }
+                $hash = password_hash($rawPassword, PASSWORD_BCRYPT);
+                $passwordChanged = true;
                 $pdo->prepare('UPDATE Users SET username = :u, password_hash = :h, role = :r, linked_id = :lid, is_active = :act WHERE user_id = :id')
                     ->execute([
                         ':u'   => $username,
@@ -1856,12 +2544,24 @@ try {
                     ]);
             }
 
-            jsonResponse(['ok' => true, 'message' => 'User account updated.']);
+            $chkStmt = $pdo->prepare('SELECT password_hash FROM Users WHERE user_id = :id');
+            $chkStmt->execute([':id' => $resourceId]);
+            $updatedHash = (string)$chkStmt->fetchColumn();
+            $hasCustomPass = $updatedHash !== '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO';
+
+            jsonResponse([
+                'ok'                  => true,
+                'password_updated'    => $passwordChanged,
+                'has_custom_password' => $hasCustomPass ? 1 : 0,
+                'message'             => $passwordChanged
+                    ? 'User account and new encrypted password saved.'
+                    : 'User account updated.',
+            ]);
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {
-            if ($resourceId === 1) {
-                jsonResponse(['ok' => false, 'error' => 'Cannot delete primary root administrator account.'], 403);
+            if ($resourceId === 1 || (int)$caller['user_id'] === $resourceId) {
+                jsonResponse(['ok' => false, 'error' => 'Cannot delete primary root or currently active administrator account.'], 403);
             }
             $pdo->prepare('DELETE FROM Users WHERE user_id = :id')->execute([':id' => $resourceId]);
             jsonResponse(['ok' => true, 'message' => 'User account deleted.']);
@@ -1872,6 +2572,7 @@ try {
     // 10. COMPLIANCE SYNC, CLEARANCE ENDORSEMENT & SYSTEM RESET ENDPOINTS
     // =========================================================================
     if ($method === 'POST' && $resource === 'compliance' && $subAction === 'sync') {
+        $caller = requireAuth($pdo, ['admin', 'adviser']);
         Database::syncAllCompliance($pdo);
         jsonResponse([
             'ok'      => true,
@@ -1880,6 +2581,7 @@ try {
     }
 
     if ($method === 'POST' && $resource === 'compliance' && $subAction === 'endorse') {
+        $caller = requireAuth($pdo, ['admin', 'adviser']);
         $body        = getJsonBody();
         $placementId = (int)($body['placement_id'] ?? 0);
         if ($placementId <= 0) {
@@ -1970,12 +2672,18 @@ try {
     }
 
     if ($method === 'POST' && $resource === 'system' && $subAction === 'reset') {
+        $caller = requireAuth($pdo, ['admin']);
         $driver = Database::getDriver();
         if ($driver === 'sqlite') {
             $sqliteSql = realpath(__DIR__ . '/../../database/schema_and_seed_sqlite.sql');
             if ($sqliteSql && file_exists($sqliteSql)) {
                 $sqlContent = file_get_contents($sqliteSql);
                 $pdo->exec($sqlContent);
+                try {
+                    $pdo->exec('PRAGMA wal_checkpoint(TRUNCATE);');
+                } catch (Throwable $e) {
+                    // Non-critical if checkpoint waits on concurrent reader
+                }
                 jsonResponse([
                     'ok'      => true,
                     'message' => 'SQLite database reset to default MIT Computer Engineering seed state.',

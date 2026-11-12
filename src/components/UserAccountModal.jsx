@@ -13,6 +13,7 @@ export default function UserAccountModal({
   userForm,
   setUserForm,
   editingUserId,
+  editingUser = null,
   students = [],
   employers = [],
   advisers = [],
@@ -56,6 +57,22 @@ export default function UserAccountModal({
             onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
             required={!editingUserId}
           />
+          {editingUserId && (
+            <div
+              data-testid="user-password-status"
+              style={{
+                marginTop: 6,
+                fontSize: 12,
+                lineHeight: 1.4,
+                fontWeight: 500,
+                color: Number(editingUser?.has_custom_password) === 1 ? '#0f7b4f' : '#5f6368',
+              }}
+            >
+              {Number(editingUser?.has_custom_password) === 1
+                ? 'Custom password saved (bcrypt-encrypted, hidden for security). Enter a new value only to change it.'
+                : 'Default demo password is set (bcrypt-encrypted, hidden for security). Enter a new password to change it.'}
+            </div>
+          )}
         </div>
         <div className="field">
           <label className="field-label" htmlFor="user-modal-role">Role</label>

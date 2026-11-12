@@ -17,56 +17,62 @@ if (strpos($uri, '/api') === 0) {
     return true;
 }
 
-// 2. Static Asset Dispatcher (dist/ and public/ directories)
-$publicDir = realpath(__DIR__ . '/../public');
-if ($publicDir && is_dir($publicDir)) {
-    $pubFile = realpath($publicDir . $uri);
-    if ($pubFile && strpos($pubFile, $publicDir) === 0 && is_file($pubFile)) {
-        $ext = strtolower(pathinfo($pubFile, PATHINFO_EXTENSION));
-        $mimeTypes = [
-            'pdf'   => 'application/pdf',
-            'png'   => 'image/png',
-            'jpg'   => 'image/jpeg',
-            'jpeg'  => 'image/jpeg',
-            'webp'  => 'image/webp',
-            'svg'   => 'image/svg+xml',
-        ];
-        if (isset($mimeTypes[$ext])) {
-            header('Content-Type: ' . $mimeTypes[$ext]);
-        }
-        readfile($pubFile);
+$mimeTypes = [
+    'html'        => 'text/html; charset=utf-8',
+    'css'         => 'text/css; charset=utf-8',
+    'js'          => 'application/javascript; charset=utf-8',
+    'json'        => 'application/json; charset=utf-8',
+    'webmanifest' => 'application/manifest+json; charset=utf-8',
+    'pdf'         => 'application/pdf',
+    'svg'         => 'image/svg+xml',
+    'png'         => 'image/png',
+    'jpg'         => 'image/jpeg',
+    'jpeg'        => 'image/jpeg',
+    'webp'        => 'image/webp',
+    'ico'         => 'image/x-icon',
+    'woff'        => 'font/woff',
+    'woff2'       => 'font/woff2',
+    'ttf'         => 'font/ttf',
+];
+
+function serveStaticFromDir(string $baseDir, string $relPath, array $mimeTypes, bool $noStore = false): bool
+{
+    $realBase = realpath($baseDir);
+    if (!$realBase || !is_dir($realBase)) {
+        return false;
+    }
+    $filePath = realpath($realBase . $relPath);
+    if (!$filePath || strpos($filePath, $realBase) !== 0 || !is_file($filePath)) {
+        return false;
+    }
+    $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    if (isset($mimeTypes[$ext])) {
+        header('Content-Type: ' . $mimeTypes[$ext]);
+    }
+    if ($noStore) {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+    }
+    readfile($filePath);
+    return true;
+}
+
+// 2. Uploaded files in temp storage (serverless / container runtime)
+if (strpos($uri, '/uploads/') === 0) {
+    $tmpUploads = rtrim(sys_get_temp_dir(), '/\\') . '/practicly_uploads';
+    if (serveStaticFromDir($tmpUploads, substr($uri, strlen('/uploads')), $mimeTypes)) {
         return true;
     }
 }
 
+// 3. Static Asset Dispatcher (public/ and dist/ directories)
+if (serveStaticFromDir(__DIR__ . '/../public', $uri, $mimeTypes)) {
+    return true;
+}
+
 $distDir = realpath(__DIR__ . '/../dist');
 if ($distDir && is_dir($distDir)) {
-    $filePath = realpath($distDir . $uri);
-    if ($filePath && strpos($filePath, $distDir) === 0 && is_file($filePath)) {
-        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-        $mimeTypes = [
-            'html'  => 'text/html; charset=utf-8',
-            'css'   => 'text/css; charset=utf-8',
-            'js'    => 'application/javascript; charset=utf-8',
-            'json'  => 'application/json; charset=utf-8',
-            'svg'   => 'image/svg+xml',
-            'png'   => 'image/png',
-            'jpg'   => 'image/jpeg',
-            'jpeg'  => 'image/jpeg',
-            'webp'  => 'image/webp',
-            'ico'   => 'image/x-icon',
-            'woff'  => 'font/woff',
-            'woff2' => 'font/woff2',
-            'ttf'   => 'font/ttf',
-        ];
-
-        if (isset($mimeTypes[$ext])) {
-            header('Content-Type: ' . $mimeTypes[$ext]);
-        }
-        // Development headers to prevent caching issues during editing
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-        readfile($filePath);
+    if (serveStaticFromDir($distDir, $uri, $mimeTypes, true)) {
         return true;
     }
 

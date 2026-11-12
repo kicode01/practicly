@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { apiFetch } from '../utils/apiClient';
 import {
   IconClose,
   IconUpload,
@@ -10,6 +11,7 @@ import {
   IconShieldCheck,
   IconPrinter,
 } from './Icons';
+import ConfirmDialog from './ConfirmDialog';
 
 const DOC_CONFIGS = {
   dtr: {
@@ -76,6 +78,7 @@ export default function SignedDtrUploadModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -141,7 +144,7 @@ export default function SignedDtrUploadModal({
     setIsUploading(true);
     setErrorMsg('');
     try {
-      const res = await fetch(cfg.uploadEndpoint, {
+      const res = await apiFetch(cfg.uploadEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -166,14 +169,14 @@ export default function SignedDtrUploadModal({
     }
   };
 
-  const handleRemoveExisting = async () => {
-    if (!window.confirm(`Are you sure you want to remove the current ${documentKind === 'eval' ? 'signed INST-02 evaluation' : 'signed DTR'} document?`)) {
-      return;
-    }
+  const handleRemoveExisting = () => {
+    setConfirmRemoveOpen(true);
+  };
 
+  const executeRemoveExisting = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(cfg.removeEndpoint, {
+      const res = await apiFetch(cfg.removeEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -183,15 +186,18 @@ export default function SignedDtrUploadModal({
 
       const json = await res.json();
       if (json.ok) {
+        setConfirmRemoveOpen(false);
         setSelectedFile(null);
         setFileDataUri('');
         if (onSuccess) onSuccess(cfg.removedMsg);
         onClose();
       } else {
         setErrorMsg(json.error || 'Failed to remove document.');
+        setConfirmRemoveOpen(false);
       }
     } catch (err) {
       setErrorMsg('Delete error: ' + err.message);
+      setConfirmRemoveOpen(false);
     } finally {
       setIsDeleting(false);
     }
@@ -457,6 +463,19 @@ export default function SignedDtrUploadModal({
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmRemoveOpen}
+        onClose={() => setConfirmRemoveOpen(false)}
+        onConfirm={executeRemoveExisting}
+        variant="danger"
+        iconType="trash"
+        title={documentKind === 'eval' ? 'Remove Signed INST-02 Copy?' : 'Remove Signed DTR Copy?'}
+        message={`This removes the uploaded ${documentKind === 'eval' ? 'signed INST-02 evaluation' : 'signed physical DTR'} scan from this placement record.`}
+        detail={existingFilename ? `File: ${existingFilename}` : ''}
+        confirmLabel="Remove Document"
+        cancelLabel="Keep File"
+      />
     </div>
   );
 }

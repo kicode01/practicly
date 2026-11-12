@@ -31,6 +31,7 @@ import {
   IconFileText,
   IconUpload,
   IconEye,
+  IconEyeOff,
   IconShare,
   IconLink,
 } from './components/Icons';
@@ -56,10 +57,12 @@ import PlacementModal from './components/PlacementModal';
 import AdviserModal from './components/AdviserModal';
 import UserAccountModal from './components/UserAccountModal';
 import SuperviseStudentModal from './components/SuperviseStudentModal';
+import ConfirmDialog from './components/ConfirmDialog';
 import { SegmentedControl, Switch, MaterialSelect, Snackbar } from './components/MaterialComponents';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
 import { clearAllSessionSignatures } from './utils/sessionSignature';
 import { getInstrumentById, getPlacementInstrumentStatus } from './utils/evaluationRubrics';
+import { apiFetch, getStoredUserSession, setVerifyContext } from './utils/apiClient';
 
 const DEMO_PRESETS = [
   {
@@ -91,6 +94,12 @@ const DEMO_PRESETS = [
     role: 'adviser',
     name: 'Engr. Marco Antonio V. Santos',
     desc: 'Faculty Adviser · Supervises Adrian & Miguel',
+  },
+  {
+    username: 'supervisor.accenture',
+    role: 'supervisor',
+    name: 'Accenture HTE Supervisor',
+    desc: 'Workplace Supervisor · Stage 1 DTR & INST-02',
   },
   {
     username: 'admin',
@@ -316,25 +325,18 @@ function WorkspaceSkeleton({ activeTab, role }) {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mit_ojt_user') || localStorage.getItem('pup_ojt_user');
-      if (!saved) return null;
-      const parsed = JSON.parse(saved);
-      if (parsed.role === 'supervisor') {
-        // Supervisors are external zero-login contacts who verify via shareable link
-        return null;
-      }
-      if (parsed.display_name) parsed.display_name = parsed.display_name.replace(/\bPUP\b/g, 'MIT');
-      if (parsed.name) parsed.name = parsed.name.replace(/\bPUP\b/g, 'MIT');
-      return parsed;
-    } catch {
-      return null;
-    }
+    const parsed = getStoredUserSession();
+    if (!parsed) return null;
+    if (parsed.display_name) parsed.display_name = parsed.display_name.replace(/\bPUP\b/g, 'MIT');
+    if (parsed.name) parsed.name = parsed.name.replace(/\bPUP\b/g, 'MIT');
+    return parsed;
   });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [showDemoAccounts, setShowDemoAccounts] = useState(false);
@@ -370,6 +372,7 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [selectedClearanceReport, setSelectedClearanceReport] = useState(null);
   const [selectedDtrPlacement, setSelectedDtrPlacement] = useState(null);
   const [dtrTransferModalOpen, setDtrTransferModalOpen] = useState(false);
@@ -386,7 +389,12 @@ export default function App() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const v = urlParams.get('verify');
-      return v ? v : null;
+      const t = urlParams.get('token');
+      if (v) {
+        setVerifyContext(v, t || null);
+        return v;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -664,7 +672,7 @@ export default function App() {
   const isFetchingRef = useRef(false);
 
   const fetchSystemData = useCallback(
-    async (silent = false) => {
+    async (silent = false, verifyOverrideId = null) => {
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
 
@@ -676,12 +684,57 @@ export default function App() {
       });
 
       try {
-        const response = await fetch('/api/bootstrap');
-        const json = await response.json();
-        if (json.ok) {
-          setData(json);
+        const activeVerifyId = verifyOverrideId ?? publicSupervisorPlacementId;
+        const sessionUser = getStoredUserSession();
+
+        if (activeVerifyId) {
+          const response = await apiFetch(`/api/verify/${encodeURIComponent(activeVerifyId)}`);
+          const json = await parseAuthResponse(response, 'Verification portal');
+          if (json.ok && json.placement) {
+            setData((prev) => ({
+              ...prev,
+              placements: [json.placement],
+              timelogs: json.timelogs || [],
+              evaluations: json.evaluations || [],
+              system_info: prev.system_info || { engine: 'sqlite' },
+            }));
+          } else {
+            showNotice(json.error || 'Failed to load supervisor verification record.', 'error');
+          }
+        } else if (!sessionUser) {
+          const response = await apiFetch('/api/public-catalog');
+          const json = await parseAuthResponse(response, 'Catalog service');
+          if (json.ok) {
+            setData((prev) => ({
+              ...prev,
+              employers: json.employers || [],
+              advisers: json.advisers || [],
+              summary: {
+                ...prev.summary,
+                total_employers: json.counts?.employers ?? prev.summary?.total_employers ?? 0,
+                total_advisers: json.counts?.advisers ?? prev.summary?.total_advisers ?? 0,
+              },
+              system_info: prev.system_info || { engine: 'sqlite' },
+            }));
+          } else {
+            showNotice(json.error || 'Failed to load registration catalog.', 'error');
+          }
         } else {
-          showNotice(json.error || 'Failed to load database state.', 'error');
+          const response = await apiFetch('/api/bootstrap');
+          if (response.status === 401) {
+            clearAllSessionSignatures();
+            localStorage.removeItem('mit_ojt_user');
+            localStorage.removeItem('pup_ojt_user');
+            setCurrentUser(null);
+            showNotice('Session expired or invalidated. Please sign in again.', 'error');
+            return;
+          }
+          const json = await parseAuthResponse(response, 'Database service');
+          if (json.ok) {
+            setData(json);
+          } else {
+            showNotice(json.error || 'Failed to load database state.', 'error');
+          }
         }
       } catch {
         showNotice('Cannot reach backend server on port 8000.', 'error');
@@ -691,7 +744,7 @@ export default function App() {
         setSyncing(false);
       }
     },
-    [showNotice]
+    [showNotice, publicSupervisorPlacementId]
   );
 
   useEffect(() => {
@@ -765,6 +818,36 @@ export default function App() {
     );
   }, [currentUser, data.timelogs]);
 
+  const auditablePlacements = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'student') {
+      return myPlacement ? [myPlacement] : [];
+    }
+    if (currentUser.role === 'supervisor') {
+      return supervisorPlacements;
+    }
+    if (currentUser.role === 'adviser' && adviserScopeOnly) {
+      return data.placements.filter((p) => Number(p.adviser_id) === Number(currentUser.linked_id));
+    }
+    return data.placements;
+  }, [currentUser, myPlacement, supervisorPlacements, adviserScopeOnly, data.placements]);
+
+  const openAuditModal = (explicitPlacement = null) => {
+    const pool = auditablePlacements.length > 0 ? auditablePlacements : data.placements;
+    const filteredMatch =
+      timelogPlacementFilter !== 'all'
+        ? data.placements.find((p) => String(p.placement_id) === String(timelogPlacementFilter))
+        : null;
+    const firstWithUpload = pool.find((p) => Boolean(p.signed_dtr_filename || p.signed_dtr_file));
+    const targetPl = explicitPlacement || filteredMatch || firstWithUpload || pool[0] || null;
+    if (!targetPl) {
+      showNotice('No student placement available to audit.', 'error');
+      return;
+    }
+    setAuditPlacement(targetPl);
+    setAuditModalOpen(true);
+  };
+
   useEffect(() => {
     if (currentUser?.role === 'student' && myPlacement) {
       setLogForm((prev) => ({
@@ -817,25 +900,60 @@ export default function App() {
   // ===========================================================================
   // AUTHENTICATION HANDLERS
   // ===========================================================================
+  const parseAuthResponse = async (res, serviceLabel) => {
+    const rawText = await res.text();
+    try {
+      const parsed = JSON.parse(rawText);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch {
+      // Non-JSON responses (e.g. HTML/404 from static-only deploy or proxy outage)
+      // must surface the HTTP status instead of claiming the server is unreachable.
+    }
+    return {
+      ok: false,
+      error: `${serviceLabel} unavailable (HTTP ${res.status || 0}). Please verify the API backend is running.`,
+    };
+  };
+
   const handleLogin = async (e, presetUsername = null) => {
     if (e) e.preventDefault();
-    const uname = presetUsername || loginUsername;
+    const uname = String(presetUsername || loginUsername || '').trim();
+    const isInternalSwitch = Boolean(presetUsername && currentUser?.role === 'admin');
     const pwd = presetUsername ? 'password123' : loginPassword;
+
+    if (!uname) {
+      setLoginError('Please enter your username, email, or ID number.');
+      return;
+    }
+    if (!isInternalSwitch && !pwd) {
+      setLoginError('Please enter your password.');
+      return;
+    }
+
     setAuthLoading(true);
     setLoginError('');
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await apiFetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: uname, password: pwd }),
+        body: JSON.stringify({
+          username: uname,
+          password: pwd,
+          switch_persona: isInternalSwitch,
+        }),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Authentication service');
       if (!json.ok) {
-        setLoginError(json.error || 'Invalid credentials.');
+        const errMsg = json.error || 'Invalid credentials.';
+        setLoginError(errMsg);
+        if (currentUser) showNotice(errMsg, 'error');
       } else {
         const cleanUser = {
           ...json.user,
+          token: json.token || json.user?.token,
           display_name: (json.user.display_name || json.user.name || '').replace(/\bPUP\b/g, 'MIT'),
         };
         setCurrentUser(cleanUser);
@@ -843,21 +961,86 @@ export default function App() {
         localStorage.removeItem('pup_ojt_user');
         setActiveTab('dashboard');
         setMobileMenuOpen(false);
+        setLoginPassword('');
+        setShowLoginPassword(false);
+        await fetchSystemData(true);
         showNotice(`Signed in as ${cleanUser.display_name}`);
       }
     } catch {
-      setLoginError('Unable to connect to authentication server.');
+      const msg = 'Unable to connect to authentication server.';
+      setLoginError(msg);
+      if (currentUser) showNotice(msg, 'error');
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const handleLogout = () => {
+  const executeLogout = () => {
     clearAllSessionSignatures();
+    setVerifyContext(null, null);
     setCurrentUser(null);
     localStorage.removeItem('mit_ojt_user');
     localStorage.removeItem('pup_ojt_user');
+    setData((prev) => ({
+      ...prev,
+      placements: [],
+      students: [],
+      timelogs: [],
+      evaluations: [],
+      compliance_reports: [],
+      users: [],
+      summary: {},
+    }));
+    setActiveTab('dashboard');
+    setMobileMenuOpen(false);
+    setAuthMode('login');
     setLoginError('');
+    setLoginPassword('');
+    setShowLoginPassword(false);
+    setShowRegPassword(false);
+    setConfirmDialog(null);
+    fetchSystemData(true);
+    showNotice('Signed out cleanly.');
+  };
+
+  const requestLogout = () => {
+    const elapsedMins = Math.floor(shiftElapsedSeconds / 60);
+    const shiftWarn = activeShift?.startedAt
+      ? `You currently have a live shift timer running (${elapsedMins} min elapsed). Signing out keeps the timer stored on this browser, or you can clock out first.`
+      : '';
+    setConfirmDialog({
+      title: 'Sign Out of Practicly?',
+      message: 'Are you sure you want to close your current portal session?',
+      detail: currentUser
+        ? `${currentUser.display_name} (${currentUser.identifier_code || currentUser.username} · ${String(currentUser.role || '').toUpperCase()})`
+        : '',
+      warning: shiftWarn,
+      confirmLabel: 'Sign Out',
+      cancelLabel: 'Stay Signed In',
+      variant: activeShift?.startedAt ? 'warning' : 'danger',
+      iconType: 'logout',
+      onConfirm: executeLogout,
+    });
+  };
+
+  const executeApiRequest = async ({ url, method = 'DELETE', afterSuccess, fallbackError, silentRefresh = true }) => {
+    setSyncing(true);
+    try {
+      const res = await apiFetch(url, { method });
+      const json = await parseAuthResponse(res, fallbackError);
+      if (json.ok) {
+        if (afterSuccess) afterSuccess(json);
+        showNotice(json.message || 'Operation completed.');
+        setConfirmDialog(null);
+        await fetchSystemData(silentRefresh);
+      } else {
+        showNotice(json.error || fallbackError, 'error');
+      }
+    } catch {
+      showNotice(fallbackError, 'error');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleRegister = async (e) => {
@@ -865,17 +1048,18 @@ export default function App() {
     setAuthLoading(true);
     setLoginError('');
     try {
-      const res = await fetch('/api/register', {
+      const res = await apiFetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registerForm),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Registration service');
       if (!json.ok) {
         setLoginError(json.error || 'Registration failed.');
       } else {
         const cleanUser = {
           ...json.user,
+          token: json.token || json.user?.token,
           display_name: (json.user.display_name || json.user.name || '').replace(/\bPUP\b/g, 'MIT'),
         };
         setCurrentUser(cleanUser);
@@ -1011,7 +1195,7 @@ export default function App() {
       const url = editingLogId ? `/api/timelogs/${editingLogId}` : '/api/timelogs';
       const method = editingLogId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1021,7 +1205,7 @@ export default function App() {
           approval_status: currentUser.role === 'student' ? 'pending' : (logForm.approval_status || 'approved'),
         }),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Attendance service');
       if (json.ok) {
         showNotice(json.message);
         setEditingLogId(null);
@@ -1040,6 +1224,8 @@ export default function App() {
       } else {
         showNotice(json.error || 'Failed to save time log.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while saving time log.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -1068,7 +1254,7 @@ export default function App() {
   const handleVerifySupervisorLog = async (tl, targetStatus = 'supervisor_verified') => {
     setSyncing(true);
     try {
-      const res = await fetch(`/api/timelogs/${tl.log_id}`, {
+      const res = await apiFetch(`/api/timelogs/${tl.log_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1097,7 +1283,7 @@ export default function App() {
   const handleVerifyAllSupervisorLogs = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/timelogs/approve-all', {
+      const res = await apiFetch('/api/timelogs/approve-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1126,7 +1312,7 @@ export default function App() {
           : currentUser.role === 'adviser' && adviserScopeOnly
           ? { adviser_id: currentUser.linked_id, target_status: 'approved' }
           : { target_status: 'approved' };
-      const res = await fetch('/api/timelogs/approve-all', {
+      const res = await apiFetch('/api/timelogs/approve-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1147,7 +1333,7 @@ export default function App() {
   const handleUpdateTimeLogApproval = async (tl, newApprovalStatus) => {
     setSyncing(true);
     try {
-      const res = await fetch(`/api/timelogs/${tl.log_id}`, {
+      const res = await apiFetch(`/api/timelogs/${tl.log_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1176,21 +1362,24 @@ export default function App() {
     }
   };
 
-  const handleDeleteTimeLog = async (logId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/timelogs/${logId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        if (editingLogId === logId) setEditingLogId(null);
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestDeleteTimeLog = (tl) => {
+    if (!tl) return;
+    setConfirmDialog({
+      title: 'Delete Time Log Entry?',
+      message: 'This attendance record will be permanently removed from the DTR ledger and hours calculation.',
+      detail: `${tl.date} · ${tl.student_name || `Placement #${tl.placement_id}`} (${Number(tl.hours_rendered || 0).toFixed(2)} hrs)`,
+      confirmLabel: 'Delete Entry',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/timelogs/${tl.log_id}`,
+          fallbackError: 'Unable to delete time log entry.',
+          afterSuccess: () => {
+            if (editingLogId === tl.log_id) setEditingLogId(null);
+          },
+        }),
+    });
   };
 
   const handleExportTimeLogsCsv = (logsToExport) => {
@@ -1226,7 +1415,7 @@ export default function App() {
     try {
       const url = editingEvalId ? `/api/evaluations/${editingEvalId}` : '/api/evaluations';
       const method = editingEvalId ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(evalForm),
@@ -1268,21 +1457,24 @@ export default function App() {
     });
   };
 
-  const handleDeleteEvaluation = async (evalId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/evaluations/${evalId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        if (editingEvalId === evalId) setEditingEvalId(null);
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestDeleteEvaluation = (ev) => {
+    if (!ev) return;
+    setConfirmDialog({
+      title: 'Delete Evaluation Record?',
+      message: 'This evaluation rubric score will be permanently deleted from clearance records.',
+      detail: `${ev.date_evaluated || 'Evaluation'} · ${ev.student_name || `Placement #${ev.placement_id}`} (Score: ${Number(ev.rating || 0).toFixed(2)} / 5.00)`,
+      confirmLabel: 'Delete Evaluation',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/evaluations/${ev.eval_id}`,
+          fallbackError: 'Unable to delete evaluation record.',
+          afterSuccess: () => {
+            if (editingEvalId === ev.eval_id) setEditingEvalId(null);
+          },
+        }),
+    });
   };
 
   // ===========================================================================
@@ -1294,12 +1486,12 @@ export default function App() {
     try {
       const url = editingEmployerId ? `/api/employers/${editingEmployerId}` : '/api/employers';
       const method = editingEmployerId ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(employerForm),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Partner HTE service');
       if (json.ok) {
         showNotice(json.message);
         setShowEmployerForm(false);
@@ -1316,8 +1508,10 @@ export default function App() {
         });
         await fetchSystemData(true);
       } else {
-        showNotice(json.error, 'error');
+        showNotice(json.error || 'Failed to save employer record.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while saving employer record.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -1341,7 +1535,7 @@ export default function App() {
   const handleUpdateEmployerMoaStatus = async (emp, newMoaStatus) => {
     setSyncing(true);
     try {
-      const res = await fetch(`/api/employers/${emp.employer_id}`, {
+      const res = await apiFetch(`/api/employers/${emp.employer_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1361,20 +1555,24 @@ export default function App() {
     }
   };
 
-  const handleDeleteEmployer = async (employerId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/employers/${employerId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestDeleteEmployer = (emp) => {
+    if (!emp) return;
+    setConfirmDialog({
+      title: 'Delete Host Training Establishment?',
+      message: 'Remove this partner company from the HTE directory.',
+      detail: `${emp.company_name}${emp.industry ? ` · ${emp.industry}` : ''}`,
+      warning: Number(emp.active_interns_count || 0) > 0
+        ? `This company currently shows ${emp.active_interns_count} linked intern(s). Deletion may be blocked or affect placement links.`
+        : '',
+      confirmLabel: 'Delete HTE Partner',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/employers/${emp.employer_id}`,
+          fallbackError: 'Unable to delete HTE partner.',
+        }),
+    });
   };
 
   // ===========================================================================
@@ -1386,20 +1584,22 @@ export default function App() {
     try {
       const url = editingPlacementId ? `/api/placements/${editingPlacementId}` : '/api/placements';
       const method = editingPlacementId ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(placementForm),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Placement service');
       if (json.ok) {
         showNotice(json.message);
         setShowPlacementForm(false);
         setEditingPlacementId(null);
         await fetchSystemData(true);
       } else {
-        showNotice(json.error, 'error');
+        showNotice(json.error || 'Failed to save placement.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while saving placement.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -1424,7 +1624,7 @@ export default function App() {
   const handleUpdatePlacementStatus = async (placementId, newStatus) => {
     setSyncing(true);
     try {
-      const res = await fetch(`/api/placements/${placementId}`, {
+      const res = await apiFetch(`/api/placements/${placementId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -1444,7 +1644,7 @@ export default function App() {
   const handleReassignPlacementAdviser = async (placementId, newAdviserId) => {
     setSyncing(true);
     try {
-      const res = await fetch(`/api/placements/${placementId}`, {
+      const res = await apiFetch(`/api/placements/${placementId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adviser_id: Number(newAdviserId) }),
@@ -1471,7 +1671,7 @@ export default function App() {
           : superviseForm.adviser_id || (selectedAdviserFilter !== 'all' ? selectedAdviserFilter : 1);
 
       if (superviseMode === 'new') {
-        const res = await fetch('/api/students', {
+        const res = await apiFetch('/api/students', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1502,7 +1702,7 @@ export default function App() {
           showNotice(json.error || 'Could not add student.', 'error');
         }
       } else {
-        const res = await fetch('/api/placements', {
+        const res = await apiFetch('/api/placements', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1531,20 +1731,22 @@ export default function App() {
     }
   };
 
-  const handleDeletePlacement = async (placementId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/placements/${placementId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestDeletePlacement = (pl) => {
+    if (!pl) return;
+    setConfirmDialog({
+      title: 'Delete OJT Placement?',
+      message: 'Removing this placement will unlink associated attendance logs, evaluations, and clearance records.',
+      detail: `${pl.student_name} → ${pl.company_name} (${Number(pl.total_hours_completed || 0).toFixed(1)} / ${Number(pl.required_hours || 300).toFixed(0)} hrs)`,
+      warning: 'Ensure you no longer need this student’s DTR logs or compliance report before deleting.',
+      confirmLabel: 'Delete Placement',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/placements/${pl.placement_id}`,
+          fallbackError: 'Unable to delete placement.',
+        }),
+    });
   };
 
   // ===========================================================================
@@ -1568,12 +1770,12 @@ export default function App() {
           }
         : studentForm;
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Student profile service');
       if (json.ok) {
         if (isStudentSelfEdit && Number(editingStudentId) === Number(currentUser?.linked_id)) {
           const updatedUser = {
@@ -1604,8 +1806,10 @@ export default function App() {
         });
         await fetchSystemData(true);
       } else {
-        showNotice(json.error, 'error');
+        showNotice(json.error || 'Failed to save student record.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while saving student record.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -1630,20 +1834,22 @@ export default function App() {
     setShowStudentForm(true);
   };
 
-  const handleDeleteStudent = async (studentId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestDeleteStudent = (st) => {
+    if (!st) return;
+    setConfirmDialog({
+      title: 'Delete Student Record?',
+      message: 'Permanently delete this student profile and associated portal access.',
+      detail: `${st.full_name} (${st.student_number} · ${st.section || 'No section'})`,
+      warning: 'Linked OJT placements, DTR logs, and evaluations for this student may also be removed.',
+      confirmLabel: 'Delete Student',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/students/${st.student_id}`,
+          fallbackError: 'Unable to delete student record.',
+        }),
+    });
   };
 
   // ===========================================================================
@@ -1655,12 +1861,12 @@ export default function App() {
     try {
       const url = editingAdviserId ? `/api/advisers/${editingAdviserId}` : '/api/advisers';
       const method = editingAdviserId ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adviserForm),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'Faculty adviser service');
       if (json.ok) {
         showNotice(json.message);
         setShowAdviserForm(false);
@@ -1675,8 +1881,10 @@ export default function App() {
         });
         await fetchSystemData(true);
       } else {
-        showNotice(json.error, 'error');
+        showNotice(json.error || 'Failed to save adviser record.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while saving adviser record.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -1695,21 +1903,24 @@ export default function App() {
     setShowAdviserForm(true);
   };
 
-  const handleDeleteAdviser = async (adviserId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/advisers/${adviserId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        if (String(selectedAdviserFilter) === String(adviserId)) setSelectedAdviserFilter('all');
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestDeleteAdviser = (adv) => {
+    if (!adv) return;
+    setConfirmDialog({
+      title: 'Delete Faculty Adviser?',
+      message: 'Remove this faculty adviser profile from the department roster.',
+      detail: `${adv.full_name} (${adv.employee_number} · ${adv.department || 'Faculty'})`,
+      confirmLabel: 'Delete Adviser',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/advisers/${adv.adviser_id}`,
+          fallbackError: 'Unable to delete adviser profile.',
+          afterSuccess: () => {
+            if (String(selectedAdviserFilter) === String(adv.adviser_id)) setSelectedAdviserFilter('all');
+          },
+        }),
+    });
   };
 
   // ===========================================================================
@@ -1721,12 +1932,12 @@ export default function App() {
     try {
       const url = editingUserId ? `/api/users/${editingUserId}` : '/api/users';
       const method = editingUserId ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userForm),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'User account service');
       if (json.ok) {
         showNotice(json.message);
         setShowUserForm(false);
@@ -1740,8 +1951,10 @@ export default function App() {
         });
         await fetchSystemData(true);
       } else {
-        showNotice(json.error, 'error');
+        showNotice(json.error || 'Unable to save user account.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while saving user account.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -1763,37 +1976,44 @@ export default function App() {
     setSyncing(true);
     try {
       const nextActive = Number(u.is_active) === 1 ? 0 : 1;
-      const res = await fetch(`/api/users/${u.user_id}`, {
+      const res = await apiFetch(`/api/users/${u.user_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: nextActive }),
       });
-      const json = await res.json();
+      const json = await parseAuthResponse(res, 'User status service');
       if (json.ok) {
         showNotice(`User ${u.username} ${nextActive ? 'activated' : 'deactivated'}.`);
         await fetchSystemData(true);
       } else {
-        showNotice(json.error, 'error');
+        showNotice(json.error || 'Unable to update user status.', 'error');
       }
+    } catch (err) {
+      showNotice(err?.message || 'Unable to reach server while updating user status.', 'error');
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.ok) {
-        showNotice(json.message);
-        await fetchSystemData(true);
-      } else {
-        showNotice(json.error, 'error');
-      }
-    } finally {
-      setSyncing(false);
+  const requestDeleteUser = (u) => {
+    if (!u) return;
+    if (Number(u.user_id) === Number(currentUser?.user_id)) {
+      showNotice('You cannot delete your currently active account.', 'error');
+      return;
     }
+    setConfirmDialog({
+      title: 'Delete User Account?',
+      message: 'This login credential will be permanently revoked and removed from the system.',
+      detail: `${u.display_name} (@${u.username} · ${String(u.role || '').toUpperCase()})`,
+      confirmLabel: 'Delete Account',
+      variant: 'danger',
+      iconType: 'trash',
+      onConfirm: () =>
+        executeApiRequest({
+          url: `/api/users/${u.user_id}`,
+          fallbackError: 'Unable to delete user account.',
+        }),
+    });
   };
 
   // ===========================================================================
@@ -1802,7 +2022,7 @@ export default function App() {
   const handleSyncCompliance = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/compliance/sync', { method: 'POST' });
+      const res = await apiFetch('/api/compliance/sync', { method: 'POST' });
       const json = await res.json();
       if (json.ok) {
         showNotice(json.message);
@@ -1816,7 +2036,7 @@ export default function App() {
   const handleEndorseClearance = async (placementId) => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/compliance/endorse', {
+      const res = await apiFetch('/api/compliance/endorse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ placement_id: placementId }),
@@ -1833,18 +2053,22 @@ export default function App() {
     }
   };
 
-  const handleResetDemo = async () => {
-    setSyncing(true);
-    try {
-      const res = await fetch('/api/system/reset', { method: 'POST' });
-      const json = await res.json();
-      if (json.ok) {
-        showNotice(json.message);
-        await fetchSystemData(false);
-      }
-    } finally {
-      setSyncing(false);
-    }
+  const requestResetDemo = () => {
+    setConfirmDialog({
+      title: 'Reset System to Default Seed Data?',
+      message: 'Restore the Practicly database back to its original demonstration state.',
+      warning: 'All newly registered students, placements, time logs, evaluations, and uploaded scans created since the last seed will be erased.',
+      confirmLabel: 'Reset Demo Data',
+      variant: 'danger',
+      iconType: 'alert',
+      onConfirm: () =>
+        executeApiRequest({
+          url: '/api/system/reset',
+          method: 'POST',
+          silentRefresh: false,
+          fallbackError: 'Unable to reset demo database.',
+        }),
+    });
   };
 
   const handleExportComplianceCsv = () => {
@@ -2342,6 +2566,7 @@ export default function App() {
         timelogs={data.timelogs}
         evaluations={data.evaluations}
         onClose={() => {
+          setVerifyContext(null, null);
           setPublicSupervisorPlacementId(null);
           try {
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -2398,7 +2623,7 @@ export default function App() {
           <h2>{authMode === 'login' ? 'Sign in' : 'Create Student Account'}</h2>
           <p className="auth-card-sub">
             {authMode === 'login'
-              ? 'Use your student, faculty adviser, or administrator credentials.'
+              ? 'Use your student, HTE supervisor, faculty adviser, or administrator credentials.'
               : 'Register your BS CpE student profile and OJT placement.'}
           </p>
 
@@ -2426,7 +2651,7 @@ export default function App() {
             <form onSubmit={(e) => handleLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="field">
                 <label className="field-label" htmlFor="login-username">
-                  Username
+                  Username, Email, or ID Number
                 </label>
                 <input
                   id="login-username"
@@ -2434,7 +2659,11 @@ export default function App() {
                   className="input"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="e.g. kian.balanag"
+                  placeholder="e.g. kian.balanag or 2023-00108-MN-0"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -2443,15 +2672,33 @@ export default function App() {
                 <label className="field-label" htmlFor="login-password">
                   Password
                 </label>
-                <input
-                  id="login-password"
-                  type="password"
-                  className="input"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                />
+                <div className="password-input-wrap">
+                  <input
+                    id="login-password"
+                    type={showLoginPassword ? 'text' : 'password'}
+                    className="input"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowLoginPassword((v) => !v)}
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    title={showLoginPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showLoginPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                </div>
+                <div className="auth-hint-row">
+                  <span>Case-insensitive username/email lookup</span>
+                  <span>
+                    Demo password: <code className="mono">password123</code>
+                  </span>
+                </div>
               </div>
 
               <button
@@ -2508,6 +2755,9 @@ export default function App() {
                     placeholder="gabriel.torres@mit.edu.ph"
                     value={registerForm.email}
                     onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                   />
                 </div>
@@ -2532,18 +2782,33 @@ export default function App() {
                     placeholder="gabriel.delarosa"
                     value={registerForm.username}
                     onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                   />
                 </div>
                 <div className="field">
                   <label className="field-label">Password</label>
-                  <input
-                    type="password"
-                    className="input"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                    required
-                  />
+                  <div className="password-input-wrap">
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      className="input"
+                      value={registerForm.password}
+                      onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowRegPassword((v) => !v)}
+                      aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                      title={showRegPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showRegPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               {data.employers.length > 0 && (
@@ -2581,7 +2846,7 @@ export default function App() {
             className="auth-demo-toggle"
             onClick={() => setShowDemoAccounts((v) => !v)}
           >
-            <span>Quick-Switch Test Accounts (Student / Adviser / Admin)</span>
+            <span>Quick-Switch Test Accounts (All Roles)</span>
             <span>{showDemoAccounts ? 'Hide' : 'Show'}</span>
           </button>
           {showDemoAccounts && (
@@ -2645,7 +2910,11 @@ export default function App() {
             <button
               type="button"
               className="btn btn-secondary btn-xs"
-              onClick={() => setPublicSupervisorPlacementId(data.placements[0]?.placement_id || '1')}
+              onClick={() => {
+                const targetId = data.placements[0]?.placement_id || '1';
+                setVerifyContext(targetId, data.placements[0]?.verify_token || null);
+                setPublicSupervisorPlacementId(targetId);
+              }}
             >
               Test Link
             </button>
@@ -2808,7 +3077,7 @@ export default function App() {
                 type="button"
                 className="btn btn-ghost-danger"
                 title="Sign out"
-                onClick={handleLogout}
+                onClick={requestLogout}
                 style={{ padding: '6px' }}
               >
                 <IconLogOut size={14} />
@@ -2862,9 +3131,13 @@ export default function App() {
                 handleLogin(null, username);
               }}
               demoPresets={DEMO_PRESETS}
+              onRequestLogout={requestLogout}
               onOpenSupervisorView={() => {
-                const targetId = myPlacement?.placement_id || (data.placements[0]?.placement_id);
-                if (targetId) setPublicSupervisorPlacementId(targetId);
+                const targetPl = myPlacement || data.placements[0];
+                if (targetPl?.placement_id) {
+                  setVerifyContext(targetPl.placement_id, targetPl.verify_token || null);
+                  setPublicSupervisorPlacementId(targetPl.placement_id);
+                }
               }}
             />
 
@@ -3019,9 +3292,6 @@ export default function App() {
                 }}
                 onShareSupervisorLink={() => {
                   setSupervisorShareModalOpen(true);
-                }}
-                onEditProfile={() => {
-                  if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
                   setActiveTab(tab);
@@ -3301,9 +3571,6 @@ export default function App() {
                 onShareSupervisorLink={() => {
                   setSupervisorShareModalOpen(true);
                 }}
-                onEditProfile={() => {
-                  if (myStudent) handleStartEditStudent(myStudent);
-                }}
                 onNavigateTab={(tab) => {
                   setActiveTab(tab);
                   scrollWorkspaceToTop();
@@ -3549,7 +3816,6 @@ export default function App() {
               <RoleHeroBanner
                 currentUser={currentUser}
                 supervisorPendingCount={supervisorPendingLogs.length}
-                onVerifyAllSupervisor={handleVerifyAllSupervisorLogs}
                 onOpenEvalModal={() => {
                   setEditingEvalId(null);
                   const firstPl = supervisorPlacements[0] || data.placements[0];
@@ -3570,18 +3836,6 @@ export default function App() {
                   setForcedEvalInstrumentId(null);
                   setEvalInitialInstrumentId('supervisor_to_student');
                   setOfficialEvalModalOpen(true);
-                }}
-                onUploadSignedDtr={() => {
-                  setSignedDtrModalOpen(true);
-                }}
-                onOpenDtrTransfer={() => {
-                  setDtrTransferModalOpen(true);
-                }}
-                onShareSupervisorLink={() => {
-                  setSupervisorShareModalOpen(true);
-                }}
-                onEditProfile={() => {
-                  if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
                   setActiveTab(tab);
@@ -3941,9 +4195,6 @@ export default function App() {
                 }}
                 onShareSupervisorLink={() => {
                   setSupervisorShareModalOpen(true);
-                }}
-                onEditProfile={() => {
-                  if (myStudent) handleStartEditStudent(myStudent);
                 }}
                 onNavigateTab={(tab) => {
                   setActiveTab(tab);
@@ -4346,7 +4597,7 @@ export default function App() {
                                   type="button"
                                   className="btn btn-ghost-danger"
                                   title="Delete student"
-                                  onClick={() => handleDeleteStudent(st.student_id)}
+                                  onClick={() => requestDeleteStudent(st)}
                                 >
                                   <IconTrash size={13} />
                                 </button>
@@ -4718,7 +4969,7 @@ export default function App() {
                                         type="button"
                                         className="btn btn-ghost-danger"
                                         title="Delete HTE"
-                                        onClick={() => handleDeleteEmployer(emp.employer_id)}
+                                        onClick={() => requestDeleteEmployer(emp)}
                                       >
                                         <IconTrash size={13} />
                                       </button>
@@ -4993,7 +5244,7 @@ export default function App() {
                                 type="button"
                                 className="btn btn-ghost-danger"
                                 title="Delete placement"
-                                onClick={() => handleDeletePlacement(pl.placement_id)}
+                                onClick={() => requestDeletePlacement(pl)}
                               >
                                 <IconTrash size={13} />
                               </button>
@@ -5103,20 +5354,7 @@ export default function App() {
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      onClick={() => {
-                        const targetPl =
-                          data.placements.find(
-                            (p) => String(p.placement_id) === String(timelogPlacementFilter)
-                          ) ||
-                          (currentUser.role === 'adviser'
-                            ? data.placements.find(
-                                (p) => Number(p.adviser_id) === Number(currentUser.linked_id)
-                              )
-                            : null) ||
-                          data.placements[0];
-                        setAuditPlacement(targetPl);
-                        setAuditModalOpen(true);
-                      }}
+                      onClick={() => openAuditModal()}
                       title="Compare digital shifts with student's uploaded signed physical DTR before endorsing"
                     >
                       <IconShieldCheck size={13} />
@@ -5243,42 +5481,9 @@ export default function App() {
                         Advisory DTR Cross-Audit &amp; Academic Endorsement
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Compare your advisee's digital shifts with their uploaded signed physical copy. Endorsed shifts are credited and forwarded to the Admin Registry.
+                        Compare your advisee&apos;s digital shifts with their uploaded signed physical copy. Endorsed shifts are credited and forwarded to the Admin Registry.
                       </div>
                     </div>
-                  </div>
-
-                  <div className="notice-banner-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => {
-                        const targetPl =
-                          data.placements.find(
-                            (p) => String(p.placement_id) === String(timelogPlacementFilter)
-                          ) ||
-                          data.placements.find(
-                            (p) => Number(p.adviser_id) === Number(currentUser.linked_id)
-                          ) ||
-                          data.placements[0];
-                        setAuditPlacement(targetPl);
-                        setAuditModalOpen(true);
-                      }}
-                    >
-                      <IconShieldCheck size={13} />
-                      Audit with Signed DTR
-                    </button>
-                    {adviserPendingVerifiedLogs.length > 0 && (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={handleApproveAllTimeLogs}
-                        disabled={syncing}
-                      >
-                        <IconCheckCircle size={13} />
-                        Endorse All Verified ({adviserPendingVerifiedLogs.length})
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -5584,6 +5789,27 @@ export default function App() {
                                   </span>
                                 ) : (
                                   <>
+                                    {(currentUser.role === 'adviser' || currentUser.role === 'admin') && (() => {
+                                      const rowPl = data.placements.find(
+                                        (p) => Number(p.placement_id) === Number(tl.placement_id)
+                                      );
+                                      if (!rowPl) return null;
+                                      const hasDoc = Boolean(rowPl.signed_dtr_filename || rowPl.signed_dtr_file);
+                                      return (
+                                        <button
+                                          type="button"
+                                          className={`btn ${hasDoc ? 'btn-tonal' : 'btn-ghost'}`}
+                                          title={
+                                            hasDoc
+                                              ? `Audit signed DTR (${rowPl.signed_dtr_filename})`
+                                              : `Cross-audit DTR for ${rowPl.student_name}`
+                                          }
+                                          onClick={() => openAuditModal(rowPl)}
+                                        >
+                                          <IconShieldCheck size={13} />
+                                        </button>
+                                      );
+                                    })()}
                                     <button
                                       type="button"
                                       className="btn btn-ghost"
@@ -5596,7 +5822,7 @@ export default function App() {
                                       type="button"
                                       className="btn btn-ghost-danger"
                                       title="Delete entry"
-                                      onClick={() => handleDeleteTimeLog(tl.log_id)}
+                                      onClick={() => requestDeleteTimeLog(tl)}
                                     >
                                       <IconTrash size={13} />
                                     </button>
@@ -5736,17 +5962,6 @@ export default function App() {
                                       >
                                         <IconPrinter size={13} />
                                         Print Blank INST-02
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-tonal btn-sm"
-                                        onClick={() => {
-                                          setSignedEvalPlacement(myPlacement);
-                                          setSignedEvalModalOpen(true);
-                                        }}
-                                      >
-                                        <IconUpload size={13} />
-                                        {myPlacement.signed_eval_filename ? 'Manage Scan' : 'Upload Signed Scan'}
                                       </button>
                                     </div>
                                   </div>
@@ -6184,7 +6399,7 @@ export default function App() {
                                         type="button"
                                         className="btn btn-ghost-danger"
                                         title="Delete evaluation"
-                                        onClick={() => handleDeleteEvaluation(ev.eval_id)}
+                                        onClick={() => requestDeleteEvaluation(ev)}
                                       >
                                         <IconTrash size={13} />
                                       </button>
@@ -6309,7 +6524,8 @@ export default function App() {
                           <button
                             type="button"
                             className="btn btn-ghost-danger"
-                            onClick={() => handleDeleteAdviser(adv.adviser_id)}
+                            title="Delete adviser"
+                            onClick={() => requestDeleteAdviser(adv)}
                           >
                             <IconTrash size={12} />
                           </button>
@@ -6774,7 +6990,7 @@ export default function App() {
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={handleResetDemo}
+                    onClick={requestResetDemo}
                     disabled={syncing}
                   >
                     <IconRefresh size={13} />
@@ -6821,7 +7037,19 @@ export default function App() {
                           key={u.user_id}
                           className={Number(editingUserId) === Number(u.user_id) ? 'is-editing' : ''}
                         >
-                          <td className="mono row-title">{u.username}</td>
+                          <td>
+                            <div className="mono row-title">{u.username}</div>
+                            <div
+                              className="row-sub"
+                              style={{
+                                color: Number(u.has_custom_password) === 1 ? '#0f7b4f' : '#6b7280',
+                              }}
+                            >
+                              {Number(u.has_custom_password) === 1
+                                ? 'Custom password saved (encrypted)'
+                                : 'Default demo password'}
+                            </div>
+                          </td>
                           <td>
                             <StatusChip
                               variant={
@@ -6875,12 +7103,12 @@ export default function App() {
                               >
                                 Switch
                               </button>
-                              {u.user_id !== 1 && (
+                              {u.user_id !== 1 && Number(u.user_id) !== Number(currentUser?.user_id) && (
                                 <button
                                   type="button"
                                   className="btn btn-ghost-danger"
                                   title="Delete user"
-                                  onClick={() => handleDeleteUser(u.user_id)}
+                                  onClick={() => requestDeleteUser(u)}
                                 >
                                   <IconTrash size={13} />
                                 </button>
@@ -6913,7 +7141,7 @@ export default function App() {
                 systemInfo={data.system_info}
                 data={data}
                 onSyncCompliance={handleSyncCompliance}
-                onResetDemo={handleResetDemo}
+                onResetDemo={requestResetDemo}
                 syncing={syncing}
               />
             </>
@@ -6925,117 +7153,70 @@ export default function App() {
 
       {/* MOBILE BOTTOM QUICK NAVIGATION BAR (Phone viewports) */}
       <nav className="mobile-bottom-nav" aria-label="Mobile quick navigation">
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('dashboard');
-            scrollWorkspaceToTop();
-            setMobileMenuOpen(false);
-          }}
-        >
-          <IconDashboard size={18} />
-          <span>Overview</span>
-        </button>
-
-        {currentUser.role === 'supervisor' ? (
-          <>
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeTab === 'timelogs' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('timelogs');
-                scrollWorkspaceToTop();
-                setMobileMenuOpen(false);
-              }}
-            >
-              <IconClock size={18} />
-              <span>Queue</span>
-            </button>
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeTab === 'evaluations' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('evaluations');
-                scrollWorkspaceToTop();
-                setMobileMenuOpen(false);
-              }}
-            >
-              <IconEvaluation size={18} />
-              <span>Evals</span>
-            </button>
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeTab === 'employers' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('employers');
-                scrollWorkspaceToTop();
-                setMobileMenuOpen(false);
-              }}
-            >
-              <IconBuilding size={18} />
-              <span>Company</span>
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              className={`mobile-nav-item ${
-                (currentUser.role === 'student' ? activeTab === 'employers' : activeTab === 'placements')
-                  ? 'active'
-                  : ''
-              }`}
-              onClick={() => {
-                setActiveTab(currentUser.role === 'student' ? 'employers' : 'placements');
-                scrollWorkspaceToTop();
-                setMobileMenuOpen(false);
-              }}
-            >
-              {currentUser.role === 'student' ? <IconBuilding size={18} /> : <IconBriefcase size={18} />}
-              <span>{currentUser.role === 'student' ? 'Partners' : 'Placements'}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`mobile-nav-item ${activeTab === 'timelogs' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('timelogs');
-                scrollWorkspaceToTop();
-                setMobileMenuOpen(false);
-              }}
-            >
-              <IconClock size={18} />
-              <span>Logs</span>
-            </button>
-
-            <button
-              type="button"
-              className={`mobile-nav-item ${
-                (currentUser.role === 'adviser' ? activeTab === 'evaluations' : activeTab === 'compliance')
-                  ? 'active'
-                  : ''
-              }`}
-              onClick={() => {
-                setActiveTab(currentUser.role === 'adviser' ? 'evaluations' : 'compliance');
-                scrollWorkspaceToTop();
-                setMobileMenuOpen(false);
-              }}
-            >
-              {currentUser.role === 'adviser' ? <IconEvaluation size={18} /> : <IconShieldCheck size={18} />}
-              <span>{currentUser.role === 'adviser' ? 'Evals' : 'Clearance'}</span>
-            </button>
-          </>
-        )}
-
-        <button
-          type="button"
-          className={`mobile-nav-item ${mobileMenuOpen ? 'active' : ''}`}
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-        >
-          {mobileMenuOpen ? <IconClose size={18} /> : <IconMenu size={18} />}
-          <span>Menu</span>
-        </button>
+        {(() => {
+          const role = currentUser.role;
+          const items =
+            role === 'student'
+              ? [
+                  { id: 'dashboard', label: 'Overview', icon: IconDashboard },
+                  { id: 'timelogs', label: 'Logs', icon: IconClock },
+                  { id: 'evaluations', label: 'Clearance', icon: IconShieldCheck },
+                  { id: 'employers', label: 'Partners', icon: IconBuilding },
+                ]
+              : role === 'supervisor'
+              ? [
+                  { id: 'dashboard', label: 'Overview', icon: IconDashboard },
+                  { id: 'timelogs', label: 'Queue', icon: IconClock },
+                  { id: 'evaluations', label: 'Evals', icon: IconEvaluation },
+                  { id: 'employers', label: 'Company', icon: IconBuilding },
+                ]
+              : role === 'adviser'
+              ? [
+                  { id: 'dashboard', label: 'Overview', icon: IconDashboard },
+                  { id: 'timelogs', label: 'Logs', icon: IconClock },
+                  { id: 'evaluations', label: 'Evals', icon: IconEvaluation },
+                  { id: 'compliance', label: 'Clearance', icon: IconShieldCheck },
+                ]
+              : [
+                  { id: 'dashboard', label: 'Overview', icon: IconDashboard },
+                  { id: 'placements', label: 'Placements', icon: IconBriefcase },
+                  { id: 'timelogs', label: 'Logs', icon: IconClock },
+                  { id: 'compliance', label: 'Clearance', icon: IconShieldCheck },
+                ];
+          const hasOverflowDrawerTabs = role === 'adviser' || role === 'admin';
+          return (
+            <>
+              {items.map((item) => {
+                const IconComp = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`mobile-nav-item ${activeTab === item.id ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      scrollWorkspaceToTop();
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    <IconComp size={18} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+              {hasOverflowDrawerTabs && (
+                <button
+                  type="button"
+                  className={`mobile-nav-item ${mobileMenuOpen ? 'active' : ''}`}
+                  onClick={() => setMobileMenuOpen((prev) => !prev)}
+                >
+                  {mobileMenuOpen ? <IconClose size={18} /> : <IconMenu size={18} />}
+                  <span>Menu</span>
+                </button>
+              )}
+            </>
+          );
+        })()}
       </nav>
 
       <ClearanceModal
@@ -7122,7 +7303,10 @@ export default function App() {
         isOpen={supervisorShareModalOpen}
         onClose={() => setSupervisorShareModalOpen(false)}
         placement={myPlacement || data.placements[0]}
-        onOpenSupervisorView={(p) => setPublicSupervisorPlacementId(p.placement_id)}
+        onOpenSupervisorView={(p) => {
+          setVerifyContext(p.placement_id, p.verify_token || null);
+          setPublicSupervisorPlacementId(p.placement_id);
+        }}
       />
 
       <SignedDtrUploadModal
@@ -7164,11 +7348,13 @@ export default function App() {
           setAuditPlacement(null);
         }}
         placement={auditPlacement}
+        placements={auditablePlacements}
+        onSelectPlacement={(pl) => setAuditPlacement(pl)}
         timelogs={data.timelogs}
         currentUser={currentUser}
         onEndorseAll={async (placementId) => {
           try {
-            const res = await fetch('/api/timelogs/approve-all', {
+            const res = await apiFetch('/api/timelogs/approve-all', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -7265,6 +7451,9 @@ export default function App() {
         userForm={userForm}
         setUserForm={setUserForm}
         editingUserId={editingUserId}
+        editingUser={
+          data.users.find((u) => Number(u.user_id) === Number(editingUserId)) || null
+        }
         students={data.students}
         employers={data.employers}
         advisers={data.advisers}
@@ -7317,6 +7506,20 @@ export default function App() {
           showNotice(msg);
           fetchSystemData(true);
         }}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmDialog)}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        detail={confirmDialog?.detail}
+        warning={confirmDialog?.warning}
+        confirmLabel={confirmDialog?.confirmLabel}
+        cancelLabel={confirmDialog?.cancelLabel}
+        variant={confirmDialog?.variant || 'danger'}
+        iconType={confirmDialog?.iconType || 'alert'}
+        onConfirm={confirmDialog?.onConfirm}
+        onClose={() => setConfirmDialog(null)}
       />
 
       <Snackbar key={toast?.id} message={toast?.message} type={toast?.type} onClose={dismissNotice} />

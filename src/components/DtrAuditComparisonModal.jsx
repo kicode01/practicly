@@ -11,11 +11,14 @@ import {
   IconExternalLink,
   IconEdit
 } from './Icons';
+import { MaterialSelect } from './MaterialComponents';
 
 export default function DtrAuditComparisonModal({
   isOpen,
   onClose,
   placement,
+  placements = [],
+  onSelectPlacement,
   timelogs = [],
   onEndorseAll,
   onUpdateApproval,
@@ -27,9 +30,8 @@ export default function DtrAuditComparisonModal({
   const [selectedLogToFlag, setSelectedLogToFlag] = useState(null);
   const [flagReason, setFlagReason] = useState('Discrepancy detected between digital shift and uploaded signed physical DTR.');
 
-  if (!isOpen || !placement) return null;
-
   const placementLogs = useMemo(() => {
+    if (!placement) return [];
     return timelogs.filter((tl) => Number(tl.placement_id) === Number(placement.placement_id));
   }, [timelogs, placement]);
 
@@ -54,6 +56,8 @@ export default function DtrAuditComparisonModal({
   const flaggedCount = useMemo(() => {
     return placementLogs.filter((tl) => tl.approval_status === 'flagged').length;
   }, [placementLogs]);
+
+  if (!isOpen || !placement) return null;
 
   const hasSignedDtr = Boolean(placement.signed_dtr_filename || placement.signed_dtr_file);
 
@@ -83,8 +87,7 @@ export default function DtrAuditComparisonModal({
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-card modal-entry-card"
-        style={{ maxWidth: '1100px', width: '96vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        className="modal-card modal-entry-card modal-audit-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
@@ -120,11 +123,38 @@ export default function DtrAuditComparisonModal({
             flexShrink: 0
           }}
         >
-          <div>
-            <span style={{ color: 'var(--text-muted)', display: 'block' }}>Intern Name &amp; ID:</span>
-            <strong style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
-              {placement.student_name} ({placement.student_number})
-            </strong>
+          <div style={{ minWidth: 0 }}>
+            <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: placements.length > 1 && onSelectPlacement ? '4px' : 0 }}>
+              Intern Name &amp; ID{placements.length > 1 ? ` (${placements.filter((p) => Boolean(p.signed_dtr_filename || p.signed_dtr_file)).length}/${placements.length} uploaded)` : ''}:
+            </span>
+            {placements.length > 1 && onSelectPlacement ? (
+              <MaterialSelect
+                className="select-sm"
+                style={{ width: '100%' }}
+                value={String(placement.placement_id)}
+                onChange={(e) => {
+                  const next = placements.find((p) => String(p.placement_id) === String(e.target.value));
+                  if (next) {
+                    setFlagModalOpen(false);
+                    setSelectedLogToFlag(null);
+                    onSelectPlacement(next);
+                  }
+                }}
+              >
+                {placements.map((p) => {
+                  const uploaded = Boolean(p.signed_dtr_filename || p.signed_dtr_file);
+                  return (
+                    <option key={p.placement_id} value={String(p.placement_id)}>
+                      {p.student_name} ({p.student_number}) {uploaded ? '· Signed DTR' : '· No Upload'}
+                    </option>
+                  );
+                })}
+              </MaterialSelect>
+            ) : (
+              <strong style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
+                {placement.student_name} ({placement.student_number})
+              </strong>
+            )}
           </div>
           <div>
             <span style={{ color: 'var(--text-muted)', display: 'block' }}>Host Company (HTE):</span>
@@ -194,7 +224,7 @@ export default function DtrAuditComparisonModal({
             <div
               className={`dtr-audit-pane ${activeTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   Digital Daily Time Records ({placementLogs.length} shifts)
                 </div>
@@ -222,7 +252,7 @@ export default function DtrAuditComparisonModal({
                         gap: '6px'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
                           {tl.date}
                         </div>
@@ -307,7 +337,7 @@ export default function DtrAuditComparisonModal({
             <div
               className={`dtr-audit-pane ${activeTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   Scanned Physical DTR Document
                 </div>

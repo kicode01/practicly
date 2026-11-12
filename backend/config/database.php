@@ -113,6 +113,7 @@ class Database
 
         try {
             $pdo->exec('PRAGMA journal_mode = WAL;');
+            $pdo->exec('PRAGMA synchronous = NORMAL;');
         } catch (Throwable $e) {
             // Non-critical: allowed if another process currently holds an exclusive lock
         }

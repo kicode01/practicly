@@ -1,0 +1,25 @@
+FROM node:22-alpine AS frontend
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY index.html vite.config.js ./
+COPY public ./public
+COPY src ./src
+RUN npm run build
+
+FROM php:8.3-cli-alpine
+WORKDIR /app
+
+COPY backend ./backend
+COPY database ./database
+COPY public ./public
+COPY --from=frontend /app/dist ./dist
+
+ENV DB_DRIVER=sqlite
+ENV DB_SQLITE_PATH=/tmp/ojt_tracking.db
+ENV PHP_CLI_SERVER_WORKERS=4
+
+EXPOSE 80
+CMD ["sh", "-c", "if [ ! -s /tmp/ojt_tracking.db ] && [ -s /app/database/ojt_tracking.db ]; then cp /app/database/ojt_tracking.db /tmp/ojt_tracking.db; fi; exec php -S 0.0.0.0:${PORT:-80} /app/backend/router.php"]

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SegmentedControl, Button, MaterialSelect } from './MaterialComponents';
+import { apiFetch } from '../utils/apiClient';
 import {
   IconEvaluation,
   IconClose,
@@ -10,7 +11,8 @@ import {
   IconBuilding,
   IconStudent,
   IconSupervisor,
-  IconCheck
+  IconCheck,
+  IconAlert
 } from './Icons';
 import {
   EVALUATION_INSTRUMENTS,
@@ -60,9 +62,11 @@ export default function OfficialEvaluationModal({
   const [selectedPlacementId, setSelectedPlacementId] = useState(
     placements[0]?.placement_id ? String(placements[0].placement_id) : '1'
   );
+  const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
+    setSubmitError('');
     if (forcedInstrumentId) {
       setSelectedInstrumentId(forcedInstrumentId);
       return;
@@ -276,22 +280,23 @@ export default function OfficialEvaluationModal({
     };
 
     try {
-      const res = await fetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json.ok) {
+        setSubmitError('');
         if (onSuccess) {
           onSuccess(`${json.updated ? 'Updated' : 'Recorded'} ${activeInstrument.name} (Score: ${computedRating.toFixed(2)}/5.00)`);
         }
         onClose();
       } else {
-        alert(json.error || 'Failed to record evaluation.');
+        setSubmitError(json.error || 'Failed to record evaluation.');
       }
     } catch (err) {
-      alert('Error saving evaluation: ' + err.message);
+      setSubmitError('Error saving evaluation: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -370,6 +375,7 @@ export default function OfficialEvaluationModal({
                   type="button"
                   className={`eval-instrument-tab ${active ? 'active' : ''}`}
                   onClick={() => {
+                    setSubmitError('');
                     setSelectedInstrumentId(inst.id);
                   }}
                 >
@@ -390,10 +396,12 @@ export default function OfficialEvaluationModal({
                 {existingRecord && !isBlankPrintMode && (
                   <span
                     style={{
+                      display: 'inline-block',
                       fontSize: '11px',
                       fontWeight: 600,
-                      padding: '3px 10px',
-                      borderRadius: '999px',
+                      lineHeight: 1.4,
+                      padding: '4px 10px',
+                      borderRadius: '10px',
                       background: 'rgba(16, 185, 129, 0.12)',
                       color: '#047857',
                     }}
@@ -417,6 +425,21 @@ export default function OfficialEvaluationModal({
             </div>
           )}
         </div>
+
+        {submitError && (
+          <div className="modal-inline-error no-print" role="alert" style={{ margin: '10px 24px 0' }}>
+            <IconAlert size={16} />
+            <span style={{ flex: 1 }}>{submitError}</span>
+            <button
+              type="button"
+              className="modal-inline-error-close"
+              onClick={() => setSubmitError('')}
+              aria-label="Dismiss error"
+            >
+              <IconClose size={13} />
+            </button>
+          </div>
+        )}
 
         {/* CONTROLS STRIP: PLACEMENT SELECTOR & COMPOSITE SCORE SUMMARY */}
         <div className="no-print eval-controls-strip">
@@ -595,7 +618,8 @@ export default function OfficialEvaluationModal({
                   >
                     {sec.title}
                   </div>
-                  <table className="table table-compact" style={{ width: '100%', margin: 0 }}>
+                  <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
+                  <table className="table table-compact official-rubric-table" style={{ width: '100%', margin: 0 }}>
                     <thead>
                       <tr>
                         <th style={{ width: '40px', textAlign: 'center' }}>#</th>
@@ -646,6 +670,7 @@ export default function OfficialEvaluationModal({
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ))}
             </div>

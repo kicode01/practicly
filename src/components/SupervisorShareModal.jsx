@@ -20,7 +20,8 @@ export default function SupervisorShareModal({
   if (!isOpen || !placement) return null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000';
-  const verifyUrl = `${origin}/?verify=${placement.placement_id}&token=MIT-VERIFY-${placement.student_number || 'CPE'}`;
+  const verifyTokenParam = placement.verify_token ? `&token=${encodeURIComponent(placement.verify_token)}` : '';
+  const verifyUrl = `${origin}/?verify=${placement.placement_id}${verifyTokenParam}`;
 
   const handleCopy = () => {
     if (navigator?.clipboard?.writeText) {

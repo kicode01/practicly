@@ -166,16 +166,17 @@ export function MaterialSelect({
     const viewportH = window.innerHeight;
     const margin = 8;
     const gap = 6;
-    const maxAllowedW = Math.min(420, viewportW - margin * 2);
+    const maxAllowedW = Math.min(viewportW - margin * 2, Math.max(760, Math.ceil(rect.width)));
     const minW = Math.min(Math.max(rect.width, isSmall ? 180 : 220), maxAllowedW);
 
-    const measuredRect = menuRef.current ? menuRef.current.getBoundingClientRect() : null;
-    const estimatedW = measuredRect && measuredRect.width > 0
-      ? Math.min(Math.max(measuredRect.width, minW), maxAllowedW)
+    const measuredW = menuRef.current ? menuRef.current.offsetWidth : 0;
+    const measuredH = menuRef.current ? menuRef.current.offsetHeight : 0;
+    const estimatedW = measuredW > 0
+      ? Math.min(Math.max(measuredW, minW), maxAllowedW)
       : Math.min(Math.max(minW, Math.min(260, maxAllowedW)), maxAllowedW);
     const estRowH = 38;
-    const estimatedH = measuredRect && measuredRect.height > 0
-      ? Math.min(measuredRect.height, 420)
+    const estimatedH = measuredH > 0
+      ? Math.min(measuredH, 420)
       : Math.min(Math.max(items.length, 1) * estRowH + 16, 420);
 
     const spaceBelow = Math.max(0, viewportH - rect.bottom - gap - margin);

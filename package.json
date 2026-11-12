@@ -13,6 +13,8 @@
     "preview": "vite preview --port 4173 --host 127.0.0.1"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/open-runde": "^5.3.0",
     "@material/web": "^2.5.0",
     "glisse": "^0.5.0",
     "react": "^18.3.1",

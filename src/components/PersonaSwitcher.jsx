@@ -9,7 +9,8 @@ import {
   IconClose,
   IconChevronDown,
   IconBuilding,
-  IconLink
+  IconLink,
+  IconLogOut
 } from './Icons';
 
 export default function PersonaSwitcher({
@@ -18,6 +19,7 @@ export default function PersonaSwitcher({
   onSwitchUser,
   demoPresets = [],
   onOpenSupervisorView,
+  onRequestLogout,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [roleFilter, setRoleFilter] = useState('all');
@@ -164,6 +166,20 @@ export default function PersonaSwitcher({
                 </span>
               </div>
             </div>
+            {onRequestLogout && (
+              <button
+                type="button"
+                className="m3-active-signout-btn"
+                onClick={() => {
+                  setIsOpen(false);
+                  onRequestLogout();
+                }}
+                title="Sign out of current account"
+              >
+                <IconLogOut size={14} />
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
 
           <div className="m3-dialog-divider" />
