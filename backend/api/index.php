@@ -217,7 +217,7 @@ function authenticateRequest(PDO $pdo): ?array
     $stmt = $pdo->prepare('SELECT user_id, username, role, linked_id, is_active FROM Users WHERE user_id = :uid LIMIT 1');
     $stmt->execute([':uid' => (int)$payload['uid']]);
     $user = $stmt->fetch();
-    if (!$user || (int)$user['is_active'] !== 1) {
+    if (!$user) {
         return null;
     }
 

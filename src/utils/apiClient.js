@@ -57,8 +57,13 @@ export function getVerifyContext() {
 export function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const token = getAuthToken();
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
+  if (token) {
+    if (!headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    if (!headers.has('X-Auth-Token')) {
+      headers.set('X-Auth-Token', token);
+    }
   }
   const verifyCtx = getVerifyContext();
   if (verifyCtx) {
