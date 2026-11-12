@@ -26,7 +26,6 @@ import {
   IconUser,
   IconFilter,
   IconCheck,
-  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconFileText,
@@ -433,32 +432,11 @@ export default function App() {
     }
   });
 
-  const [collapsedNavGroups, setCollapsedNavGroups] = useState(() => {
-    try {
-      const saved = localStorage.getItem('practicly_collapsed_nav_groups');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
   const handleToggleSidebar = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       try {
         localStorage.setItem('practicly_sidebar_collapsed', String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  };
-
-  const handleToggleNavGroup = (groupLabel) => {
-    setCollapsedNavGroups((prev) => {
-      const next = { ...prev, [groupLabel]: !prev[groupLabel] };
-      try {
-        localStorage.setItem('practicly_collapsed_nav_groups', JSON.stringify(next));
       } catch {
         // ignore
       }
@@ -2698,60 +2676,43 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary Navigation">
-          {navGroups.map((group) => {
-            const isGroupCollapsed = Boolean(collapsedNavGroups[group.label]);
-            const hasActiveItem = group.items.some((i) => i.id === activeTab);
-            const isExpanded = !isGroupCollapsed || hasActiveItem;
-
-            return (
-              <div key={group.label} className="sidebar-group">
-                <button
-                  type="button"
-                  className="sidebar-group-header"
-                  onClick={() => handleToggleNavGroup(group.label)}
-                  title={`${isExpanded ? 'Collapse' : 'Expand'} ${group.label}`}
-                  aria-expanded={isExpanded}
-                >
-                  <span className="sidebar-group-label">{group.label}</span>
-                  <span className={`sidebar-group-chevron ${isExpanded ? 'is-expanded' : ''}`}>
-                    <IconChevronDown size={13} />
-                  </span>
-                </button>
-
-                {isExpanded && (
-                  <div className="sidebar-group-items">
-                    {group.items.map((item) => {
-                      const IconComp = item.icon;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
-                          title={sidebarCollapsed ? `${item.label}${item.count !== undefined ? ` (${item.count})` : ''}` : undefined}
-                          onClick={() => {
-                            setActiveTab(item.id);
-                            setSearchQuery('');
-                            scrollWorkspaceToTop();
-                            setMobileMenuOpen(false);
-                          }}
-                        >
-                          <span className="sidebar-link-main">
-                            <span className="sidebar-link-icon-wrap">
-                              <IconComp size={16} />
-                            </span>
-                            <span className="sidebar-link-label">{item.label}</span>
-                          </span>
-                          {item.count !== undefined && (
-                            <span className="sidebar-count">{item.count}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+          {navGroups.map((group) => (
+            <div key={group.label} className="sidebar-group">
+              <div className="sidebar-group-header">
+                <span className="sidebar-group-label">{group.label}</span>
               </div>
-            );
-          })}
+
+              <div className="sidebar-group-items">
+                {group.items.map((item) => {
+                  const IconComp = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
+                      title={sidebarCollapsed ? `${item.label}${item.count !== undefined ? ` (${item.count})` : ''}` : undefined}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setSearchQuery('');
+                        scrollWorkspaceToTop();
+                        setMobileMenuOpen(false);
+                      }}
+                    >
+                      <span className="sidebar-link-main">
+                        <span className="sidebar-link-icon-wrap">
+                          <IconComp size={16} />
+                        </span>
+                        <span className="sidebar-link-label">{item.label}</span>
+                      </span>
+                      {item.count !== undefined && (
+                        <span className="sidebar-count">{item.count}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
