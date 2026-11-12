@@ -48,7 +48,7 @@ import EvaluationEntryModal from './components/EvaluationEntryModal';
 import DtrTransferModal from './components/DtrTransferModal';
 import OfficialEvaluationModal from './components/OfficialEvaluationModal';
 import SupervisorShareModal from './components/SupervisorShareModal';
-import PublicSupervisorVerifyView from './components/PublicSupervisorVerifyView';
+import PublicSupervisorVerifyView, { PublicSupervisorVerifySkeleton } from './components/PublicSupervisorVerifyView';
 import SignedDtrUploadModal from './components/SignedDtrUploadModal';
 import DtrAuditComparisonModal from './components/DtrAuditComparisonModal';
 import StudentProfileModal from './components/StudentProfileModal';
@@ -460,6 +460,7 @@ export default function App() {
     }
     return null;
   });
+  const isTestSkeletonPortal = useMemo(() => typeof window !== 'undefined' && window.location.search.includes('test_skeleton'), []);
 
   // Live Clock-In / Clock-Out Timer for Student Portal
   const [activeShift, setActiveShift] = useState(() => {
@@ -2778,18 +2779,14 @@ export default function App() {
   // PUBLIC SUPERVISOR VERIFICATION PORTAL (NO LOGIN REQUIRED)
   // ===========================================================================
   if (publicSupervisorPlacementId) {
-    if (loading) {
+    if (loading || isTestSkeletonPortal) {
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-canvas)' }}>
-          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-            <span className="spin-anim" style={{ display: 'inline-flex' }}>
-              <IconBrandLogo size={42} />
-            </span>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>
-              Loading HTE Supervisor Verification Portal...
-            </div>
-          </div>
-        </div>
+        <PublicSupervisorVerifySkeleton
+          onClose={() => {
+            setVerifyContext(null, null);
+            setPublicSupervisorPlacementId(null);
+          }}
+        />
       );
     }
     const targetPlacement =

@@ -800,3 +800,150 @@ export default function PublicSupervisorVerifyView({
     </div>
   );
 }
+
+export function PublicSupervisorVerifySkeleton({ onClose }) {
+  return (
+    <div className="public-verify-shell" aria-busy="true" aria-label="Loading HTE Supervisor Verification Portal">
+      <div className="public-verify-container skeleton-stage">
+        {/* PUBLIC VERIFICATION HEADER SKELETON */}
+        <header className="public-verify-header">
+          <div className="public-verify-header-brand">
+            <IconBrandLogo size={36} />
+            <div>
+              <div className="sk-shimmer sk-title" style={{ width: '380px', maxWidth: '85%', height: '17px' }} />
+              <div className="sk-shimmer sk-subtitle" style={{ width: '250px', maxWidth: '65%', height: '12px', marginTop: '6px' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {onClose ? (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm no-print"
+                onClick={onClose}
+                title="Return to main university portal"
+              >
+                Exit
+              </button>
+            ) : (
+              <div className="sk-shimmer sk-btn" style={{ width: '64px', height: '32px', borderRadius: '8px' }} />
+            )}
+          </div>
+        </header>
+
+        {/* TRAINEE OVERVIEW CARD SKELETON */}
+        <div className="public-verify-summary-grid">
+          <div className="public-verify-summary-item">
+            <div className="sk-shimmer sk-metric-label" style={{ width: '85px', height: '11px' }} />
+            <div className="sk-shimmer sk-title" style={{ width: '150px', height: '16px', margin: '5px 0' }} />
+            <div className="sk-shimmer sk-line-sm" style={{ width: '115px' }} />
+            <div className="sk-shimmer sk-line-sm" style={{ width: '135px' }} />
+          </div>
+
+          <div className="public-verify-summary-item">
+            <div className="sk-shimmer sk-metric-label" style={{ width: '135px', height: '11px' }} />
+            <div className="sk-shimmer sk-title" style={{ width: '165px', height: '16px', margin: '5px 0' }} />
+            <div className="sk-shimmer sk-line-sm" style={{ width: '140px' }} />
+            <div className="sk-shimmer sk-line-sm" style={{ width: '125px' }} />
+          </div>
+
+          <div className="public-verify-summary-item">
+            <div className="sk-shimmer sk-metric-label" style={{ width: '120px', height: '11px' }} />
+            <div className="sk-shimmer sk-title" style={{ width: '155px', height: '16px', margin: '5px 0' }} />
+            <div className="sk-shimmer sk-line-sm" style={{ width: '110px' }} />
+            <div className="sk-shimmer sk-line-sm" style={{ width: '100px' }} />
+          </div>
+
+          <div className="public-verify-summary-item is-highlight">
+            <div className="sk-shimmer sk-metric-label" style={{ width: '90px', height: '11px' }} />
+            <div className="sk-shimmer sk-metric-value" style={{ width: '95px', height: '26px', margin: '5px 0' }} />
+            <div className="sk-shimmer sk-metric-foot" style={{ width: '130px' }} />
+          </div>
+        </div>
+
+        {/* TAB BUTTONS SKELETON */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            marginBottom: '4px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div className="action-row-wrap" style={{ display: 'flex', gap: '8px' }}>
+            <div className="sk-btn-primary" style={{ width: '190px', height: '34px', borderRadius: '8px' }} />
+            <div className="sk-shimmer sk-btn" style={{ width: '250px', height: '34px', borderRadius: '8px' }} />
+          </div>
+          <div className="sk-shimmer sk-line-sm" style={{ width: '280px', height: '11px' }} />
+        </div>
+
+        {/* SUPERVISOR ACTION BAR SKELETON */}
+        <div className="public-verify-actionbar">
+          <div className="public-verify-action-info">
+            <div className="sk-shimmer sk-title" style={{ width: '200px', height: '15px' }} />
+            <div className="sk-shimmer sk-subtitle" style={{ width: '380px', maxWidth: '85%', height: '12px', marginTop: '6px' }} />
+          </div>
+          <div className="public-verify-action-buttons">
+            <div className="sk-shimmer sk-btn" style={{ width: '110px', height: '32px', borderRadius: '8px' }} />
+            <div className="sk-btn-primary" style={{ width: '130px', height: '32px', borderRadius: '8px' }} />
+          </div>
+        </div>
+
+        {/* DTR SHIFT TABLE PANEL SKELETON */}
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <div className="sk-shimmer sk-title" style={{ width: '240px', height: '16px' }} />
+              <div className="sk-shimmer sk-subtitle" style={{ width: '360px', maxWidth: '80%', height: '12px', marginTop: '6px' }} />
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table className="table table-fit">
+              <thead>
+                <tr>
+                  <th><div className="sk-shimmer" style={{ width: '60px', height: '10px' }} /></th>
+                  <th><div className="sk-shimmer" style={{ width: '55px', height: '10px' }} /></th>
+                  <th><div className="sk-shimmer" style={{ width: '55px', height: '10px' }} /></th>
+                  <th><div className="sk-shimmer" style={{ width: '45px', height: '10px' }} /></th>
+                  <th className="text-right"><div className="sk-shimmer" style={{ width: '65px', height: '10px', marginLeft: 'auto' }} /></th>
+                  <th><div className="sk-shimmer" style={{ width: '180px', height: '10px' }} /></th>
+                  <th><div className="sk-shimmer" style={{ width: '70px', height: '10px' }} /></th>
+                  <th className="text-right"><div className="sk-shimmer" style={{ width: '50px', height: '10px', marginLeft: 'auto' }} /></th>
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4].map((r) => (
+                  <tr key={r} className={`sk-row-stagger-${r}`}>
+                    <td><div className="sk-shimmer sk-line" style={{ width: '80px' }} /></td>
+                    <td><div className="sk-shimmer sk-line" style={{ width: '55px' }} /></td>
+                    <td><div className="sk-shimmer sk-line" style={{ width: '55px' }} /></td>
+                    <td><div className="sk-shimmer sk-line" style={{ width: '38px' }} /></td>
+                    <td className="text-right"><div className="sk-shimmer sk-line" style={{ width: '48px', marginLeft: 'auto' }} /></td>
+                    <td>
+                      <div className="sk-shimmer sk-line" style={{ width: r % 2 === 0 ? '280px' : '230px' }} />
+                      <div className="sk-shimmer sk-line-sm" style={{ width: r % 2 === 0 ? '160px' : '190px' }} />
+                    </td>
+                    <td><div className="sk-shimmer sk-chip" style={{ width: '90px' }} /></td>
+                    <td className="text-right">
+                      <div className="sk-action-group">
+                        <div className="sk-shimmer sk-action-pill" style={{ width: '48px' }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <footer style={{ textAlign: 'center', padding: '16px 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+          Metropolitan Institute of Technology · Commission on Higher Education (CHED) CMO 104 Series of 2017 Practicum Standard
+        </footer>
+      </div>
+    </div>
+  );
+}
