@@ -76,9 +76,11 @@ export default function PersonaSwitcher({
     }));
   }, [users, demoPresets]);
 
-  // Legitimate internal system roles: student, adviser, supervisor, admin
+  // Legitimate internal system roles: student, adviser, admin
+  // (HTE Supervisors do not have accounts; they access via zero-login portal links)
   const filteredUsers = useMemo(() => {
     return userList.filter((u) => {
+      if (u.role === 'supervisor') return false; // External contact (Zero-login verification portal only)
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (!search.trim()) return true;
       const q = search.toLowerCase();
@@ -98,8 +100,6 @@ export default function PersonaSwitcher({
         return 'Student Intern';
       case 'adviser':
         return 'Faculty Adviser';
-      case 'supervisor':
-        return 'HTE Supervisor';
       case 'admin':
         return 'Practicum Coordinator';
       default:
@@ -113,8 +113,6 @@ export default function PersonaSwitcher({
         return <IconStudent size={size} />;
       case 'adviser':
         return <IconSupervisor size={size} />;
-      case 'supervisor':
-        return <IconSupervisor size={size} />;
       case 'admin':
         return <IconShieldCheck size={size} />;
       default:
@@ -124,7 +122,6 @@ export default function PersonaSwitcher({
 
   const studentCount = userList.filter((u) => u.role === 'student').length;
   const adviserCount = userList.filter((u) => u.role === 'adviser').length;
-  const supervisorCount = userList.filter((u) => u.role === 'supervisor').length;
   const adminCount = userList.filter((u) => u.role === 'admin').length;
 
   return (
@@ -226,7 +223,7 @@ export default function PersonaSwitcher({
               className={`m3-filter-chip ${roleFilter === 'all' ? 'is-active' : ''}`}
               onClick={() => setRoleFilter('all')}
             >
-              All ({userList.length})
+              All ({userList.filter((u) => u.role !== 'supervisor').length})
             </button>
             <button
               type="button"
@@ -241,13 +238,6 @@ export default function PersonaSwitcher({
               onClick={() => setRoleFilter('adviser')}
             >
               Advisers ({adviserCount})
-            </button>
-            <button
-              type="button"
-              className={`m3-filter-chip ${roleFilter === 'supervisor' ? 'is-active' : ''}`}
-              onClick={() => setRoleFilter('supervisor')}
-            >
-              Supervisors ({supervisorCount})
             </button>
             <button
               type="button"

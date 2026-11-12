@@ -1377,3 +1377,8 @@ SET status = CASE
     ELSE 'ongoing'
 END
 WHERE status != 'dropped';
+
+
+-- Persistent Application Secret for Token Validation
+CREATE TABLE IF NOT EXISTS AppSecret (id INTEGER PRIMARY KEY, secret TEXT NOT NULL);
+INSERT OR REPLACE INTO AppSecret (id, secret) VALUES (1, '9f05468cfffebb29259934cae1c4eea30860a5491b42e6faf1d17e43ca4429b9');

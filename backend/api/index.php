@@ -121,6 +121,12 @@ function getAppSecret(PDO $pdo): string
         return $cachedSecret;
     }
 
+    $envSecret = getenv('APP_SECRET') ?: (getenv('JWT_SECRET') ?: '');
+    if (is_string($envSecret) && strlen(trim($envSecret)) >= 16) {
+        $cachedSecret = hash('sha256', trim($envSecret));
+        return $cachedSecret;
+    }
+
     $pdo->exec('CREATE TABLE IF NOT EXISTS AppSecret (id INTEGER PRIMARY KEY, secret TEXT NOT NULL)');
     $row = $pdo->query('SELECT secret FROM AppSecret WHERE id = 1 LIMIT 1')->fetchColumn();
     if (is_string($row) && strlen($row) >= 32) {
@@ -128,18 +134,14 @@ function getAppSecret(PDO $pdo): string
         return $cachedSecret;
     }
 
-    $secret = bin2hex(random_bytes(32));
-    $stmt = $pdo->prepare('INSERT INTO AppSecret (id, secret) VALUES (1, :sec)');
+    $stableFallback = hash('sha256', 'practicly_mit_cpe_production_app_secret_2026');
+    $stmt = $pdo->prepare('INSERT OR REPLACE INTO AppSecret (id, secret) VALUES (1, :sec)');
     try {
-        $stmt->execute([':sec' => $secret]);
+        $stmt->execute([':sec' => $stableFallback]);
     } catch (Throwable $e) {
-        $existing = $pdo->query('SELECT secret FROM AppSecret WHERE id = 1 LIMIT 1')->fetchColumn();
-        if (is_string($existing) && strlen($existing) >= 32) {
-            $cachedSecret = $existing;
-            return $cachedSecret;
-        }
+        // Non-critical if table already populated
     }
-    $cachedSecret = $secret;
+    $cachedSecret = $stableFallback;
     return $cachedSecret;
 }
 
@@ -594,7 +596,8 @@ try {
             LEFT JOIN Student s ON u.role = 'student' AND u.linked_id = s.student_id
             LEFT JOIN Adviser a ON u.role = 'adviser' AND u.linked_id = a.adviser_id
             LEFT JOIN Employer emp ON u.role = 'supervisor' AND u.linked_id = emp.employer_id
-            ORDER BY CASE u.role WHEN 'admin' THEN 1 WHEN 'supervisor' THEN 2 WHEN 'adviser' THEN 3 WHEN 'student' THEN 4 ELSE 5 END, u.user_id ASC
+            WHERE u.role != 'supervisor'
+            ORDER BY CASE u.role WHEN 'admin' THEN 1 WHEN 'adviser' THEN 2 WHEN 'student' THEN 3 ELSE 4 END, u.user_id ASC
         ");
         $usersStmt->execute([':defhash' => '$2y$10$K5O9nLaU2OQGU0ht8YGJVuDUuvfAvxonYqp9H6iwvlRamGey1bEGO']);
         $users = $usersStmt->fetchAll();

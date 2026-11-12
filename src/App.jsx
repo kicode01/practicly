@@ -106,12 +106,6 @@ const DEMO_PRESETS = [
     desc: 'Faculty Adviser · Supervises Adrian & Miguel',
   },
   {
-    username: 'supervisor.accenture',
-    role: 'supervisor',
-    name: 'Accenture HTE Supervisor',
-    desc: 'Workplace Supervisor · Stage 1 DTR & INST-02',
-  },
-  {
     username: 'admin',
     role: 'admin',
     name: 'CpE Department Administrator',
