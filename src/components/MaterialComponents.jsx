@@ -1,4 +1,5 @@
-import React, { forwardRef, useState, useEffect, useRef, useMemo } from 'react';
+import React, { forwardRef, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { IconSearch, IconChevronDown, IconCheck, IconAlert, IconClose } from './Icons';
 
 /**
@@ -120,50 +121,12 @@ export function MaterialSelect({
   align = 'auto',
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
 
-  // Auto-detect right alignment when opening
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      if (align === 'right') {
-        setAlignRight(true);
-      } else if (align === 'left') {
-        setAlignRight(false);
-      } else {
-        const rect = containerRef.current.getBoundingClientRect();
-        // If container is within 340px of right screen edge or in the right half of the page
-        const isNearRight = window.innerWidth - rect.left < 340 || rect.right > window.innerWidth - 120;
-        setAlignRight(isNearRight);
-      }
-    }
-  }, [isOpen, align]);
-
-  // Close when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    function handleKeyDown(e) {
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  const isSmall = className.includes('select-sm');
 
   // Extract items from options prop OR <option> children
   const items = useMemo(() => {
@@ -187,6 +150,127 @@ export function MaterialSelect({
     return parsed;
   }, [options, children]);
 
+  // Compute portal menu coordinates relative to viewport so ancestors never clip it
+  const updateMenuPosition = useCallback((closeIfOffscreen = false) => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+
+    // Close during scroll if trigger has scrolled completely out of the viewport
+    if (closeIfOffscreen && (rect.bottom < 0 || rect.top > window.innerHeight)) {
+      setIsOpen(false);
+      return;
+    }
+
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+    const margin = 8;
+    const gap = 6;
+    const maxAllowedW = Math.min(420, viewportW - margin * 2);
+    const minW = Math.min(Math.max(rect.width, isSmall ? 180 : 220), maxAllowedW);
+
+    const measuredRect = menuRef.current ? menuRef.current.getBoundingClientRect() : null;
+    const estimatedW = measuredRect && measuredRect.width > 0
+      ? Math.min(Math.max(measuredRect.width, minW), maxAllowedW)
+      : Math.min(Math.max(minW, Math.min(260, maxAllowedW)), maxAllowedW);
+    const estRowH = 38;
+    const estimatedH = measuredRect && measuredRect.height > 0
+      ? Math.min(measuredRect.height, 420)
+      : Math.min(Math.max(items.length, 1) * estRowH + 16, 420);
+
+    const spaceBelow = Math.max(0, viewportH - rect.bottom - gap - margin);
+    const spaceAbove = Math.max(0, rect.top - gap - margin);
+    const openUpward = spaceBelow < Math.min(estimatedH, 220) && spaceAbove > spaceBelow;
+    const availableSpace = openUpward ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(120, Math.min(420, availableSpace));
+    const renderedH = Math.min(estimatedH, maxHeight);
+
+    const top = openUpward
+      ? Math.max(margin, rect.top - renderedH - gap)
+      : Math.min(viewportH - renderedH - margin, rect.bottom + gap);
+
+    const containerEl = containerRef.current;
+    const inRightContext = Boolean(
+      containerEl &&
+      containerEl.closest('.panel-toolbar, .panel-actions, .page-actions, .topbar-controls, td.text-right')
+    );
+    const shouldAlignRight =
+      align === 'right' ||
+      (align !== 'left' && (inRightContext || viewportW - rect.left < estimatedW + margin));
+
+    let left = shouldAlignRight ? rect.right - estimatedW : rect.left;
+    left = Math.max(margin, Math.min(left, viewportW - estimatedW - margin));
+
+    setMenuPosition({
+      top: Math.round(top),
+      left: Math.round(left),
+      minWidth: Math.round(minW),
+      maxWidth: Math.round(maxAllowedW),
+      maxHeight: Math.round(maxHeight),
+      openUpward,
+    });
+  }, [align, isSmall, items.length]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setMenuPosition(null);
+      return undefined;
+    }
+    updateMenuPosition();
+    // Re-measure right after menu renders so exact DOM dimensions refine flip & clamping
+    const rafId = window.requestAnimationFrame(() => updateMenuPosition());
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isOpen, updateMenuPosition]);
+
+  // Keep menu anchored on ancestor/window scroll and resize (ignore scrolling inside the menu itself)
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleScroll = (e) => {
+      if (menuRef.current && e.target && menuRef.current.contains(e.target)) {
+        return;
+      }
+      updateMenuPosition(true);
+    };
+    const handleResize = () => updateMenuPosition();
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isOpen, updateMenuPosition]);
+
+  // Close when clicking outside both trigger container and portaled menu
+  useEffect(() => {
+    function handleClickOutside(e) {
+      const inTrigger = containerRef.current && containerRef.current.contains(e.target);
+      const inMenu = menuRef.current && menuRef.current.contains(e.target);
+      if (!inTrigger && !inMenu) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape' && isOpen) {
+        e.stopPropagation();
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown, true);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen]);
+
   const selectedItem = items.find((it) => String(it.value) === String(value));
   const displayLabel = selectedItem ? selectedItem.label : (placeholder || 'Select...');
 
@@ -206,8 +290,6 @@ export function MaterialSelect({
     setIsOpen(false);
   };
 
-  const isSmall = className.includes('select-sm');
-
   return (
     <div
       ref={containerRef}
@@ -215,6 +297,7 @@ export function MaterialSelect({
       style={{ position: 'relative', display: 'inline-block', ...style }}
     >
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         name={name}
@@ -229,8 +312,33 @@ export function MaterialSelect({
         <IconChevronDown size={isSmall ? 15 : 18} className={`m3-select-chevron ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen && (
-        <div className={`m3-select-menu ${alignRight ? 'is-align-right' : ''}`} role="listbox">
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          className={`m3-select-menu is-portal ${menuPosition?.openUpward ? 'is-open-upward' : ''}`}
+          role="listbox"
+          style={
+            menuPosition
+              ? {
+                  position: 'fixed',
+                  top: `${menuPosition.top}px`,
+                  left: `${menuPosition.left}px`,
+                  minWidth: `${menuPosition.minWidth}px`,
+                  maxWidth: `${menuPosition.maxWidth}px`,
+                  maxHeight: `${menuPosition.maxHeight}px`,
+                  zIndex: 2600,
+                }
+              : {
+                  position: 'fixed',
+                  visibility: 'hidden',
+                  top: 0,
+                  left: 0,
+                  zIndex: 2600,
+                }
+          }
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {items.length === 0 ? (
             <div className="m3-select-empty">No options available</div>
           ) : (
@@ -252,7 +360,8 @@ export function MaterialSelect({
               );
             })
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

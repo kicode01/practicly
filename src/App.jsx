@@ -51,6 +51,11 @@ import PublicSupervisorVerifyView from './components/PublicSupervisorVerifyView'
 import SignedDtrUploadModal from './components/SignedDtrUploadModal';
 import DtrAuditComparisonModal from './components/DtrAuditComparisonModal';
 import StudentProfileModal from './components/StudentProfileModal';
+import EmployerModal from './components/EmployerModal';
+import PlacementModal from './components/PlacementModal';
+import AdviserModal from './components/AdviserModal';
+import UserAccountModal from './components/UserAccountModal';
+import SuperviseStudentModal from './components/SuperviseStudentModal';
 import { SegmentedControl, Switch, MaterialSelect, Snackbar } from './components/MaterialComponents';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
 import { clearAllSessionSignatures } from './utils/sessionSignature';
@@ -1341,7 +1346,6 @@ export default function App() {
       moa_validity: emp.moa_validity || '2028-12-31',
     });
     setShowEmployerForm(true);
-    scrollWorkspaceToTop();
   };
 
   const handleUpdateEmployerMoaStatus = async (emp, newMoaStatus) => {
@@ -1425,7 +1429,6 @@ export default function App() {
       status: pl.status,
     });
     setShowPlacementForm(true);
-    scrollWorkspaceToTop();
   };
 
   const handleUpdatePlacementStatus = async (placementId, newStatus) => {
@@ -1700,7 +1703,6 @@ export default function App() {
       username: '',
     });
     setShowAdviserForm(true);
-    scrollWorkspaceToTop();
   };
 
   const handleDeleteAdviser = async (adviserId) => {
@@ -1765,7 +1767,6 @@ export default function App() {
       is_active: Number(u.is_active),
     });
     setShowUserForm(true);
-    scrollWorkspaceToTop();
   };
 
   const handleToggleUserActive = async (u) => {
@@ -2686,7 +2687,13 @@ export default function App() {
     supervisorShareModalOpen ||
     signedDtrModalOpen ||
     signedEvalModalOpen ||
-    auditModalOpen
+    auditModalOpen ||
+    showStudentForm ||
+    showEmployerForm ||
+    showPlacementForm ||
+    showAdviserForm ||
+    showUserForm ||
+    showSuperviseForm
   );
 
   return (
@@ -3351,183 +3358,6 @@ export default function App() {
                   ).length * 300
                 }
               />
-
-              {showSuperviseForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">Add or Assign Student to My Supervision</div>
-                      <div className="panel-desc">
-                        Register a new BS CpE intern or assign an existing student under {currentUser.display_name}
-                      </div>
-                    </div>
-                    <div className="action-row-wrap" style={{ gap: '6px' }}>
-                      <button
-                        type="button"
-                        className={`btn btn-sm ${superviseMode === 'new' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setSuperviseMode('new')}
-                      >
-                        Register New Student
-                      </button>
-                      <button
-                        type="button"
-                        className={`btn btn-sm ${superviseMode === 'existing' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setSuperviseMode('existing')}
-                      >
-                        Assign Existing Student
-                      </button>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveSuperviseStudent}>
-                      {superviseMode === 'new' ? (
-                        <div className="field-grid-3">
-                          <div className="field">
-                            <label className="field-label">Student Number</label>
-                            <input
-                              type="text"
-                              className="input mono"
-                              placeholder="2023-00315-MN-0"
-                              value={superviseForm.student_number}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, student_number: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Full Name (Last, First M.I.)</label>
-                            <input
-                              type="text"
-                              className="input"
-                              placeholder="Navarro, Bea Katrina L."
-                              value={superviseForm.full_name}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, full_name: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Section</label>
-                            <input
-                              type="text"
-                              className="input"
-                              value={superviseForm.section}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, section: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Institutional Email</label>
-                            <input
-                              type="email"
-                              className="input"
-                              placeholder="bea.navarro@mit.edu.ph"
-                              value={superviseForm.email}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, email: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Host Company (HTE)</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.employer_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, employer_id: e.target.value })
-                              }
-                            >
-                              {data.employers.map((emp) => (
-                                <option key={emp.employer_id} value={emp.employer_id}>
-                                  {emp.company_name}
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Internship Designation</label>
-                            <input
-                              type="text"
-                              className="input"
-                              value={superviseForm.position_title}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, position_title: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="field-grid-3">
-                          <div className="field">
-                            <label className="field-label">Select Student</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.student_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, student_id: e.target.value })
-                              }
-                            >
-                              <option value="">Choose student...</option>
-                              {data.students.map((st) => (
-                                <option key={st.student_id} value={st.student_id}>
-                                  {st.full_name} ({st.student_number}){' '}
-                                  {st.adviser_name ? `— Currently: ${st.adviser_name}` : '— Unassigned'}
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Host Company (HTE)</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.employer_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, employer_id: e.target.value })
-                              }
-                            >
-                              {data.employers.map((emp) => (
-                                <option key={emp.employer_id} value={emp.employer_id}>
-                                  {emp.company_name}
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Internship Designation</label>
-                            <input
-                              type="text"
-                              className="input"
-                              value={superviseForm.position_title}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, position_title: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                        </div>
-                      )}
-                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {superviseMode === 'new' ? 'Register & Supervise Student' : 'Assign to My Supervision'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => setShowSuperviseForm(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
 
               <div className="panel">
                 <div className="panel-toolbar">
@@ -4700,7 +4530,7 @@ export default function App() {
                           moa_status: 'active',
                           moa_validity: '2028-12-31',
                         });
-                        setShowEmployerForm((v) => !v);
+                        setShowEmployerForm(true);
                       }}
                     >
                       <IconPlus size={13} />
@@ -4709,128 +4539,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-
-              {showEmployerForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">
-                        {editingEmployerId ? `Edit Partner Company #${editingEmployerId}` : 'Register Partner Company'}
-                      </div>
-                      <div className="panel-desc">
-                        {editingEmployerId
-                          ? 'Update HTE contact details, supervisor, or MOA validity'
-                          : 'Add a Host Training Establishment to the departmental directory'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveEmployer}>
-                      <div className="field-grid-3">
-                        <div className="field">
-                          <label className="field-label">Company Name</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="Texas Instruments Philippines"
-                            value={employerForm.company_name}
-                            onChange={(e) => setEmployerForm({ ...employerForm, company_name: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Industry Sector</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={employerForm.industry}
-                            onChange={(e) => setEmployerForm({ ...employerForm, industry: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Contact Person</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="Engr. Roberto V. Salazar"
-                            value={employerForm.contact_person}
-                            onChange={(e) => setEmployerForm({ ...employerForm, contact_person: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Office Address</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="BGC, Taguig City"
-                            value={employerForm.address}
-                            onChange={(e) => setEmployerForm({ ...employerForm, address: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Phone &amp; Email</label>
-                          <div className="form-inline-pair">
-                            <input
-                              type="text"
-                              className="input"
-                              placeholder="(02) 8800-1000"
-                              value={employerForm.contact_number}
-                              onChange={(e) => setEmployerForm({ ...employerForm, contact_number: e.target.value })}
-                              required
-                            />
-                            <input
-                              type="email"
-                              className="input"
-                              placeholder="hr@company.com"
-                              value={employerForm.email}
-                              onChange={(e) => setEmployerForm({ ...employerForm, email: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">MOA Status &amp; Expiry</label>
-                          <div className="form-inline-pair">
-                            <MaterialSelect
-                              className="select"
-                              value={employerForm.moa_status}
-                              onChange={(e) => setEmployerForm({ ...employerForm, moa_status: e.target.value })}
-                            >
-                              <option value="active">Active</option>
-                              <option value="pending_renewal">Pending Renewal</option>
-                              <option value="expired">Expired</option>
-                            </MaterialSelect>
-                            <input
-                              type="date"
-                              className="input"
-                              value={employerForm.moa_validity}
-                              onChange={(e) => setEmployerForm({ ...employerForm, moa_validity: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {editingEmployerId ? 'Save Changes' : 'Save Partner HTE'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setShowEmployerForm(false);
-                            setEditingEmployerId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
 
               <div className="panel">
                 <div className="panel-toolbar">
@@ -5077,7 +4785,7 @@ export default function App() {
                         required_hours: '300',
                         status: 'ongoing',
                       });
-                      setShowPlacementForm((v) => !v);
+                      setShowPlacementForm(true);
                     }}
                   >
                     <IconPlus size={13} />
@@ -5085,137 +4793,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-
-              {showPlacementForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">
-                        {editingPlacementId ? `Edit Placement Contract #${editingPlacementId}` : 'Assign Student Placement'}
-                      </div>
-                      <div className="panel-desc">
-                        {editingPlacementId
-                          ? 'Modify student assignment, host company, adviser, or required hours'
-                          : 'Create an OJT deployment contract for the term'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSavePlacement}>
-                      <div className="field-grid-3">
-                        <div className="field">
-                          <label className="field-label">Student</label>
-                          <MaterialSelect
-                            className="select"
-                            value={placementForm.student_id}
-                            onChange={(e) => setPlacementForm({ ...placementForm, student_id: e.target.value })}
-                          >
-                            <option value="">Select student...</option>
-                            {data.students.map((s) => (
-                              <option key={s.student_id} value={s.student_id}>
-                                {s.full_name} ({s.student_number})
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Host Company</label>
-                          <MaterialSelect
-                            className="select"
-                            value={placementForm.employer_id}
-                            onChange={(e) => setPlacementForm({ ...placementForm, employer_id: e.target.value })}
-                          >
-                            <option value="">Select company...</option>
-                            {data.employers.map((emp) => (
-                              <option key={emp.employer_id} value={emp.employer_id}>
-                                {emp.company_name}
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Faculty Adviser</label>
-                          <MaterialSelect
-                            className="select"
-                            value={placementForm.adviser_id}
-                            onChange={(e) => setPlacementForm({ ...placementForm, adviser_id: e.target.value })}
-                          >
-                            <option value="">Select adviser...</option>
-                            {data.advisers.map((adv) => (
-                              <option key={adv.adviser_id} value={adv.adviser_id}>
-                                {adv.full_name}
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Position Title</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={placementForm.position_title}
-                            onChange={(e) => setPlacementForm({ ...placementForm, position_title: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Start &amp; End Date</label>
-                          <div className="form-inline-pair">
-                            <input
-                              type="date"
-                              className="input"
-                              value={placementForm.start_date}
-                              onChange={(e) => setPlacementForm({ ...placementForm, start_date: e.target.value })}
-                              required
-                            />
-                            <input
-                              type="date"
-                              className="input"
-                              value={placementForm.end_date}
-                              onChange={(e) => setPlacementForm({ ...placementForm, end_date: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Required Hours &amp; Term</label>
-                          <div className="form-inline-pair">
-                            <input
-                              type="number"
-                              className="input tabular-nums input-code-sm"
-                              value={placementForm.required_hours}
-                              onChange={(e) => setPlacementForm({ ...placementForm, required_hours: e.target.value })}
-                              required
-                            />
-                            <input
-                              type="text"
-                              className="input"
-                              value={placementForm.academic_term}
-                              onChange={(e) => setPlacementForm({ ...placementForm, academic_term: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {editingPlacementId ? 'Save Changes' : 'Create Placement'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setShowPlacementForm(false);
-                            setEditingPlacementId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
 
               <div className="panel">
                 <div className="panel-toolbar">
@@ -6660,7 +6237,7 @@ export default function App() {
                         contact_number: '',
                         username: '',
                       });
-                      setShowAdviserForm((v) => !v);
+                      setShowAdviserForm(true);
                     }}
                   >
                     <IconPlus size={13} />
@@ -6679,7 +6256,7 @@ export default function App() {
                         employer_id: String(data.employers[0]?.employer_id || 1),
                         student_id: String(data.students[0]?.student_id || 1),
                       }));
-                      setShowSuperviseForm((v) => !v);
+                      setShowSuperviseForm(true);
                     }}
                   >
                     <IconPlus size={13} />
@@ -6687,306 +6264,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-
-              {showSuperviseForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">Add or Assign Student to Faculty Adviser Supervision</div>
-                      <div className="panel-desc">
-                        Register a new student or assign/transfer an existing student to a Faculty OJT Adviser
-                      </div>
-                    </div>
-                    <div className="action-row-wrap" style={{ gap: '6px' }}>
-                      <button
-                        type="button"
-                        className={`btn btn-sm ${superviseMode === 'new' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setSuperviseMode('new')}
-                      >
-                        Register New Student
-                      </button>
-                      <button
-                        type="button"
-                        className={`btn btn-sm ${superviseMode === 'existing' ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setSuperviseMode('existing')}
-                      >
-                        Assign Existing Student
-                      </button>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveSuperviseStudent}>
-                      {superviseMode === 'new' ? (
-                        <div className="field-grid-3">
-                          <div className="field">
-                            <label className="field-label">Assigned Faculty Adviser</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.adviser_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, adviser_id: e.target.value })
-                              }
-                            >
-                              {data.advisers.map((adv) => (
-                                <option key={adv.adviser_id} value={adv.adviser_id}>
-                                  {adv.full_name} ({adv.employee_number})
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Student Number</label>
-                            <input
-                              type="text"
-                              className="input mono"
-                              placeholder="2023-00315-MN-0"
-                              value={superviseForm.student_number}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, student_number: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Full Name (Last, First M.I.)</label>
-                            <input
-                              type="text"
-                              className="input"
-                              placeholder="Navarro, Bea Katrina L."
-                              value={superviseForm.full_name}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, full_name: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Section &amp; Email</label>
-                            <div className="form-inline-pair">
-                              <input
-                                type="text"
-                                className="input input-code-md"
-                                value={superviseForm.section}
-                                onChange={(e) =>
-                                  setSuperviseForm({ ...superviseForm, section: e.target.value })
-                                }
-                                required
-                              />
-                              <input
-                                type="email"
-                                className="input"
-                                placeholder="bea@mit.edu.ph"
-                                value={superviseForm.email}
-                                onChange={(e) =>
-                                  setSuperviseForm({ ...superviseForm, email: e.target.value })
-                                }
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Host Company (HTE)</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.employer_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, employer_id: e.target.value })
-                              }
-                            >
-                              {data.employers.map((emp) => (
-                                <option key={emp.employer_id} value={emp.employer_id}>
-                                  {emp.company_name}
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Internship Designation</label>
-                            <input
-                              type="text"
-                              className="input"
-                              value={superviseForm.position_title}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, position_title: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="field-grid-3">
-                          <div className="field">
-                            <label className="field-label">Assigned Faculty Adviser</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.adviser_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, adviser_id: e.target.value })
-                              }
-                            >
-                              {data.advisers.map((adv) => (
-                                <option key={adv.adviser_id} value={adv.adviser_id}>
-                                  {adv.full_name} ({adv.employee_number})
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Select Student to Supervise</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.student_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, student_id: e.target.value })
-                              }
-                            >
-                              <option value="">Choose student...</option>
-                              {data.students.map((st) => (
-                                <option key={st.student_id} value={st.student_id}>
-                                  {st.full_name} ({st.student_number}){' '}
-                                  {st.adviser_name ? `— Currently: ${st.adviser_name}` : '— Unassigned'}
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                          <div className="field">
-                            <label className="field-label">Host Company (HTE)</label>
-                            <MaterialSelect
-                              className="select"
-                              value={superviseForm.employer_id}
-                              onChange={(e) =>
-                                setSuperviseForm({ ...superviseForm, employer_id: e.target.value })
-                              }
-                            >
-                              {data.employers.map((emp) => (
-                                <option key={emp.employer_id} value={emp.employer_id}>
-                                  {emp.company_name}
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                        </div>
-                      )}
-                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {superviseMode === 'new' ? 'Register & Supervise Student' : 'Assign Student to Adviser'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => setShowSuperviseForm(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {showAdviserForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">
-                        {editingAdviserId ? `Edit Faculty Adviser #${editingAdviserId}` : 'Register Faculty OJT Adviser'}
-                      </div>
-                      <div className="panel-desc">
-                        {editingAdviserId
-                          ? 'Update faculty coordinator profile'
-                          : 'Creates adviser record and provisions login account'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveAdviser}>
-                      <div className="field-grid-3">
-                        <div className="field">
-                          <label className="field-label">Employee Code</label>
-                          <input
-                            type="text"
-                            className="input mono"
-                            placeholder="MIT-COE-0082"
-                            value={adviserForm.employee_number}
-                            onChange={(e) => setAdviserForm({ ...adviserForm, employee_number: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Full Name &amp; Title</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="Engr. Ramon C. Mendoza, MSc"
-                            value={adviserForm.full_name}
-                            onChange={(e) => setAdviserForm({ ...adviserForm, full_name: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Department</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={adviserForm.department}
-                            onChange={(e) => setAdviserForm({ ...adviserForm, department: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Faculty Email</label>
-                          <input
-                            type="email"
-                            className="input"
-                            placeholder="rcmendoza@mit.edu.ph"
-                            value={adviserForm.email}
-                            onChange={(e) => setAdviserForm({ ...adviserForm, email: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Contact Number</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="0917-800-1122"
-                            value={adviserForm.contact_number}
-                            onChange={(e) => setAdviserForm({ ...adviserForm, contact_number: e.target.value })}
-                            required
-                          />
-                        </div>
-                        {!editingAdviserId && (
-                          <div className="field">
-                            <label className="field-label">Login Username (Optional)</label>
-                            <input
-                              type="text"
-                              className="input mono"
-                              placeholder="engr.mendoza"
-                              value={adviserForm.username}
-                              onChange={(e) => setAdviserForm({ ...adviserForm, username: e.target.value })}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {editingAdviserId ? 'Save Changes' : 'Save Adviser'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setShowAdviserForm(false);
-                            setEditingAdviserId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
 
               <div
                 className="metric-strip metric-strip-advisers"
@@ -7516,7 +6793,7 @@ export default function App() {
                         linked_id: '',
                         is_active: 1,
                       });
-                      setShowUserForm((v) => !v);
+                      setShowUserForm(true);
                     }}
                   >
                     <IconPlus size={13} />
@@ -7524,132 +6801,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-
-              {showUserForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">
-                        {editingUserId ? `Edit User Account #${editingUserId}` : 'Create User Account'}
-                      </div>
-                      <div className="panel-desc">
-                        Configure username, password, system role, and linked stakeholder record
-                      </div>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveUser}>
-                      <div className="field-grid-3">
-                        <div className="field">
-                          <label className="field-label">Username</label>
-                          <input
-                            type="text"
-                            className="input mono"
-                            placeholder="e.g. juan.cruz"
-                            value={userForm.username}
-                            onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">
-                            {editingUserId ? 'New Password (leave blank to keep)' : 'Password'}
-                          </label>
-                          <input
-                            type="text"
-                            className="input mono"
-                            placeholder={editingUserId ? 'Leave blank to keep current' : 'password123'}
-                            value={userForm.password}
-                            onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                            required={!editingUserId}
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Role</label>
-                          <MaterialSelect
-                            className="select"
-                            value={userForm.role}
-                            onChange={(e) =>
-                              setUserForm({ ...userForm, role: e.target.value, linked_id: '' })
-                            }
-                          >
-                            <option value="student">Student</option>
-                            <option value="supervisor">HTE Industry Supervisor</option>
-                            <option value="adviser">Faculty Adviser</option>
-                            <option value="admin">Administrator</option>
-                          </MaterialSelect>
-                        </div>
-                        {userForm.role === 'student' && (
-                          <div className="field">
-                            <label className="field-label">Linked Student Record</label>
-                            <MaterialSelect
-                              className="select"
-                              value={userForm.linked_id}
-                              onChange={(e) => setUserForm({ ...userForm, linked_id: e.target.value })}
-                            >
-                              <option value="">Select student...</option>
-                              {data.students.map((s) => (
-                                <option key={s.student_id} value={s.student_id}>
-                                  {s.full_name} ({s.student_number})
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                        )}
-                        {userForm.role === 'supervisor' && (
-                          <div className="field">
-                            <label className="field-label">Linked Partner Company (HTE)</label>
-                            <MaterialSelect
-                              className="select"
-                              value={userForm.linked_id}
-                              onChange={(e) => setUserForm({ ...userForm, linked_id: e.target.value })}
-                            >
-                              <option value="">Select company...</option>
-                              {data.employers.map((emp) => (
-                                <option key={emp.employer_id} value={emp.employer_id}>
-                                  {emp.company_name} ({emp.contact_person})
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                        )}
-                        {userForm.role === 'adviser' && (
-                          <div className="field">
-                            <label className="field-label">Linked Adviser Record</label>
-                            <MaterialSelect
-                              className="select"
-                              value={userForm.linked_id}
-                              onChange={(e) => setUserForm({ ...userForm, linked_id: e.target.value })}
-                            >
-                              <option value="">Select adviser...</option>
-                              {data.advisers.map((a) => (
-                                <option key={a.adviser_id} value={a.adviser_id}>
-                                  {a.full_name} ({a.employee_number})
-                                </option>
-                              ))}
-                            </MaterialSelect>
-                          </div>
-                        )}
-                      </div>
-                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {editingUserId ? 'Save Changes' : 'Create Account'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setShowUserForm(false);
-                            setEditingUserId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
 
               <div className="panel">
                 <div className="table-wrap">
@@ -8058,6 +7209,79 @@ export default function App() {
             ? data.placements.find((p) => Number(p.student_id) === Number(editingStudentId)) || null
             : null
         }
+        employers={data.employers}
+        advisers={data.advisers}
+        syncing={syncing}
+      />
+
+      <EmployerModal
+        isOpen={showEmployerForm}
+        onClose={() => {
+          setShowEmployerForm(false);
+          setEditingEmployerId(null);
+        }}
+        onSubmit={handleSaveEmployer}
+        employerForm={employerForm}
+        setEmployerForm={setEmployerForm}
+        editingEmployerId={editingEmployerId}
+        syncing={syncing}
+      />
+
+      <PlacementModal
+        isOpen={showPlacementForm}
+        onClose={() => {
+          setShowPlacementForm(false);
+          setEditingPlacementId(null);
+        }}
+        onSubmit={handleSavePlacement}
+        placementForm={placementForm}
+        setPlacementForm={setPlacementForm}
+        editingPlacementId={editingPlacementId}
+        students={data.students}
+        employers={data.employers}
+        advisers={data.advisers}
+        syncing={syncing}
+      />
+
+      <AdviserModal
+        isOpen={showAdviserForm}
+        onClose={() => {
+          setShowAdviserForm(false);
+          setEditingAdviserId(null);
+        }}
+        onSubmit={handleSaveAdviser}
+        adviserForm={adviserForm}
+        setAdviserForm={setAdviserForm}
+        editingAdviserId={editingAdviserId}
+        syncing={syncing}
+      />
+
+      <UserAccountModal
+        isOpen={showUserForm}
+        onClose={() => {
+          setShowUserForm(false);
+          setEditingUserId(null);
+        }}
+        onSubmit={handleSaveUser}
+        userForm={userForm}
+        setUserForm={setUserForm}
+        editingUserId={editingUserId}
+        students={data.students}
+        employers={data.employers}
+        advisers={data.advisers}
+        syncing={syncing}
+      />
+
+      <SuperviseStudentModal
+        isOpen={showSuperviseForm}
+        onClose={() => setShowSuperviseForm(false)}
+        onSubmit={handleSaveSuperviseStudent}
+        superviseMode={superviseMode}
+        setSuperviseMode={setSuperviseMode}
+        superviseForm={superviseForm}
+        setSuperviseForm={setSuperviseForm}
+        currentUser={currentUser}
+        students={data.students}
         employers={data.employers}
         advisers={data.advisers}
         syncing={syncing}
