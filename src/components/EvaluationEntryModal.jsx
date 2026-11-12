@@ -115,7 +115,7 @@ export default function EvaluationEntryModal({
                 {placements.map((pl) => (
                   <option key={pl.placement_id} value={pl.placement_id}>
                     {pl.student_name} — {pl.company_name} ({Number(pl.total_hours_completed || 0).toFixed(1)}/
-                    {Number(pl.required_hours || 300).toFixed(0)} hrs · {pl.evaluation_count || 0}/2 evals)
+                    {Number(pl.required_hours || 300).toFixed(0)} hrs · {pl.completed_instruments_count ?? pl.evaluation_count ?? 0}/4 instruments)
                   </option>
                 ))}
               </MaterialSelect>
@@ -124,29 +124,50 @@ export default function EvaluationEntryModal({
             {/* Evaluator Role & Date */}
             <div className="field-grid-2">
               <div className="field">
-                <label className="field-label">Evaluator Role</label>
+                <label className="field-label">Evaluation Instrument / Role</label>
                 <MaterialSelect
-                  value={evalForm.evaluator_type}
+                  value={evalForm.instrument_type || (evalForm.evaluator_type === 'adviser' ? 'adviser_to_hte' : evalForm.evaluator_type === 'student' ? 'student_to_supervisor' : 'supervisor_to_student')}
                   onChange={(e) => {
-                    const etype = e.target.value;
+                    const itype = e.target.value;
                     const pl = placements.find((p) => String(p.placement_id) === String(evalForm.placement_id));
+                    const etype =
+                      itype === 'supervisor_to_student'
+                        ? 'employer'
+                        : itype === 'adviser_to_hte'
+                        ? 'adviser'
+                        : 'student';
                     setEvalForm({
                       ...evalForm,
+                      instrument_type: itype,
                       evaluator_type: etype,
                       evaluator_name:
                         etype === 'employer'
                           ? currentUser?.role === 'supervisor'
                             ? currentUser.display_name
                             : pl?.company_contact_person || 'HTE Supervisor'
-                          : currentUser?.role === 'adviser'
+                          : etype === 'adviser'
+                          ? currentUser?.role === 'adviser'
+                            ? currentUser.display_name
+                            : pl?.adviser_name || 'Faculty Adviser'
+                          : currentUser?.role === 'student'
                           ? currentUser.display_name
-                          : pl?.adviser_name || 'Faculty Adviser',
+                          : pl?.student_name || 'Student Intern',
                     });
                   }}
                   style={{ width: '100%' }}
                 >
-                  <option value="employer">Employer / HTE Supervisor Rating (Encoded from Signed Form)</option>
-                  <option value="adviser">Faculty Adviser Academic Endorsement</option>
+                  {(currentUser?.role === 'supervisor' || currentUser?.role === 'admin') && (
+                    <option value="supervisor_to_student">INST-02: HTE Supervisor -&gt; Trainee &amp; School</option>
+                  )}
+                  {(currentUser?.role === 'adviser' || currentUser?.role === 'admin') && (
+                    <option value="adviser_to_hte">INST-03: Faculty Adviser -&gt; HTE Quality Audit</option>
+                  )}
+                  {(currentUser?.role === 'student' || currentUser?.role === 'admin') && (
+                    <option value="student_to_supervisor">INST-01: Student -&gt; Training Supervisor</option>
+                  )}
+                  {(currentUser?.role === 'student' || currentUser?.role === 'admin') && (
+                    <option value="student_to_adviser">INST-04: Student -&gt; Faculty Adviser</option>
+                  )}
                 </MaterialSelect>
               </div>
 
@@ -177,7 +198,7 @@ export default function EvaluationEntryModal({
 
             {/* Rubric Score Presets */}
             <div className="field">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
                 <label className="field-label" style={{ margin: 0 }}>Score Presets (1.00 – 5.00)</label>
                 <span className="field-hint">Rubric: 40% Tech · 30% Ethic · 30% Attendance</span>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   IconBriefcase,
   IconClock,
@@ -8,20 +8,144 @@ import {
   IconPrinter,
   IconBrandLogo,
   IconEdit,
-  IconClose
+  IconClose,
+  IconEvaluation,
 } from './Icons';
+import { getInstrumentById, getInterpretation } from '../utils/evaluationRubrics';
+import SessionSignatureControl, {
+  PrintableSignatoryBlock,
+  useSessionSignature,
+} from './SessionSignatureControl';
 
 export default function PublicSupervisorVerifyView({
   placement,
   timelogs = [],
+  evaluations = [],
   onClose,
-  onRefresh
+  onRefresh,
 }) {
+  const [portalTab, setPortalTab] = useState('dtr');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
   const [flagModalOpen, setFlagModalOpen] = useState(false);
   const [selectedLogToFlag, setSelectedLogToFlag] = useState(null);
   const [flagReason, setFlagReason] = useState('Please verify and correct the recorded shift hours.');
+
+  const inst02 = useMemo(() => getInstrumentById('supervisor_to_student'), []);
+  const supervisorSig = useSessionSignature('supervisor', placement?.placement_id || 'portal');
+
+  const existingInst02 = useMemo(() => {
+    if (!placement) return null;
+    return (
+      evaluations.find(
+        (ev) =>
+          Number(ev.placement_id) === Number(placement.placement_id) &&
+          (ev.instrument_type === 'supervisor_to_student' || ev.evaluator_type === 'employer')
+      ) || null
+    );
+  }, [evaluations, placement]);
+
+  const inst02Items = useMemo(() => {
+    const list = [];
+    inst02.sections.forEach((sec, sIdx) => {
+      sec.items.forEach((text, iIdx) => {
+        list.push({ key: `${sIdx}_${iIdx}`, sectionTitle: sec.title, text });
+      });
+    });
+    return list;
+  }, [inst02]);
+
+  const [evalScores, setEvalScores] = useState({});
+  const [evaluatorName, setEvaluatorName] = useState('');
+  const [dateEvaluated, setDateEvaluated] = useState(new Date().toISOString().slice(0, 10));
+  const [evalComments, setEvalComments] = useState('');
+  const [evalSaving, setEvalSaving] = useState(false);
+  const [evalSavedNotice, setEvalSavedNotice] = useState('');
+
+  useEffect(() => {
+    if (!placement) return;
+    if (existingInst02) {
+      setEvaluatorName(existingInst02.evaluator_name || placement.company_contact_person || 'HTE Supervisor');
+      setDateEvaluated(existingInst02.date_evaluated || new Date().toISOString().slice(0, 10));
+      setEvalComments(existingInst02.comments || '');
+      let parsed = null;
+      if (existingInst02.criteria_scores) {
+        try {
+          parsed =
+            typeof existingInst02.criteria_scores === 'string'
+              ? JSON.parse(existingInst02.criteria_scores)
+              : existingInst02.criteria_scores;
+        } catch {
+          parsed = null;
+        }
+      }
+      const next = {};
+      const fallback = Math.max(1, Math.min(5, Math.round(Number(existingInst02.rating || 5))));
+      inst02Items.forEach((it) => {
+        next[it.key] = parsed && parsed[it.key] ? Number(parsed[it.key]) : fallback;
+      });
+      setEvalScores(next);
+    } else {
+      setEvaluatorName(placement.company_contact_person || 'HTE Workplace Supervisor');
+      setDateEvaluated(new Date().toISOString().slice(0, 10));
+      setEvalComments('');
+      const next = {};
+      inst02Items.forEach((it) => {
+        next[it.key] = 5;
+      });
+      setEvalScores(next);
+    }
+  }, [placement, existingInst02, inst02Items]);
+
+  const evalComposite = useMemo(() => {
+    const vals = Object.values(evalScores).filter((v) => Number(v) > 0);
+    if (vals.length === 0) return 5.0;
+    return parseFloat((vals.reduce((a, b) => a + Number(b), 0) / vals.length).toFixed(2));
+  }, [evalScores]);
+
+  const evalInterp = getInterpretation(evalComposite);
+
+  const handleSaveInst02 = async (e) => {
+    e.preventDefault();
+    if (!placement) return;
+    setEvalSaving(true);
+    setEvalSavedNotice('');
+    try {
+      const res = await fetch('/api/evaluations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          placement_id: placement.placement_id,
+          instrument_type: 'supervisor_to_student',
+          evaluator_type: 'employer',
+          evaluator_name: evaluatorName || placement.company_contact_person || 'HTE Supervisor',
+          technical_score: evalComposite,
+          attitude_score: evalComposite,
+          attendance_score: 5.0,
+          rating: evalComposite,
+          comments:
+            evalComments.trim() ||
+            'Submitted online via HTE Supervisor Verification Portal (INST-02).',
+          date_evaluated: dateEvaluated,
+          criteria_scores: evalScores,
+          upsert: true,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setEvalSavedNotice(
+          `INST-02 evaluation ${json.updated ? 'updated' : 'submitted'} successfully (${evalComposite.toFixed(2)} / 5.00).`
+        );
+        if (onRefresh) onRefresh();
+      } else {
+        alert(json.error || 'Failed to save supervisor evaluation.');
+      }
+    } catch (err) {
+      alert('Failed to submit INST-02 evaluation: ' + err.message);
+    } finally {
+      setEvalSaving(false);
+    }
+  };
 
   const placementLogs = useMemo(() => {
     if (!placement) return [];
@@ -116,24 +240,11 @@ export default function PublicSupervisorVerifyView({
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-canvas)', color: 'var(--text-primary)', padding: '24px 16px' }}>
-      <div style={{ maxWidth: '960px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="public-verify-shell">
+      <div className="public-verify-container">
         {/* PUBLIC VERIFICATION HEADER */}
-        <header
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px 24px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: 'var(--shadow-sm)',
-            flexWrap: 'wrap',
-            gap: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <header className="public-verify-header">
+          <div className="public-verify-header-brand">
             <IconBrandLogo size={36} />
             <div>
               <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
@@ -228,6 +339,49 @@ export default function PublicSupervisorVerifyView({
           </div>
         </div>
 
+        {/* PORTAL SECTION TABS: DTR vs INST-02 EVALUATION */}
+        <div
+          className="no-print"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            marginBottom: '16px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${portalTab === 'dtr' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setPortalTab('dtr')}
+            >
+              <IconClock size={14} />
+              DTR Shift Verification ({pendingCount > 0 ? `${pendingCount} Pending` : `${placementLogs.length} Logged`})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${portalTab === 'eval' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setPortalTab('eval')}
+            >
+              <IconEvaluation size={14} />
+              INST-02: Trainee &amp; School Evaluation (
+              {existingInst02
+                ? `Submitted ${Number(existingInst02.rating).toFixed(2)}`
+                : placement.signed_eval_filename
+                ? 'Signed Scan on File'
+                : 'Pending'}
+              )
+            </button>
+          </div>
+          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            Option: Submit INST-02 directly online or print &amp; sign physically for the trainee to upload.
+          </span>
+        </div>
+
+        {portalTab === 'dtr' && (
+          <>
         {/* ACTION TOOLBAR FOR SUPERVISOR */}
         <div className="public-verify-actionbar">
           <div className="public-verify-action-info">
@@ -345,6 +499,174 @@ export default function PublicSupervisorVerifyView({
             </table>
           </div>
         </div>
+          </>
+        )}
+
+        {portalTab === 'eval' && (
+          <form onSubmit={handleSaveInst02} className="panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {evalSavedNotice && (
+              <div className="public-verify-alert is-success" style={{ marginBottom: 0 }}>
+                <IconCheckCircle size={18} />
+                <div>
+                  <strong>INST-02 Evaluation Recorded:</strong> {evalSavedNotice}
+                </div>
+              </div>
+            )}
+
+            {placement.signed_eval_filename && !existingInst02 && (
+              <div className="public-verify-alert is-warning" style={{ marginBottom: 0 }}>
+                <IconCheckCircle size={16} />
+                <div>
+                  A signed physical INST-02 copy (<strong>{placement.signed_eval_filename}</strong>) was already uploaded by the trainee. You may also record itemized digital scores below.
+                </div>
+              </div>
+            )}
+
+            <div className="public-verify-eval-head">
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  {inst02.code} · Official HTE Supervisor Instrument
+                </div>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, margin: '4px 0', color: 'var(--text-primary)' }}>
+                  {inst02.name}
+                </h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                  {inst02.description}
+                </p>
+              </div>
+              <div className="public-verify-eval-score">
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Composite Score</div>
+                  <div className="mono tabular-nums" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--brand)' }}>
+                    {evalComposite.toFixed(2)} <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>/ 5.00</span>
+                  </div>
+                </div>
+                <span className="status-chip success">{evalInterp.label}</span>
+                <button type="button" className="btn btn-secondary btn-sm no-print" onClick={() => window.print()}>
+                  <IconPrinter size={14} />
+                  Print INST-02
+                </button>
+              </div>
+            </div>
+
+            <div className="field-grid-2">
+              <div className="field">
+                <label className="field-label">Evaluator / Immediate Supervisor Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={evaluatorName}
+                  onChange={(e) => setEvaluatorName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label className="field-label">Date Evaluated</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={dateEvaluated}
+                  onChange={(e) => setDateEvaluated(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {inst02.sections.map((section, sIdx) => (
+              <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', padding: '6px 10px', background: 'var(--bg-subtle)', borderRadius: '6px' }}>
+                  {section.title}
+                </div>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '40px' }}>#</th>
+                        <th>Performance Indicator</th>
+                        <th className="text-right" style={{ width: '220px' }}>Rating (1 Low – 5 High)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.items.map((itemText, iIdx) => {
+                        const key = `${sIdx}_${iIdx}`;
+                        const val = Number(evalScores[key] || 5);
+                        return (
+                          <tr key={key}>
+                            <td className="mono">{iIdx + 1}</td>
+                            <td style={{ fontSize: '12.5px', lineHeight: 1.45 }}>{itemText}</td>
+                            <td className="text-right">
+                              <div style={{ display: 'inline-flex', gap: '4px' }}>
+                                {[1, 2, 3, 4, 5].map((num) => (
+                                  <button
+                                    key={num}
+                                    type="button"
+                                    className={`btn btn-xs ${val === num ? 'btn-primary' : 'btn-secondary'}`}
+                                    style={{ minWidth: '30px', justifyContent: 'center' }}
+                                    onClick={() => setEvalScores((prev) => ({ ...prev, [key]: num }))}
+                                  >
+                                    {num}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+
+            <div className="field">
+              <label className="field-label">{inst02.commentsLabel}</label>
+              <textarea
+                className="input"
+                rows={3}
+                value={evalComments}
+                onChange={(e) => setEvalComments(e.target.value)}
+                placeholder="Share trainee technical strengths, work ethic observations, or curriculum recommendations for MIT CpE..."
+              />
+            </div>
+
+            <SessionSignatureControl
+              role="supervisor"
+              userId={placement?.placement_id || 'portal'}
+              signerName={evaluatorName || placement.company_contact_person}
+              title="Optional Print Signature (Browser Tab Only)"
+            />
+
+            <div className="cert-signatures" style={{ marginTop: '8px' }}>
+              <PrintableSignatoryBlock
+                printedName={evaluatorName || placement.company_contact_person}
+                roleLabel="Immediate HTE Supervisor"
+                signature={supervisorSig}
+                matchesRole={true}
+              />
+              <PrintableSignatoryBlock
+                printedName={placement.adviser_name}
+                roleLabel="Noted by: Faculty Practicum Adviser"
+                signature={null}
+                matchesRole={false}
+              />
+            </div>
+
+            <div className="no-print action-row-wrap" style={{ justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-default)' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+                <IconPrinter size={14} />
+                Print Copy for Filing
+              </button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={evalSaving}>
+                <IconCheckCircle size={14} />
+                {evalSaving
+                  ? 'Submitting...'
+                  : existingInst02
+                  ? `Update INST-02 Evaluation (${evalComposite.toFixed(2)})`
+                  : `Submit INST-02 Evaluation (${evalComposite.toFixed(2)})`}
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* FOOTER */}
         <footer style={{ textAlign: 'center', padding: '16px 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>

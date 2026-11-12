@@ -59,7 +59,7 @@ export const EVALUATION_INSTRUMENTS = [
     shortTitle: 'Student → Supervisor Mentorship',
     evaluatorRole: 'student',
     targetRole: 'supervisor',
-    evaluatorTypeDb: 'employer',
+    evaluatorTypeDb: 'student',
     description: 'Student intern assessment of immediate supervisor mentoring, coaching, work ethics, and task assistance',
     sections: [
       {
@@ -162,7 +162,7 @@ export const EVALUATION_INSTRUMENTS = [
     shortTitle: 'Student → Faculty Supervision',
     evaluatorRole: 'student',
     targetRole: 'adviser',
-    evaluatorTypeDb: 'adviser',
+    evaluatorTypeDb: 'student',
     description: 'Student assessment of faculty adviser regular consultations, academic guidance, and monitoring',
     sections: [
       {
@@ -206,4 +206,67 @@ export const getInterpretation = (score) => {
   if (num >= 2.51) return { label: 'Somewhat Compliant / Satisfactory', desc: '41% - 65% Needs Minor Refinement', badge: 'rating-pill-satisfactory' };
   if (num >= 1.51) return { label: 'Not Compliant / Fair', desc: '11% - 40% Remediation Required', badge: 'rating-pill-poor' };
   return { label: 'Fully Not Compliant / Poor', desc: '0% - 10% Unsatisfactory', badge: 'rating-pill-poor' };
+};
+
+export const INSTRUMENT_ORDER_BY_ROLE = {
+  student: ['student_to_supervisor', 'student_to_adviser'],
+  supervisor: ['supervisor_to_student'],
+  adviser: ['adviser_to_hte'],
+  admin: ['supervisor_to_student', 'adviser_to_hte', 'student_to_supervisor', 'student_to_adviser'],
+};
+
+export const getInstrumentsForRole = (role) => {
+  const allowedIds = INSTRUMENT_ORDER_BY_ROLE[role] || INSTRUMENT_ORDER_BY_ROLE.admin;
+  return allowedIds
+    .map((id) => EVALUATION_INSTRUMENTS.find((inst) => inst.id === id))
+    .filter(Boolean);
+};
+
+export const getInstrumentById = (id) =>
+  EVALUATION_INSTRUMENTS.find((inst) => inst.id === id) || EVALUATION_INSTRUMENTS[0];
+
+export const getPlacementInstrumentStatus = (placement) => {
+  if (!placement) {
+    return {
+      hoursMet: false,
+      inst01: false,
+      inst02Online: false,
+      inst02Signed: false,
+      inst02: false,
+      inst03: false,
+      inst04: false,
+      completedCount: 0,
+      allInstrumentsMet: false,
+      isCleared: false,
+      missingLabels: [],
+    };
+  }
+  const hoursMet = Number(placement.total_hours_completed || 0) >= Number(placement.required_hours || 300);
+  const inst02Online = Number(placement.has_online_employer_eval || 0) === 1;
+  const inst02Signed = Boolean(placement.signed_eval_filename || placement.signed_eval_file || Number(placement.has_signed_eval || 0) === 1);
+  const inst02 = Number(placement.has_employer_eval || 0) === 1 || inst02Online || inst02Signed;
+  const inst03 = Number(placement.has_adviser_eval || 0) === 1;
+  const inst01 = Number(placement.has_student_supervisor_eval || 0) === 1;
+  const inst04 = Number(placement.has_student_adviser_eval || 0) === 1;
+  const completedCount = (inst01 ? 1 : 0) + (inst02 ? 1 : 0) + (inst03 ? 1 : 0) + (inst04 ? 1 : 0);
+  const allInstrumentsMet = inst01 && inst02 && inst03 && inst04;
+  const isCleared = Number(placement.requirement_met || 0) === 1;
+  const missingLabels = [];
+  if (!inst02) missingLabels.push('INST-02 (Supervisor)');
+  if (!inst03) missingLabels.push('INST-03 (Adviser)');
+  if (!inst01) missingLabels.push('INST-01 (Student -> Supervisor)');
+  if (!inst04) missingLabels.push('INST-04 (Student -> Adviser)');
+  return {
+    hoursMet,
+    inst01,
+    inst02Online,
+    inst02Signed,
+    inst02,
+    inst03,
+    inst04,
+    completedCount,
+    allInstrumentsMet,
+    isCleared,
+    missingLabels,
+  };
 };

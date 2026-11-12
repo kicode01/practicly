@@ -378,7 +378,7 @@ export default function DtrTransferModal({
 
         {/* PLACEMENT TARGET SELECTOR (FOR ADVISER / ADMIN) */}
         {placements.length > 1 && currentUser?.role !== 'student' && (
-          <div style={{ padding: '12px 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="form-inline-pair" style={{ padding: '12px 24px 0', gap: '10px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Student Placement:</span>
             <MaterialSelect
               className="select-sm"
@@ -417,6 +417,8 @@ export default function DtrTransferModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
                   padding: '12px 16px',
                   background: 'var(--bg-subtle)',
                   borderRadius: 'var(--radius-md)',
@@ -633,7 +635,7 @@ export default function DtrTransferModal({
 
                 <div className="field">
                   <label className="field-label">Signed Document Upload</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="form-inline-pair">
                     <button
                       type="button"
                       className="btn btn-secondary"
@@ -781,7 +783,7 @@ export default function DtrTransferModal({
               </div>
 
               {/* AUDIT METRIC COMPARISON STRIP */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div className="modal-metric-grid-3">
                 <div
                   style={{
                     padding: '14px',
@@ -846,7 +848,7 @@ export default function DtrTransferModal({
               </div>
 
               {/* SIDE-BY-SIDE VERIFICATION: SIGNED DOCUMENT VS SYSTEM INPUTTED LOGS */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '2px' }}>
+              <div className="modal-info-grid-2" style={{ gap: '14px', marginTop: '2px' }}>
                 {/* LEFT: SIGNED PROOF FROM SUPERVISOR */}
                 <div
                   style={{
@@ -1035,7 +1037,7 @@ export default function DtrTransferModal({
               )}
 
               {/* ACTION FOOTER */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+              <div className="action-row-wrap" style={{ justifyContent: 'flex-end', marginTop: '12px' }}>
                 <button type="button" className="btn btn-secondary" onClick={onClose}>
                   Close
                 </button>

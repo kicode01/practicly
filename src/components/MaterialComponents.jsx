@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useEffect, useRef, useMemo } from 'react';
-import { IconSearch, IconChevronDown, IconCheck } from './Icons';
+import { IconSearch, IconChevronDown, IconCheck, IconAlert, IconClose } from './Icons';
 
 /**
  * Google Material Design 3 (M3) Web Component Implementations
@@ -260,6 +260,47 @@ export function MaterialSelect({
 
 export const Select = MaterialSelect;
 
+/**
+ * Material Design 3 Snackbar
+ * Displays brief, low-emphasis status or feedback messages anchored to the viewport.
+ */
+export function Snackbar({ message, type = 'success', onClose, className = '' }) {
+  if (!message) return null;
+
+  const isError = type === 'error';
+  const isWarning = type === 'warning';
+  const variantClass = isError
+    ? 'm3-snackbar--error'
+    : isWarning
+      ? 'm3-snackbar--warning'
+      : 'm3-snackbar--default';
+
+  return (
+    <div
+      className={`m3-snackbar ${variantClass} ${className}`.trim()}
+      role={isError ? 'alert' : 'status'}
+      aria-live={isError ? 'assertive' : 'polite'}
+    >
+      {(isError || isWarning) && (
+        <span className="m3-snackbar__icon" aria-hidden="true">
+          <IconAlert size={18} />
+        </span>
+      )}
+      <span className="m3-snackbar__label">{message}</span>
+      {onClose && (
+        <button
+          type="button"
+          className="m3-snackbar__close"
+          onClick={onClose}
+          aria-label="Dismiss notification"
+        >
+          <IconClose size={18} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default {
   SegmentedControl,
   Switch,
@@ -269,4 +310,5 @@ export default {
   Button,
   MaterialSelect,
   Select,
+  Snackbar,
 };

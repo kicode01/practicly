@@ -1,8 +1,16 @@
 import React from 'react';
 import { IconPrinter, IconBrandLogo } from './Icons';
+import SessionSignatureControl, {
+  PrintableSignatoryBlock,
+  useSessionSignature,
+} from './SessionSignatureControl';
 
-export default function DtrModal({ placement, logs = [], onClose }) {
+export default function DtrModal({ placement, logs = [], currentUser = null, onClose }) {
   if (!placement) return null;
+
+  const userRole = currentUser?.role || 'student';
+  const userId = currentUser?.user_id || currentUser?.linked_id || userRole;
+  const activeSignature = useSessionSignature(userRole, userId);
 
   const sortedLogs = [...logs].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const approvedHours = sortedLogs
@@ -19,7 +27,7 @@ export default function DtrModal({ placement, logs = [], onClose }) {
               Verified attendance ledger for {placement.student_name} ({placement.student_number})
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="action-row-wrap">
             <button type="button" className="btn btn-primary btn-sm" onClick={() => window.print()}>
               <IconPrinter size={14} />
               Print Official DTR
@@ -31,6 +39,15 @@ export default function DtrModal({ placement, logs = [], onClose }) {
         </div>
 
         <div className="dtr-modal-body">
+          {currentUser && (
+            <div style={{ marginBottom: '12px' }}>
+              <SessionSignatureControl
+                role={userRole}
+                userId={userId}
+                signerName={currentUser.display_name || placement.student_name}
+              />
+            </div>
+          )}
           <div className="certificate-sheet">
           <div className="cert-header">
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
@@ -127,18 +144,24 @@ export default function DtrModal({ placement, logs = [], onClose }) {
           </div>
 
           <div className="cert-signatures" style={{ marginTop: '36px' }}>
-            <div>
-              <div className="cert-sig-line">{placement.student_name}</div>
-              <div className="cert-sig-role">Student Intern Signature</div>
-            </div>
-            <div>
-              <div className="cert-sig-line">{placement.company_contact_person}</div>
-              <div className="cert-sig-role">HTE Training Supervisor</div>
-            </div>
-            <div>
-              <div className="cert-sig-line">{placement.adviser_name}</div>
-              <div className="cert-sig-role">Faculty Practicum Adviser</div>
-            </div>
+            <PrintableSignatoryBlock
+              printedName={placement.student_name}
+              roleLabel="Student Intern Signature"
+              signature={activeSignature}
+              matchesRole={userRole === 'student'}
+            />
+            <PrintableSignatoryBlock
+              printedName={placement.company_contact_person}
+              roleLabel="HTE Training Supervisor"
+              signature={activeSignature}
+              matchesRole={userRole === 'supervisor'}
+            />
+            <PrintableSignatoryBlock
+              printedName={placement.adviser_name}
+              roleLabel="Faculty Practicum Adviser"
+              signature={activeSignature}
+              matchesRole={userRole === 'adviser'}
+            />
           </div>
         </div>
         </div>

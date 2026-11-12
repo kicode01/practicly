@@ -129,7 +129,7 @@ export default function RoleHeroBanner({
                     : 'Required hours met'
                   : `${formatHours(remaining)} hrs remaining`}
               </span>
-              <span>{placement.evaluation_count || 0}/2 evaluations</span>
+              <span>{placement.completed_instruments_count ?? placement.evaluation_count ?? 0}/4 instruments</span>
             </div>
           </div>
         </div>
@@ -184,10 +184,11 @@ export default function RoleHeroBanner({
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={onOpenOfficialEval}
+                onClick={() => onOpenOfficialEval()}
+                title="Evaluate your HTE Supervisor (INST-01) and Faculty OJT Adviser (INST-04)"
               >
                 <IconEvaluation size={14} />
-                Evaluate
+                Evaluate (INST-01/04)
               </button>
             )}
             {onOpenClearanceModal && (
@@ -397,11 +398,11 @@ export default function RoleHeroBanner({
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={onOpenOfficialEval}
-                title="Official 360° rubrics (HTE compliance and trainee evaluation)"
+                onClick={() => onOpenOfficialEval()}
+                title="Faculty Adviser -> HTE Institutional Quality Audit (INST-03)"
               >
                 <IconEvaluation size={14} />
-                Official 360° Rubrics
+                HTE Quality Audit (INST-03)
               </button>
             )}
           </div>

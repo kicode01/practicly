@@ -230,7 +230,7 @@ export default function DatabaseInspectorView({
               <span className="mono">{systemInfo?.database || 'ojt_tracking_db'}</span> · Click any table card to inspect live rows
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="action-row-wrap">
             <button
               type="button"
               className="btn btn-secondary btn-sm"

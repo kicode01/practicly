@@ -77,14 +77,12 @@ export default function SupervisorShareModal({
 
           {/* TARGET INFO */}
           <div
+            className="modal-info-grid-2"
             style={{
               padding: '12px 14px',
               background: 'var(--bg-subtle)',
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border-default)',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '10px',
               fontSize: '11.5px'
             }}
           >
@@ -109,7 +107,7 @@ export default function SupervisorShareModal({
           {/* GENERATED LINK BOX */}
           <div className="field">
             <label className="field-label">Shareable Supervisor Verification URL</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="form-inline-pair">
               <input
                 type="text"
                 readOnly
@@ -156,7 +154,7 @@ export default function SupervisorShareModal({
         </div>
 
         {/* MODAL FOOTER */}
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="modal-footer" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn btn-secondary btn-sm"

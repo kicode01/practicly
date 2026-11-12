@@ -30,6 +30,21 @@ function jsonResponse(array $data, int $status = 200): void
     exit;
 }
 
+function resolveUploadDir(string $subdir): string
+{
+    $safeSubdir = trim($subdir, '/\\');
+    $defaultBase = __DIR__ . '/../../public/uploads';
+    $useTemp = (getenv('DB_SQLITE_PATH') !== false && trim((string)getenv('DB_SQLITE_PATH')) !== '')
+        || !is_writable(is_dir($defaultBase) ? $defaultBase : dirname($defaultBase));
+    $dir = $useTemp
+        ? rtrim(sys_get_temp_dir(), '/\\') . '/practicly_uploads/' . $safeSubdir
+        : $defaultBase . '/' . $safeSubdir;
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+    return $dir;
+}
+
 function getJsonBody(): array
 {
     $raw = file_get_contents('php://input');
@@ -116,7 +131,15 @@ try {
                 vp.completion_percentage,
                 vp.status AS placement_status,
                 vp.requirement_met,
-                vp.clearance_reference
+                vp.clearance_reference,
+                vp.has_online_employer_eval,
+                vp.has_signed_eval,
+                vp.has_employer_eval,
+                vp.has_adviser_eval,
+                vp.has_student_supervisor_eval,
+                vp.has_student_adviser_eval,
+                vp.completed_instruments_count,
+                vp.signed_eval_filename
             FROM Student s
             LEFT JOIN vw_placement_progress vp ON s.student_id = vp.student_id
             ORDER BY s.full_name ASC
@@ -181,6 +204,8 @@ try {
                 cr.requirement_met,
                 cr.has_employer_eval,
                 cr.has_adviser_eval,
+                cr.has_student_supervisor_eval,
+                cr.has_student_adviser_eval,
                 cr.average_rating,
                 cr.clearance_reference,
                 cr.generated_date,
@@ -206,8 +231,18 @@ try {
                 vp.completion_percentage,
                 vp.total_log_days,
                 vp.evaluation_count,
+                vp.has_online_employer_eval,
+                vp.has_signed_eval,
+                vp.signed_eval_file,
+                vp.signed_eval_filename,
+                vp.signed_eval_uploaded_at,
+                vp.signed_eval_notes,
+                vp.signed_eval_data,
+                vp.completed_instruments_count,
                 vp.employer_rating,
                 vp.adviser_rating,
+                vp.student_supervisor_rating,
+                vp.student_adviser_rating,
                 vp.status AS placement_status
             FROM ComplianceReport cr
             INNER JOIN vw_placement_progress vp ON cr.placement_id = vp.placement_id
@@ -818,13 +853,30 @@ try {
     // 4. EVALUATION MODULE (POST / PUT / DELETE /api/evaluations)
     // =========================================================================
     if ($resource === 'evaluations') {
+        $instrumentToEvaluator = [
+            'supervisor_to_student' => 'employer',
+            'adviser_to_hte'        => 'adviser',
+            'student_to_supervisor' => 'student',
+            'student_to_adviser'    => 'student',
+        ];
+
         if ($method === 'POST') {
             $body          = getJsonBody();
             $placementId   = (int)($body['placement_id'] ?? 0);
+            $instrumentType = trim((string)($body['instrument_type'] ?? ''));
             $evalTypeCandidate = (string)($body['evaluator_type'] ?? 'employer');
-            $evaluatorType = in_array($evalTypeCandidate, ['employer', 'adviser', 'student'], true)
-                ? $evalTypeCandidate
-                : 'employer';
+            if ($instrumentType !== '' && isset($instrumentToEvaluator[$instrumentType])) {
+                $evaluatorType = $instrumentToEvaluator[$instrumentType];
+            } else {
+                $evaluatorType = in_array($evalTypeCandidate, ['employer', 'adviser', 'student'], true)
+                    ? $evalTypeCandidate
+                    : 'employer';
+                if ($instrumentType === '') {
+                    $instrumentType = $evaluatorType === 'employer'
+                        ? 'supervisor_to_student'
+                        : ($evaluatorType === 'adviser' ? 'adviser_to_hte' : 'student_to_supervisor');
+                }
+            }
             $evaluatorName = trim((string)($body['evaluator_name'] ?? 'Authorized Evaluator'));
             $techScore     = max(1.0, min(5.0, (float)($body['technical_score'] ?? 4.80)));
             $attScore      = max(1.0, min(5.0, (float)($body['attitude_score'] ?? 4.80)));
@@ -834,16 +886,53 @@ try {
                 : round(($techScore + $attScore + $attendScore) / 3, 2);
             $comments      = trim((string)($body['comments'] ?? 'Satisfactory completion of assigned engineering tasks.'));
             $dateEvaluated = trim((string)($body['date_evaluated'] ?? date('Y-m-d')));
-            $instrumentType = trim((string)($body['instrument_type'] ?? ''));
-            if ($instrumentType === '') {
-                $instrumentType = $evaluatorType === 'employer' ? 'supervisor_to_student' : 'adviser_to_hte';
-            }
             $criteriaScores = isset($body['criteria_scores'])
                 ? (is_string($body['criteria_scores']) ? $body['criteria_scores'] : json_encode($body['criteria_scores']))
                 : null;
+            $shouldUpsert  = !empty($body['upsert']);
 
             if ($placementId <= 0) {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+
+            if ($shouldUpsert) {
+                $dupStmt = $pdo->prepare('SELECT eval_id FROM Evaluation WHERE placement_id = :pid AND instrument_type = :itype LIMIT 1');
+                $dupStmt->execute([':pid' => $placementId, ':itype' => $instrumentType]);
+                $existingEvalId = $dupStmt->fetchColumn();
+                if ($existingEvalId) {
+                    $up = $pdo->prepare("
+                        UPDATE Evaluation
+                        SET evaluator_type = :etype,
+                            evaluator_name = :ename,
+                            technical_score = :tech,
+                            attitude_score = :att,
+                            attendance_score = :atd,
+                            rating = :rat,
+                            comments = :comm,
+                            date_evaluated = :dt,
+                            criteria_scores = :cscores
+                        WHERE eval_id = :id
+                    ");
+                    $up->execute([
+                        ':etype'   => $evaluatorType,
+                        ':ename'   => $evaluatorName,
+                        ':tech'    => $techScore,
+                        ':att'     => $attScore,
+                        ':atd'     => $attendScore,
+                        ':rat'     => $rating,
+                        ':comm'    => $comments,
+                        ':dt'      => $dateEvaluated,
+                        ':cscores' => $criteriaScores,
+                        ':id'      => (int)$existingEvalId,
+                    ]);
+                    Database::syncCompliance($pdo, $placementId);
+                    jsonResponse([
+                        'ok'      => true,
+                        'eval_id' => (int)$existingEvalId,
+                        'updated' => true,
+                        'message' => sprintf('%s evaluation updated (Rating: %.2f / 5.00). Compliance report recalculated.', ucfirst($evaluatorType), $rating),
+                    ]);
+                }
             }
 
             $stmt = $pdo->prepare("
@@ -889,16 +978,20 @@ try {
                 jsonResponse(['ok' => false, 'error' => 'Evaluation not found.'], 404);
             }
 
-            $placementId   = (int)($body['placement_id'] ?? $existing['placement_id']);
-            $evaluatorType = $body['evaluator_type'] ?? $existing['evaluator_type'];
-            $evaluatorName = trim((string)($body['evaluator_name'] ?? $existing['evaluator_name']));
-            $techScore     = max(1.0, min(5.0, (float)($body['technical_score'] ?? $existing['technical_score'])));
-            $attScore      = max(1.0, min(5.0, (float)($body['attitude_score'] ?? $existing['attitude_score'])));
-            $attendScore   = max(1.0, min(5.0, (float)($body['attendance_score'] ?? $existing['attendance_score'])));
-            $rating        = round(($techScore + $attScore + $attendScore) / 3, 2);
-            $comments      = trim((string)($body['comments'] ?? $existing['comments']));
-            $dateEvaluated = trim((string)($body['date_evaluated'] ?? $existing['date_evaluated']));
+            $placementId    = (int)($body['placement_id'] ?? $existing['placement_id']);
             $instrumentType = trim((string)($body['instrument_type'] ?? ($existing['instrument_type'] ?? 'supervisor_to_student')));
+            $evaluatorType  = isset($instrumentToEvaluator[$instrumentType])
+                ? $instrumentToEvaluator[$instrumentType]
+                : ($body['evaluator_type'] ?? $existing['evaluator_type']);
+            $evaluatorName  = trim((string)($body['evaluator_name'] ?? $existing['evaluator_name']));
+            $techScore      = max(1.0, min(5.0, (float)($body['technical_score'] ?? $existing['technical_score'])));
+            $attScore       = max(1.0, min(5.0, (float)($body['attitude_score'] ?? $existing['attitude_score'])));
+            $attendScore    = max(1.0, min(5.0, (float)($body['attendance_score'] ?? $existing['attendance_score'])));
+            $rating         = isset($body['rating']) && $body['rating'] !== ''
+                ? max(1.0, min(5.0, (float)$body['rating']))
+                : round(($techScore + $attScore + $attendScore) / 3, 2);
+            $comments       = trim((string)($body['comments'] ?? $existing['comments']));
+            $dateEvaluated  = trim((string)($body['date_evaluated'] ?? $existing['date_evaluated']));
             $criteriaScores = isset($body['criteria_scores'])
                 ? (is_string($body['criteria_scores']) ? $body['criteria_scores'] : json_encode($body['criteria_scores']))
                 : ($existing['criteria_scores'] ?? null);
@@ -973,11 +1066,7 @@ try {
                 jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
             }
 
-            // Ensure upload directory exists in public/uploads/signed_dtr
-            $uploadDir = __DIR__ . '/../../public/uploads/signed_dtr';
-            if (!is_dir($uploadDir)) {
-                @mkdir($uploadDir, 0777, true);
-            }
+            $uploadDir = resolveUploadDir('signed_dtr');
 
             $savedPath = null;
             if ($fileData !== '' && strpos($fileData, 'base64,') !== false) {
@@ -1042,6 +1131,90 @@ try {
             jsonResponse([
                 'ok' => true,
                 'message' => 'Signed DTR copy removed.',
+            ]);
+        }
+
+        if ($method === 'POST' && in_array($subAction, ['upload-signed-eval', 'signed-eval'], true)) {
+            $body = getJsonBody();
+            $placementId = (int)($body['placement_id'] ?? 0);
+            $fileName = trim((string)($body['filename'] ?? 'signed_inst02_eval.pdf'));
+            $fileData = trim((string)($body['file_data'] ?? ''));
+            $notes = trim((string)($body['notes'] ?? ''));
+
+            if ($placementId <= 0) {
+                jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+            if (strlen($fileData) > 22000000) {
+                jsonResponse(['ok' => false, 'error' => 'File payload exceeds the 15 MB upload limit.'], 413);
+            }
+
+            $uploadDir = resolveUploadDir('signed_eval');
+
+            $savedPath = null;
+            if ($fileData !== '' && strpos($fileData, 'base64,') !== false) {
+                $parts = explode('base64,', $fileData);
+                $rawBytes = base64_decode($parts[1] ?? '');
+                if ($rawBytes) {
+                    $safeExt = strtolower((string)pathinfo($fileName, PATHINFO_EXTENSION));
+                    if (!in_array($safeExt, ['pdf', 'png', 'jpg', 'jpeg', 'webp'], true)) {
+                        $safeExt = 'pdf';
+                    }
+                    $safeName = 'eval_inst02_p' . $placementId . '_' . time() . '.' . $safeExt;
+                    @file_put_contents($uploadDir . '/' . $safeName, $rawBytes);
+                    $savedPath = '/uploads/signed_eval/' . $safeName;
+                }
+            }
+
+            $nowSql = Database::getDriver() === 'sqlite' ? "datetime('now')" : "NOW()";
+            $stmt = $pdo->prepare("
+                UPDATE Placement
+                SET signed_eval_file = :fpath,
+                    signed_eval_filename = :fname,
+                    signed_eval_uploaded_at = {$nowSql},
+                    signed_eval_notes = :notes,
+                    signed_eval_data = :fdata
+                WHERE placement_id = :pid
+            ");
+            $stmt->execute([
+                ':fpath' => $savedPath ?: $fileName,
+                ':fname' => $fileName,
+                ':notes' => $notes,
+                ':fdata' => $fileData,
+                ':pid'   => $placementId,
+            ]);
+
+            Database::syncCompliance($pdo, $placementId);
+
+            jsonResponse([
+                'ok' => true,
+                'message' => 'Signed INST-02 Supervisor Evaluation uploaded successfully. Marked submitted for Faculty Adviser review and compliance tracking.',
+                'filename' => $fileName,
+                'uploaded_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        if ($method === 'POST' && in_array($subAction, ['remove-signed-eval', 'delete-signed-eval'], true)) {
+            $body = getJsonBody();
+            $placementId = (int)($body['placement_id'] ?? 0);
+            if ($placementId <= 0) {
+                jsonResponse(['ok' => false, 'error' => 'Valid placement_id is required.'], 400);
+            }
+
+            $pdo->prepare("
+                UPDATE Placement
+                SET signed_eval_file = NULL,
+                    signed_eval_filename = NULL,
+                    signed_eval_uploaded_at = NULL,
+                    signed_eval_notes = NULL,
+                    signed_eval_data = NULL
+                WHERE placement_id = :pid
+            ")->execute([':pid' => $placementId]);
+
+            Database::syncCompliance($pdo, $placementId);
+
+            jsonResponse([
+                'ok' => true,
+                'message' => 'Signed INST-02 Supervisor Evaluation copy removed and compliance recalculated.',
             ]);
         }
 
@@ -1751,17 +1924,17 @@ try {
             ]);
         }
 
-        // 3. If student has no Adviser evaluation yet, record the Faculty Adviser endorsement evaluation
+        // 3. If student has no Adviser HTE Audit evaluation (INST-03) yet, record it
         if ((int)$pl['adv_eval_count'] === 0) {
             $evIns = $pdo->prepare("
                 INSERT INTO Evaluation (
-                    placement_id, evaluator_type, evaluator_name,
+                    placement_id, instrument_type, evaluator_type, evaluator_name,
                     technical_score, attitude_score, attendance_score, rating,
                     comments, date_evaluated
                 ) VALUES (
-                    :pid, 'adviser', :ename,
+                    :pid, 'adviser_to_hte', 'adviser', :ename,
                     4.95, 4.95, 5.00, 4.97,
-                    'Satisfied all BS CpE OJT practicum competencies, technical deliverables, and DTR hour requirements. Endorsed for institutional clearance.',
+                    'Satisfied all BS CpE OJT practicum competencies, HTE quality standards, and DTR hour requirements. Endorsed by Faculty Adviser.',
                     :dt
                 )
             ");
@@ -1772,12 +1945,27 @@ try {
             ]);
         }
 
-        // 4. Synchronize ComplianceReport and mark completed
+        // 4. Synchronize ComplianceReport across all 4 required instruments + hours
         Database::syncCompliance($pdo, $placementId);
+
+        $crStmt = $pdo->prepare('SELECT * FROM vw_placement_progress WHERE placement_id = :pid');
+        $crStmt->execute([':pid' => $placementId]);
+        $crRow = $crStmt->fetch();
+        $isCleared = $crRow && (int)($crRow['requirement_met'] ?? 0) === 1;
+        $missing = [];
+        if ($crRow) {
+            if (!(int)($crRow['has_employer_eval'] ?? 0)) $missing[] = 'INST-02 (Supervisor Evaluation or Signed Scan)';
+            if (!(int)($crRow['has_adviser_eval'] ?? 0)) $missing[] = 'INST-03 (Adviser HTE Audit)';
+            if (!(int)($crRow['has_student_supervisor_eval'] ?? 0)) $missing[] = 'INST-01 (Student -> Supervisor)';
+            if (!(int)($crRow['has_student_adviser_eval'] ?? 0)) $missing[] = 'INST-04 (Student -> Adviser)';
+        }
 
         jsonResponse([
             'ok'      => true,
-            'message' => 'Student placement endorsed and cleared for OJT completion.',
+            'cleared' => $isCleared,
+            'message' => $isCleared
+                ? 'Student placement endorsed and cleared across all 4 evaluation instruments and hours.'
+                : 'Hours and Faculty Audit (INST-03) endorsed. Final clearance remains pending: ' . implode(', ', $missing) . '.',
         ]);
     }
 

@@ -42,7 +42,7 @@ export function IconBrandLogo({ size = 28, className = '' }) {
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 256 256"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
@@ -50,43 +50,32 @@ export function IconBrandLogo({ size = 28, className = '' }) {
       role="img"
       aria-label="Practicly Emblem"
     >
-      <defs>
-        <linearGradient id="practiclyBg" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0b57d0" />
-          <stop offset="50%" stopColor="#1a73e8" />
-          <stop offset="100%" stopColor="#0b57d0" />
-        </linearGradient>
-        <linearGradient id="practiclyStem" x1="18" y1="48" x2="25" y2="16" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#c2e7ff" />
-          <stop offset="100%" stopColor="#ffffff" />
-        </linearGradient>
-        <linearGradient id="practiclyArc" x1="22" y1="16" x2="48" y2="38" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="60%" stopColor="#c2e7ff" />
-          <stop offset="100%" stopColor="#7cacf8" />
-        </linearGradient>
-        <filter id="practiclyShadow" x="0" y="0" width="64" height="64" filterUnits="userSpaceOnUse">
-          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0b57d0" floodOpacity="0.25" />
-        </filter>
-      </defs>
-
-      <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#practiclyBg)" filter="url(#practiclyShadow)" />
-      <rect x="4" y="4" width="56" height="56" rx="16" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-
-      {/* Pillar: Classroom Theory (Academic Foundation) */}
-      <rect x="18" y="16" width="7" height="32" rx="3.5" fill="url(#practiclyStem)" />
-
-      {/* Loop: Real-World Experience (Forward Trajectory Arc) */}
+      <title>Practicly Emblem</title>
+      {/* Left vertical stem (academic foundation) */}
       <path
-        d="M21.5 16H34C40.6274 16 46 21.3726 46 28C46 34.6274 40.6274 40 34 40H22"
-        stroke="url(#practiclyArc)"
-        strokeWidth="6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        fill="var(--practicly-logo-stem, #0B57D0)"
+        d="M 35 72 L 37 70 L 87 70 L 87 218 A 18 18 0 0 1 69 236 L 53 236 A 18 18 0 0 1 35 218 Z"
       />
-
-      <circle cx="34" cy="28" r="3.5" fill="#ffffff" />
-      <circle cx="34" cy="28" r="1.8" fill="#0b57d0" />
+      {/* Lower horizontal return bridge (verified completion) */}
+      <path
+        fill="var(--practicly-logo-bridge, #00796B)"
+        d="M 35 132 L 143 132 L 143 184 L 35 184 Z"
+      />
+      {/* Continuous upper bar + 180-deg outer C-arch (real-world trajectory) */}
+      <path
+        fill="var(--practicly-logo-arch, #0097E6)"
+        d="M 87 20 L 139 20 A 82 82 0 0 1 139 184 L 139 132 A 30 30 0 0 0 139 72 L 85 72 L 85 22 Z"
+      />
+      {/* Top-left 45-deg folded corner crease */}
+      <path
+        fill="var(--practicly-logo-fold, #083D99)"
+        d="M 35 72 L 87 20 L 87 72 Z"
+      />
+      {/* Lower stem-bridge overlap fold */}
+      <path
+        fill="var(--practicly-logo-fold, #083D99)"
+        d="M 35 132 L 87 132 L 87 184 L 35 184 Z"
+      />
     </svg>
   );
 }

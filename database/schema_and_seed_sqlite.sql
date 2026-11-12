@@ -124,6 +124,11 @@ CREATE TABLE Placement (
     signed_dtr_uploaded_at DATETIME DEFAULT NULL,
     signed_dtr_notes TEXT DEFAULT NULL,
     signed_dtr_data MEDIUMTEXT DEFAULT NULL,
+    signed_eval_file TEXT DEFAULT NULL,
+    signed_eval_filename TEXT DEFAULT NULL,
+    signed_eval_uploaded_at DATETIME DEFAULT NULL,
+    signed_eval_notes TEXT DEFAULT NULL,
+    signed_eval_data MEDIUMTEXT DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -188,6 +193,8 @@ CREATE TABLE ComplianceReport (
     requirement_met INTEGER NOT NULL DEFAULT 0 CHECK(requirement_met IN (0, 1)),
     has_employer_eval INTEGER NOT NULL DEFAULT 0 CHECK(has_employer_eval IN (0, 1)),
     has_adviser_eval INTEGER NOT NULL DEFAULT 0 CHECK(has_adviser_eval IN (0, 1)),
+    has_student_supervisor_eval INTEGER NOT NULL DEFAULT 0 CHECK(has_student_supervisor_eval IN (0, 1)),
+    has_student_adviser_eval INTEGER NOT NULL DEFAULT 0 CHECK(has_student_adviser_eval IN (0, 1)),
     average_rating REAL NULL,
     clearance_reference TEXT NULL,
     generated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -204,8 +211,9 @@ CREATE TRIGGER trg_timelog_after_insert AFTER INSERT ON TimeLog
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     )
     SELECT
         p.placement_id,
@@ -213,15 +221,37 @@ BEGIN
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
                  AND p.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
         (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
                  AND p.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
             ELSE NULL
         END,
@@ -233,6 +263,8 @@ BEGIN
         requirement_met = excluded.requirement_met,
         has_employer_eval = excluded.has_employer_eval,
         has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
         average_rating = excluded.average_rating,
         clearance_reference = excluded.clearance_reference,
         generated_date = DATETIME('now');
@@ -250,8 +282,9 @@ CREATE TRIGGER trg_timelog_after_update AFTER UPDATE ON TimeLog
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     )
     SELECT
         p.placement_id,
@@ -259,15 +292,37 @@ BEGIN
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
                  AND p.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
         (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
                  AND p.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
             ELSE NULL
         END,
@@ -279,6 +334,8 @@ BEGIN
         requirement_met = excluded.requirement_met,
         has_employer_eval = excluded.has_employer_eval,
         has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
         average_rating = excluded.average_rating,
         clearance_reference = excluded.clearance_reference,
         generated_date = DATETIME('now');
@@ -296,8 +353,9 @@ CREATE TRIGGER trg_timelog_after_delete AFTER DELETE ON TimeLog
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     )
     SELECT
         p.placement_id,
@@ -305,16 +363,37 @@ BEGIN
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
                  AND p.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
         (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
             ELSE NULL
         END,
@@ -326,6 +405,8 @@ BEGIN
         requirement_met = excluded.requirement_met,
         has_employer_eval = excluded.has_employer_eval,
         has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
         average_rating = excluded.average_rating,
         clearance_reference = excluded.clearance_reference,
         generated_date = DATETIME('now');
@@ -343,26 +424,47 @@ CREATE TRIGGER trg_evaluation_after_insert AFTER INSERT ON Evaluation
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     )
     SELECT
         p.placement_id,
         COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
         (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
             ELSE NULL
         END,
@@ -374,6 +476,8 @@ BEGIN
         requirement_met = excluded.requirement_met,
         has_employer_eval = excluded.has_employer_eval,
         has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
         average_rating = excluded.average_rating,
         clearance_reference = excluded.clearance_reference,
         generated_date = DATETIME('now');
@@ -391,26 +495,47 @@ CREATE TRIGGER trg_evaluation_after_update AFTER UPDATE ON Evaluation
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     )
     SELECT
         p.placement_id,
         COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
         (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
             ELSE NULL
         END,
@@ -422,6 +547,8 @@ BEGIN
         requirement_met = excluded.requirement_met,
         has_employer_eval = excluded.has_employer_eval,
         has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
         average_rating = excluded.average_rating,
         clearance_reference = excluded.clearance_reference,
         generated_date = DATETIME('now');
@@ -439,26 +566,47 @@ CREATE TRIGGER trg_evaluation_after_delete AFTER DELETE ON Evaluation
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     )
     SELECT
         p.placement_id,
         COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
-        COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0),
         (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id),
         CASE
             WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) >= p.required_hours
-                 AND (SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id) > 0
                  AND p.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                     OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
             ELSE NULL
         END,
@@ -470,6 +618,8 @@ BEGIN
         requirement_met = excluded.requirement_met,
         has_employer_eval = excluded.has_employer_eval,
         has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
         average_rating = excluded.average_rating,
         clearance_reference = excluded.clearance_reference,
         generated_date = DATETIME('now');
@@ -487,31 +637,74 @@ CREATE TRIGGER trg_placement_after_insert AFTER INSERT ON Placement
 BEGIN
     INSERT INTO ComplianceReport (
         placement_id, total_hours_completed, requirement_met,
-        has_employer_eval, has_adviser_eval, average_rating,
-        clearance_reference, generated_date
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
     ) VALUES (
-        NEW.placement_id, 0.00, 0, 0, 0, NULL, NULL, DATETIME('now')
+        NEW.placement_id, 0.00, 0, 0, 0, 0, 0, NULL, NULL, DATETIME('now')
     );
 END;
 
 -- 8. Placement After Update Trigger
 CREATE TRIGGER trg_placement_after_update AFTER UPDATE ON Placement
 BEGIN
-    UPDATE ComplianceReport
-    SET requirement_met = CASE
-            WHEN total_hours_completed >= NEW.required_hours
+    INSERT INTO ComplianceReport (
+        placement_id, total_hours_completed, requirement_met,
+        has_employer_eval, has_adviser_eval,
+        has_student_supervisor_eval, has_student_adviser_eval,
+        average_rating, clearance_reference, generated_date
+    )
+    SELECT
+        NEW.placement_id,
+        COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = NEW.placement_id AND approval_status != 'flagged'), 0.00),
+        CASE
+            WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = NEW.placement_id AND approval_status != 'flagged'), 0.00) >= NEW.required_hours
                  AND NEW.status != 'dropped'
-            THEN 1
-            ELSE 0
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                     OR COALESCE(TRIM(NEW.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(NEW.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+            THEN 1 ELSE 0
         END,
-        clearance_reference = CASE
-            WHEN total_hours_completed >= NEW.required_hours
+        CASE
+            WHEN COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                 OR COALESCE(TRIM(NEW.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(NEW.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END,
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0),
+        COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0),
+        (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = NEW.placement_id),
+        CASE
+            WHEN COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = NEW.placement_id AND approval_status != 'flagged'), 0.00) >= NEW.required_hours
                  AND NEW.status != 'dropped'
+                 AND (
+                     COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                     OR COALESCE(TRIM(NEW.signed_eval_filename), '') != ''
+                     OR COALESCE(TRIM(NEW.signed_eval_file), '') != ''
+                 )
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
+                 AND COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = NEW.placement_id), 0) = 1
             THEN printf('MIT-CPE-CLR-2026-%04d', NEW.placement_id)
             ELSE NULL
         END,
-        generated_date = DATETIME('now')
-    WHERE placement_id = NEW.placement_id;
+        DATETIME('now')
+    ON CONFLICT(placement_id) DO UPDATE SET
+        total_hours_completed = excluded.total_hours_completed,
+        requirement_met = excluded.requirement_met,
+        has_employer_eval = excluded.has_employer_eval,
+        has_adviser_eval = excluded.has_adviser_eval,
+        has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+        has_student_adviser_eval = excluded.has_student_adviser_eval,
+        average_rating = excluded.average_rating,
+        clearance_reference = excluded.clearance_reference,
+        generated_date = DATETIME('now');
 END;
 
 -- =============================================================================
@@ -553,6 +746,11 @@ SELECT
     p.signed_dtr_uploaded_at,
     p.signed_dtr_notes,
     p.signed_dtr_data,
+    p.signed_eval_file,
+    p.signed_eval_filename,
+    p.signed_eval_uploaded_at,
+    p.signed_eval_notes,
+    p.signed_eval_data,
     COALESCE(tl_agg.total_hours_rendered, 0.00) AS total_hours_completed,
     CASE
         WHEN (p.required_hours - COALESCE(tl_agg.total_hours_rendered, 0.00)) > 0
@@ -569,14 +767,46 @@ SELECT
     COALESCE(tl_agg.log_count, 0) AS total_log_days,
     tl_agg.last_logged_date,
     COALESCE(ev_agg.eval_count, 0) AS evaluation_count,
-    COALESCE(ev_agg.has_employer_eval, 0) AS has_employer_eval,
+    COALESCE(ev_agg.has_online_employer_eval, 0) AS has_online_employer_eval,
+    CASE
+        WHEN COALESCE(TRIM(p.signed_eval_filename), '') != '' OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+        THEN 1 ELSE 0
+    END AS has_signed_eval,
+    CASE
+        WHEN COALESCE(ev_agg.has_online_employer_eval, 0) = 1
+             OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+             OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+        THEN 1 ELSE 0
+    END AS has_employer_eval,
     COALESCE(ev_agg.has_adviser_eval, 0) AS has_adviser_eval,
+    COALESCE(ev_agg.has_student_supervisor_eval, 0) AS has_student_supervisor_eval,
+    COALESCE(ev_agg.has_student_adviser_eval, 0) AS has_student_adviser_eval,
+    (
+        CASE
+            WHEN COALESCE(ev_agg.has_online_employer_eval, 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+            THEN 1 ELSE 0
+        END
+        + COALESCE(ev_agg.has_adviser_eval, 0)
+        + COALESCE(ev_agg.has_student_supervisor_eval, 0)
+        + COALESCE(ev_agg.has_student_adviser_eval, 0)
+    ) AS completed_instruments_count,
     ev_agg.employer_rating,
     ev_agg.adviser_rating,
+    ev_agg.student_supervisor_rating,
+    ev_agg.student_adviser_rating,
     ev_agg.average_rating,
     CASE
         WHEN COALESCE(tl_agg.total_hours_rendered, 0.00) >= p.required_hours
-             AND COALESCE(ev_agg.eval_count, 0) > 0
+             AND (
+                 COALESCE(ev_agg.has_online_employer_eval, 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+             )
+             AND COALESCE(ev_agg.has_adviser_eval, 0) = 1
+             AND COALESCE(ev_agg.has_student_supervisor_eval, 0) = 1
+             AND COALESCE(ev_agg.has_student_adviser_eval, 0) = 1
              AND p.status != 'dropped'
         THEN 1
         ELSE 0
@@ -601,10 +831,14 @@ LEFT JOIN (
     SELECT
         placement_id,
         COUNT(eval_id) AS eval_count,
-        MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) AS has_employer_eval,
-        MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) AS has_adviser_eval,
-        MAX(CASE WHEN evaluator_type = 'employer' THEN rating ELSE NULL END) AS employer_rating,
-        MAX(CASE WHEN evaluator_type = 'adviser' THEN rating ELSE NULL END) AS adviser_rating,
+        MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) AS has_online_employer_eval,
+        MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) AS has_adviser_eval,
+        MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) AS has_student_supervisor_eval,
+        MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) AS has_student_adviser_eval,
+        MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN rating ELSE NULL END) AS employer_rating,
+        MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN rating ELSE NULL END) AS adviser_rating,
+        MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN rating ELSE NULL END) AS student_supervisor_rating,
+        MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN rating ELSE NULL END) AS student_adviser_rating,
         ROUND(AVG(rating), 2) AS average_rating
     FROM Evaluation
     GROUP BY placement_id
@@ -1001,35 +1235,55 @@ INSERT INTO TimeLog (placement_id, date, time_in, time_out, break_minutes, hours
 (24, '2026-09-25', '08:00:00', '17:00:00', 60, 40.00, 'Week 7 Consolidated Block: Resolved 6 CTS (Compatibility Test Suite) camera test cases.', 'approved'),
 (24, '2026-11-05', '08:00:00', '17:00:00', 60, 12.00, 'Completed final HAL benchmark comparisons and technical slide deck.', 'approved');
 
--- 7. Seed 27 Performance Evaluations
-INSERT INTO Evaluation (eval_id, placement_id, evaluator_type, evaluator_name, technical_score, attitude_score, attendance_score, rating, comments, date_evaluated) VALUES
-(1,  1,  'employer', 'Engr. Paolo M. Sarmiento (Accenture)',          4.90, 5.00, 4.95, 4.95, 'Kian demonstrated exceptional mastery of React architecture, state management, and accessible UI engineering. Delivered production-ready dashboards ahead of schedule.', '2026-10-28'),
-(2,  1,  'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.90, 4.95, 5.00, 4.95, 'All weekly accomplishment logs and DTR sheets were submitted promptly with comprehensive technical documentation. Cleared for OJT completion.', '2026-10-30'),
-(3,  2,  'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           5.00, 4.90, 4.95, 4.95, 'Emmanuel designed highly optimized SQL queries, stored procedures, and REST endpoints. His relational schema work directly improved our reporting pipeline.', '2026-10-27'),
-(4,  2,  'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 4.90, 5.00, 4.95, 'Outstanding backend engineering performance and complete compliance requirements. Highly recommended for clearance.', '2026-10-30'),
-(5,  3,  'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.85, 5.00, 4.90, 4.92, 'Sophia produced meticulous system documentation, UAT test matrices, and QA reports. She only needs 16 more hours to complete her 300-hour practicum.', '2026-11-04'),
-(6,  6,  'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.95, 5.00, 4.97, 'Clarisse showed strong analytical rigor in RTL verification and scripting automation. Exceeded expectations for an undergraduate intern.', '2026-10-26'),
-(7,  6,  'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 5.00, 5.00, 4.97, 'Completed 310 hours with exemplary evaluations from Samsung R&D. Approved for final OJT clearance.', '2026-10-29'),
-(8,  9,  'employer', 'Engr. Roberto V. Salazar (Texas Instruments)',  4.90, 4.95, 5.00, 4.95, 'Justine quickly grasped ATE mixed-signal test programming and STDF data analytics, reducing probe test overhead by 14%.', '2026-10-27'),
-(9,  9,  'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.85, 4.95, 5.00, 4.93, 'Verified 308 hours of semiconductor test engineering practicum at Texas Instruments. Endorsed for institutional clearance.', '2026-10-29'),
-(10, 10, 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    5.00, 4.95, 4.95, 4.97, 'Bea delivered production-grade idempotency middleware and k6 load testing scripts for our payment gateway squad.', '2026-10-28'),
-(11, 10, 'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 5.00, 4.95, 4.97, 'Exemplary FinTech software engineering practicum portfolio and complete DTR records. Cleared.', '2026-10-30'),
-(12, 12, 'employer', 'Engr. Hideki K. Taniguchi (Rohm Electronics)',  4.85, 4.95, 5.00, 4.93, 'Hannah demonstrated high precision in CMOS analog layout, DRC/LVS verification, and parasitic extraction.', '2026-10-28'),
-(13, 12, 'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.90, 4.90, 5.00, 4.93, 'All 305 hours and LSI layout deliverables verified. Approved for final OJT clearance.', '2026-10-30'),
-(14, 13, 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.80, 4.90, 4.95, 4.88, 'John Paul contributed across both Next.js and NestJS microservices with strong automated test coverage.', '2026-11-02'),
-(15, 13, 'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'Completed 300 hours of full-stack cloud native development with complete documentation. Cleared.', '2026-11-04'),
-(16, 14, 'employer', 'Engr. Victor M. Manansala (Trend Micro)',       5.00, 4.95, 5.00, 4.98, 'Angelica authored 18 high-accuracy YARA detection rules and automated IOC enrichment tools for our threat hunting lab.', '2026-10-27'),
-(17, 14, 'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.95, 5.00, 5.00, 4.98, 'Exceptional cybersecurity research performance and complete 304-hour DTR compliance. Cleared with distinction.', '2026-10-29'),
-(18, 16, 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    4.90, 4.90, 4.95, 4.92, 'Danielle built reliable Terraform and ArgoCD GitOps pipelines and improved our Kubernetes autoscaling playbooks.', '2026-10-28'),
-(19, 16, 'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 4.95, 4.95, 4.93, 'Satisfied all 300 required hours and SRE competency milestones. Endorsed for clearance.', '2026-10-30'),
-(20, 18, 'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           4.85, 4.95, 4.90, 4.90, 'Trisha designed clean dimensional schemas and automated data quality checks that strengthened our analytics pipeline.', '2026-10-28'),
-(21, 18, 'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'All 300 practicum hours and data engineering deliverables verified. Cleared for graduation requirements.', '2026-10-30'),
-(22, 20, 'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.90, 4.95, 4.95, 4.93, 'Alyssa automated 45 end-to-end Cypress regression specs and significantly improved nightly build stability.', '2026-10-29'),
-(23, 20, 'adviser',  'Engr. Christian Paul D. Vergara, MSc',          4.90, 4.90, 5.00, 4.93, 'Completed 304 hours with strong QA automation output. Approved for OJT clearance.', '2026-10-30'),
-(24, 11, 'employer', 'Engr. Dennis A. Villareal (Smart / PLDT)',      4.80, 4.90, 4.85, 4.85, 'Mid-term evaluation: Raphael is performing very well in 5G core and optical transport validation.', '2026-10-30'),
-(25, 17, 'employer', 'Engr. Teresa L. Valenzuela (Analog Devices)',   4.90, 4.85, 4.95, 4.90, 'Mid-term evaluation: Christian demonstrated strong Verilog HDL and Vivado timing closure skills.', '2026-11-02'),
-(26, 22, 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.90, 5.00, 4.95, 4.95, 'Samantha built our reusable React component library and Storybook documentation; only 24 hours remaining.', '2026-11-03'),
-(27, 24, 'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.90, 4.95, 4.93, 'Katrina resolved 6 Android CTS camera test cases and optimized HAL3 frame latency; 8 hours remaining.', '2026-11-04');
+-- 7. Seed Performance Evaluations (with explicit instrument_type across all 4 OJT instruments)
+INSERT INTO Evaluation (eval_id, placement_id, instrument_type, evaluator_type, evaluator_name, technical_score, attitude_score, attendance_score, rating, comments, date_evaluated) VALUES
+(1,  1,  'supervisor_to_student', 'employer', 'Engr. Paolo M. Sarmiento (Accenture)',          4.90, 5.00, 4.95, 4.95, 'Kian demonstrated exceptional mastery of React architecture, state management, and accessible UI engineering. Delivered production-ready dashboards ahead of schedule.', '2026-10-28'),
+(2,  1,  'adviser_to_hte',        'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.90, 4.95, 5.00, 4.95, 'All weekly accomplishment logs and DTR sheets were submitted promptly with comprehensive technical documentation. HTE supervision verified.', '2026-10-30'),
+(3,  2,  'supervisor_to_student', 'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           5.00, 4.90, 4.95, 4.95, 'Emmanuel designed highly optimized SQL queries, stored procedures, and REST endpoints. His relational schema work directly improved our reporting pipeline.', '2026-10-27'),
+(4,  2,  'adviser_to_hte',        'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 4.90, 5.00, 4.95, 'Outstanding backend engineering performance and complete compliance requirements. Highly recommended for clearance.', '2026-10-30'),
+(5,  3,  'supervisor_to_student', 'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.85, 5.00, 4.90, 4.92, 'Sophia produced meticulous system documentation, UAT test matrices, and QA reports. She only needs 16 more hours to complete her 300-hour practicum.', '2026-11-04'),
+(6,  6,  'supervisor_to_student', 'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.95, 5.00, 4.97, 'Clarisse showed strong analytical rigor in RTL verification and scripting automation. Exceeded expectations for an undergraduate intern.', '2026-10-26'),
+(7,  6,  'adviser_to_hte',        'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 5.00, 5.00, 4.97, 'Completed 310 hours with exemplary evaluations from Samsung R&D. Approved for final OJT clearance.', '2026-10-29'),
+(8,  9,  'supervisor_to_student', 'employer', 'Engr. Roberto V. Salazar (Texas Instruments)',  4.90, 4.95, 5.00, 4.95, 'Justine quickly grasped ATE mixed-signal test programming and STDF data analytics, reducing probe test overhead by 14%.', '2026-10-27'),
+(9,  9,  'adviser_to_hte',        'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.85, 4.95, 5.00, 4.93, 'Verified 308 hours of semiconductor test engineering practicum at Texas Instruments. Endorsed for institutional clearance.', '2026-10-29'),
+(10, 10, 'supervisor_to_student', 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    5.00, 4.95, 4.95, 4.97, 'Bea delivered production-grade idempotency middleware and k6 load testing scripts for our payment gateway squad.', '2026-10-28'),
+(11, 10, 'adviser_to_hte',        'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 5.00, 4.95, 4.97, 'Exemplary FinTech software engineering practicum portfolio and complete DTR records. Cleared.', '2026-10-30'),
+(12, 12, 'supervisor_to_student', 'employer', 'Engr. Hideki K. Taniguchi (Rohm Electronics)',  4.85, 4.95, 5.00, 4.93, 'Hannah demonstrated high precision in CMOS analog layout, DRC/LVS verification, and parasitic extraction.', '2026-10-28'),
+(13, 12, 'adviser_to_hte',        'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.90, 4.90, 5.00, 4.93, 'All 305 hours and LSI layout deliverables verified. Approved for final OJT clearance.', '2026-10-30'),
+(14, 13, 'supervisor_to_student', 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.80, 4.90, 4.95, 4.88, 'John Paul contributed across both Next.js and NestJS microservices with strong automated test coverage.', '2026-11-02'),
+(15, 13, 'adviser_to_hte',        'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'Completed 300 hours of full-stack cloud native development with complete documentation. Cleared.', '2026-11-04'),
+(16, 14, 'supervisor_to_student', 'employer', 'Engr. Victor M. Manansala (Trend Micro)',       5.00, 4.95, 5.00, 4.98, 'Angelica authored 18 high-accuracy YARA detection rules and automated IOC enrichment tools for our threat hunting lab.', '2026-10-27'),
+(17, 14, 'adviser_to_hte',        'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.95, 5.00, 5.00, 4.98, 'Exceptional cybersecurity research performance and complete 304-hour DTR compliance. Cleared with distinction.', '2026-10-29'),
+(18, 16, 'supervisor_to_student', 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    4.90, 4.90, 4.95, 4.92, 'Danielle built reliable Terraform and ArgoCD GitOps pipelines and improved our Kubernetes autoscaling playbooks.', '2026-10-28'),
+(19, 16, 'adviser_to_hte',        'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 4.95, 4.95, 4.93, 'Satisfied all 300 required hours and SRE competency milestones. Endorsed for clearance.', '2026-10-30'),
+(20, 18, 'supervisor_to_student', 'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           4.85, 4.95, 4.90, 4.90, 'Trisha designed clean dimensional schemas and automated data quality checks that strengthened our analytics pipeline.', '2026-10-28'),
+(21, 18, 'adviser_to_hte',        'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'All 300 practicum hours and data engineering deliverables verified. Cleared for graduation requirements.', '2026-10-30'),
+(22, 20, 'supervisor_to_student', 'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.90, 4.95, 4.95, 4.93, 'Alyssa automated 45 end-to-end Cypress regression specs and significantly improved nightly build stability.', '2026-10-29'),
+(23, 20, 'adviser_to_hte',        'adviser',  'Engr. Christian Paul D. Vergara, MSc',          4.90, 4.90, 5.00, 4.93, 'Completed 304 hours with strong QA automation output. Approved for OJT clearance.', '2026-10-30'),
+(24, 11, 'supervisor_to_student', 'employer', 'Engr. Dennis A. Villareal (Smart / PLDT)',      4.80, 4.90, 4.85, 4.85, 'Mid-term evaluation: Raphael is performing very well in 5G core and optical transport validation.', '2026-10-30'),
+(25, 17, 'supervisor_to_student', 'employer', 'Engr. Teresa L. Valenzuela (Analog Devices)',   4.90, 4.85, 4.95, 4.90, 'Mid-term evaluation: Christian demonstrated strong Verilog HDL and Vivado timing closure skills.', '2026-11-02'),
+(26, 22, 'supervisor_to_student', 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.90, 5.00, 4.95, 4.95, 'Samantha built our reusable React component library and Storybook documentation; only 24 hours remaining.', '2026-11-03'),
+(27, 24, 'supervisor_to_student', 'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.90, 4.95, 4.93, 'Katrina resolved 6 Android CTS camera test cases and optimized HAL3 frame latency; 8 hours remaining.', '2026-11-04'),
+(28, 2,  'student_to_supervisor', 'student',  'Calangian, Emmanuel G.',                        4.95, 4.90, 5.00, 4.95, 'Mr. Carlo J. Pangilinan provided clear architecture reviews and backend optimization mentorship.', '2026-10-28'),
+(29, 2,  'student_to_adviser',    'student',  'Calangian, Emmanuel G.',                        4.95, 4.95, 5.00, 4.97, 'Engr. Dela Cruz guided all DTR deliverables and capstone alignment weekly.', '2026-10-28'),
+(30, 6,  'student_to_supervisor', 'student',  'Villanueva, Clarisse Anne T.',                  4.95, 5.00, 4.95, 4.97, 'Dr. Kenneth Y. Lim mentored RTL verification best practices consistently.', '2026-10-28'),
+(31, 6,  'student_to_adviser',    'student',  'Villanueva, Clarisse Anne T.',                  4.95, 4.95, 5.00, 4.97, 'Dr. Bautista monitored progress closely and checked laboratory reports promptly.', '2026-10-28'),
+(32, 9,  'student_to_supervisor', 'student',  'Alcantara, Justine Mark D.',                    4.90, 4.95, 4.95, 4.93, 'Engr. Salazar provided hands-on ATE probe instrumentation coaching.', '2026-10-28'),
+(33, 9,  'student_to_adviser',    'student',  'Alcantara, Justine Mark D.',                    4.90, 4.95, 4.95, 4.93, 'Engr. Tolentino checked semiconductor compliance logs consistently.', '2026-10-28'),
+(34, 10, 'student_to_supervisor', 'student',  'Pascual, Bea Katrina S.',                       4.95, 4.95, 5.00, 4.97, 'Engr. Ilagan gave constructive API scalability feedback every sprint.', '2026-10-29'),
+(35, 10, 'student_to_adviser',    'student',  'Pascual, Bea Katrina S.',                       4.95, 4.95, 5.00, 4.97, 'Engr. Dela Cruz endorsed verification milestones on schedule.', '2026-10-29'),
+(36, 12, 'student_to_supervisor', 'student',  'Evangelista, Hannah Camille B.',                4.90, 4.95, 4.95, 4.93, 'Engr. Taniguchi taught strict DRC/LVS verification workflows.', '2026-10-29'),
+(37, 12, 'student_to_adviser',    'student',  'Evangelista, Hannah Camille B.',                4.90, 4.90, 5.00, 4.93, 'Engr. Tolentino supported HTE coordination throughout the term.', '2026-10-29'),
+(38, 13, 'student_to_supervisor', 'student',  'Bautista, John Paul V.',                        4.85, 4.90, 4.95, 4.90, 'Ms. Policarpio guided full-stack PR reviews and CI pipelines.', '2026-11-03'),
+(39, 13, 'student_to_adviser',    'student',  'Bautista, John Paul V.',                        4.85, 4.90, 4.95, 4.90, 'Dr. Macapagal provided clear practicum documentation guidance.', '2026-11-03'),
+(40, 14, 'student_to_supervisor', 'student',  'Castillo, Angelica Joy M.',                     4.95, 5.00, 5.00, 4.98, 'Engr. Manansala shared threat hunting workflows and YARA feedback.', '2026-10-28'),
+(41, 14, 'student_to_adviser',    'student',  'Castillo, Angelica Joy M.',                     4.95, 4.95, 5.00, 4.97, 'Dr. Macapagal validated research milestones and compliance reports.', '2026-10-28'),
+(42, 16, 'student_to_supervisor', 'student',  'Aquino, Danielle Faith R.',                     4.90, 4.90, 4.95, 4.92, 'Engr. Ilagan reviewed Kubernetes IaC rollouts thoroughly.', '2026-10-29'),
+(43, 16, 'student_to_adviser',    'student',  'Aquino, Danielle Faith R.',                     4.90, 4.95, 4.95, 4.93, 'Dr. Bautista checked HTE site visits and attendance verification.', '2026-10-29'),
+(44, 18, 'student_to_supervisor', 'student',  'Ocampo, Trisha Nicole G.',                      4.90, 4.95, 4.90, 4.92, 'Mr. Pangilinan structured weekly ETL quality walkthroughs.', '2026-10-29'),
+(45, 18, 'student_to_adviser',    'student',  'Ocampo, Trisha Nicole G.',                      4.90, 4.90, 4.95, 4.92, 'Dr. Macapagal confirmed endorsement readiness ahead of deadline.', '2026-10-29'),
+(46, 20, 'student_to_supervisor', 'student',  'Mercado, Alyssa Marie F.',                      4.90, 4.95, 4.95, 4.93, 'Ms. Soriano coached Cypress regression design and QA triaging.', '2026-10-29'),
+(47, 20, 'student_to_adviser',    'student',  'Mercado, Alyssa Marie F.',                      4.90, 4.90, 5.00, 4.93, 'Engr. Vergara guided weekly accomplishment reviews effectively.', '2026-10-29');
 
 -- 8. Synchronize Initial ComplianceReport Records (24 Rows)
 INSERT INTO ComplianceReport (
@@ -1038,6 +1292,8 @@ INSERT INTO ComplianceReport (
     requirement_met,
     has_employer_eval,
     has_adviser_eval,
+    has_student_supervisor_eval,
+    has_student_adviser_eval,
     average_rating,
     clearance_reference,
     generated_date
@@ -1047,17 +1303,38 @@ SELECT
     COALESCE(tl_agg.total_hours, 0.00) AS total_hours_completed,
     CASE
         WHEN COALESCE(tl_agg.total_hours, 0.00) >= p.required_hours
-             AND COALESCE(ev_agg.eval_count, 0) > 0
+             AND (
+                 COALESCE(ev_agg.has_emp, 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+             )
+             AND COALESCE(ev_agg.has_adv, 0) = 1
+             AND COALESCE(ev_agg.has_stu_sup, 0) = 1
+             AND COALESCE(ev_agg.has_stu_adv, 0) = 1
              AND p.status != 'dropped'
         THEN 1
         ELSE 0
     END AS requirement_met,
-    COALESCE(ev_agg.has_emp, 0) AS has_employer_eval,
+    CASE
+        WHEN COALESCE(ev_agg.has_emp, 0) = 1
+             OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+             OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+        THEN 1 ELSE 0
+    END AS has_employer_eval,
     COALESCE(ev_agg.has_adv, 0) AS has_adviser_eval,
+    COALESCE(ev_agg.has_stu_sup, 0) AS has_student_supervisor_eval,
+    COALESCE(ev_agg.has_stu_adv, 0) AS has_student_adviser_eval,
     ev_agg.avg_rating AS average_rating,
     CASE
         WHEN COALESCE(tl_agg.total_hours, 0.00) >= p.required_hours
-             AND COALESCE(ev_agg.eval_count, 0) > 0
+             AND (
+                 COALESCE(ev_agg.has_emp, 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+             )
+             AND COALESCE(ev_agg.has_adv, 0) = 1
+             AND COALESCE(ev_agg.has_stu_sup, 0) = 1
+             AND COALESCE(ev_agg.has_stu_adv, 0) = 1
              AND p.status != 'dropped'
         THEN printf('MIT-CPE-CLR-2026-%04d', p.placement_id)
         ELSE NULL
@@ -1074,8 +1351,10 @@ LEFT JOIN (
     SELECT
         placement_id,
         COUNT(*) AS eval_count,
-        MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) AS has_emp,
-        MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) AS has_adv,
+        MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) AS has_emp,
+        MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) AS has_adv,
+        MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) AS has_stu_sup,
+        MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) AS has_stu_adv,
         ROUND(AVG(rating), 2) AS avg_rating
     FROM Evaluation
     GROUP BY placement_id
@@ -1085,12 +1364,16 @@ ON CONFLICT(placement_id) DO UPDATE SET
     requirement_met = excluded.requirement_met,
     has_employer_eval = excluded.has_employer_eval,
     has_adviser_eval = excluded.has_adviser_eval,
+    has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+    has_student_adviser_eval = excluded.has_student_adviser_eval,
     average_rating = excluded.average_rating,
     clearance_reference = excluded.clearance_reference,
     generated_date = excluded.generated_date;
 
 -- Ensure Placement completion status matches compliance
 UPDATE Placement
-SET status = 'completed'
-WHERE placement_id IN (SELECT placement_id FROM ComplianceReport WHERE requirement_met = 1)
-  AND status != 'dropped';
+SET status = CASE
+    WHEN placement_id IN (SELECT placement_id FROM ComplianceReport WHERE requirement_met = 1) THEN 'completed'
+    ELSE 'ongoing'
+END
+WHERE status != 'dropped';

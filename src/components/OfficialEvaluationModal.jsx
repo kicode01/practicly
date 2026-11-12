@@ -12,32 +12,70 @@ import {
   IconSupervisor,
   IconCheck
 } from './Icons';
-import { EVALUATION_INSTRUMENTS, getInterpretation } from '../utils/evaluationRubrics';
+import {
+  EVALUATION_INSTRUMENTS,
+  getInstrumentsForRole,
+  getInterpretation,
+} from '../utils/evaluationRubrics';
+import SessionSignatureControl, {
+  PrintableSignatoryBlock,
+  useSessionSignature,
+} from './SessionSignatureControl';
+
+const SIGNATORY_ROLE_SLOTS = {
+  supervisor_to_student: ['supervisor', 'adviser'],
+  student_to_supervisor: ['student', 'adviser'],
+  adviser_to_hte: ['adviser', 'admin'],
+  student_to_adviser: ['student', 'admin'],
+};
 
 export default function OfficialEvaluationModal({
   isOpen,
   onClose,
   placements = [],
+  evaluations = [],
   currentUser,
   onSuccess,
-  existingEvaluation = null,
+  initialInstrumentId = null,
+  forcedInstrumentId = null,
+  onOpenSignedEvalUpload = null,
 }) {
-  const [selectedInstrumentId, setSelectedInstrumentId] = useState('supervisor_to_student');
+  const userRole = currentUser?.role || 'admin';
+  const userId = currentUser?.user_id || currentUser?.linked_id || userRole;
+  const activeSignature = useSessionSignature(userRole, userId);
+
+  const visibleInstruments = useMemo(() => {
+    if (forcedInstrumentId) {
+      const forced = EVALUATION_INSTRUMENTS.find((i) => i.id === forcedInstrumentId);
+      return forced ? [forced] : getInstrumentsForRole(userRole);
+    }
+    return getInstrumentsForRole(userRole);
+  }, [userRole, forcedInstrumentId]);
+
+  const isBlankPrintMode = Boolean(forcedInstrumentId && userRole === 'student');
+
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState(
+    () => visibleInstruments[0]?.id || 'supervisor_to_student'
+  );
   const [selectedPlacementId, setSelectedPlacementId] = useState(
     placements[0]?.placement_id ? String(placements[0].placement_id) : '1'
   );
 
   useEffect(() => {
-    if (isOpen) {
-      if (currentUser?.role === 'student') {
-        setSelectedInstrumentId('student_to_supervisor');
-      } else if (currentUser?.role === 'adviser') {
-        setSelectedInstrumentId('adviser_to_hte');
-      } else if (currentUser?.role === 'supervisor') {
-        setSelectedInstrumentId('supervisor_to_student');
-      }
+    if (!isOpen) return;
+    if (forcedInstrumentId) {
+      setSelectedInstrumentId(forcedInstrumentId);
+      return;
     }
-  }, [isOpen, currentUser?.role]);
+    if (
+      initialInstrumentId &&
+      visibleInstruments.some((inst) => inst.id === initialInstrumentId)
+    ) {
+      setSelectedInstrumentId(initialInstrumentId);
+      return;
+    }
+    setSelectedInstrumentId(visibleInstruments[0]?.id || 'supervisor_to_student');
+  }, [isOpen, initialInstrumentId, forcedInstrumentId, visibleInstruments]);
 
   useEffect(() => {
     if (placements && placements.length > 0) {
@@ -56,10 +94,23 @@ export default function OfficialEvaluationModal({
 
   const activeInstrument = useMemo(() => {
     return (
+      visibleInstruments.find((i) => i.id === selectedInstrumentId) ||
       EVALUATION_INSTRUMENTS.find((i) => i.id === selectedInstrumentId) ||
+      visibleInstruments[0] ||
       EVALUATION_INSTRUMENTS[0]
     );
-  }, [selectedInstrumentId]);
+  }, [selectedInstrumentId, visibleInstruments]);
+
+  const existingRecord = useMemo(() => {
+    if (!activePlacement || !evaluations.length) return null;
+    return (
+      evaluations.find(
+        (ev) =>
+          String(ev.placement_id) === String(activePlacement.placement_id) &&
+          ev.instrument_type === activeInstrument.id
+      ) || null
+    );
+  }, [evaluations, activePlacement, activeInstrument]);
 
   // Scores state: Map of questionIndex => rating (1-5)
   const [scores, setScores] = useState({});
@@ -87,13 +138,52 @@ export default function OfficialEvaluationModal({
     return list;
   }, [activeInstrument]);
 
-  // Set default evaluator name and initial scores
+  // Set default evaluator name and initial scores (prefill from saved submission if present)
   useEffect(() => {
+    if (existingRecord) {
+      setEvaluatorName(existingRecord.evaluator_name || currentUser?.display_name || 'Authorized Evaluator');
+      setDateEvaluated(existingRecord.date_evaluated || new Date().toISOString().slice(0, 10));
+
+      let parsedCriteria = null;
+      if (existingRecord.criteria_scores) {
+        try {
+          parsedCriteria =
+            typeof existingRecord.criteria_scores === 'string'
+              ? JSON.parse(existingRecord.criteria_scores)
+              : existingRecord.criteria_scores;
+        } catch {
+          parsedCriteria = null;
+        }
+      }
+      const nextScores = {};
+      const fallbackScore = Math.max(1, Math.min(5, Math.round(Number(existingRecord.rating || 5))));
+      allItems.forEach((item) => {
+        nextScores[item.key] =
+          parsedCriteria && parsedCriteria[item.key]
+            ? Number(parsedCriteria[item.key])
+            : fallbackScore;
+      });
+      setScores(nextScores);
+
+      if (activeInstrument.id === 'adviser_to_hte') {
+        const raw = String(existingRecord.comments || '');
+        const sMatch = raw.match(/Strengths:\s*([^\n]*)/i);
+        const aMatch = raw.match(/Areas for Improvement:\s*([^\n]*)/i);
+        const rMatch = raw.match(/Recommendations:\s*([^\n]*)/i);
+        setStrengths(sMatch ? sMatch[1].trim() : raw);
+        setAreasImprovement(aMatch ? aMatch[1].trim() : '');
+        setRecommendations(rMatch ? rMatch[1].trim() : '');
+      } else {
+        setComments(existingRecord.comments || '');
+      }
+      return;
+    }
+
     if (activeInstrument.id === 'supervisor_to_student') {
       setEvaluatorName(
         currentUser?.role === 'supervisor'
           ? currentUser.display_name
-          : activePlacement?.company_contact_person || 'Engr. Marc Danielle Sison, Lead Engineer'
+          : activePlacement?.company_contact_person || 'HTE Workplace Supervisor'
       );
     } else if (activeInstrument.id === 'student_to_supervisor') {
       setEvaluatorName(
@@ -115,25 +205,27 @@ export default function OfficialEvaluationModal({
       );
     }
 
-    // Default all items to 5
     const initialScores = {};
     allItems.forEach((item) => {
-      initialScores[item.key] = 5;
+      initialScores[item.key] = isBlankPrintMode ? null : 5;
     });
     setScores(initialScores);
+    setDateEvaluated(new Date().toISOString().slice(0, 10));
 
     if (activeInstrument.id === 'adviser_to_hte') {
       setStrengths('Comprehensive engineering workstation setup, structured technical mentor oversight, and strong compliance with safety protocols.');
       setAreasImprovement('Provide earlier notice regarding shift rotation schedules during national holidays.');
       setRecommendations('Continue accredited Host Training Establishment partnership for upcoming BS Computer Engineering cohorts.');
+    } else if (isBlankPrintMode) {
+      setComments('');
     } else {
       setComments('Exemplary practicum performance with outstanding initiative and technical competence.');
     }
-  }, [activeInstrument, activePlacement, allItems, currentUser]);
+  }, [activeInstrument, activePlacement, allItems, currentUser, existingRecord, isBlankPrintMode]);
 
   // Compute live weighted mean
   const computedRating = useMemo(() => {
-    const values = Object.values(scores);
+    const values = Object.values(scores).filter((v) => v !== null && v !== undefined && Number(v) > 0);
     if (values.length === 0) return 5.0;
     const sum = values.reduce((acc, curr) => acc + Number(curr), 0);
     return parseFloat((sum / values.length).toFixed(2));
@@ -160,7 +252,7 @@ export default function OfficialEvaluationModal({
   // Submit to backend
   const handleSaveEvaluation = async (e) => {
     e.preventDefault();
-    if (!activePlacement) return;
+    if (!activePlacement || isBlankPrintMode) return;
 
     setIsSubmitting(true);
     let combinedComments = comments;
@@ -180,6 +272,7 @@ export default function OfficialEvaluationModal({
       comments: combinedComments,
       date_evaluated: dateEvaluated,
       criteria_scores: scores,
+      upsert: true,
     };
 
     try {
@@ -190,7 +283,9 @@ export default function OfficialEvaluationModal({
       });
       const json = await res.json();
       if (json.ok) {
-        if (onSuccess) onSuccess(`Recorded ${activeInstrument.name} (Score: ${computedRating.toFixed(2)}/5.00)`);
+        if (onSuccess) {
+          onSuccess(`${json.updated ? 'Updated' : 'Recorded'} ${activeInstrument.name} (Score: ${computedRating.toFixed(2)}/5.00)`);
+        }
         onClose();
       } else {
         alert(json.error || 'Failed to record evaluation.');
@@ -208,6 +303,8 @@ export default function OfficialEvaluationModal({
 
   if (!isOpen) return null;
 
+  const slotRoles = SIGNATORY_ROLE_SLOTS[activeInstrument.id] || ['supervisor', 'adviser'];
+
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div
@@ -222,9 +319,25 @@ export default function OfficialEvaluationModal({
               <IconEvaluation size={18} />
             </div>
             <div>
-              <div className="modal-title">Official OJT Evaluation Instruments &amp; Rubrics Hub</div>
+              <div className="modal-title">
+                {isBlankPrintMode
+                  ? 'Printable INST-02 HTE Supervisor Evaluation Form'
+                  : userRole === 'student'
+                  ? 'Student Evaluation Forms (INST-01 & INST-04)'
+                  : userRole === 'adviser'
+                  ? 'Faculty Adviser HTE Audit (INST-03)'
+                  : userRole === 'supervisor'
+                  ? 'HTE Supervisor Evaluation Form (INST-02)'
+                  : 'Official OJT Evaluation Instruments & Rubrics Hub'}
+              </div>
               <div className="modal-subtitle">
-                Institutional 360-degree evaluation forms (CHED Practicum Standards &amp; Quality Assurance)
+                {isBlankPrintMode
+                  ? 'Print cleanly for your HTE Training Supervisor wet-ink signature, then upload scanned proof'
+                  : userRole === 'student'
+                  ? 'Evaluate your HTE training supervisor (INST-01) and faculty OJT adviser (INST-04)'
+                  : userRole === 'adviser'
+                  ? 'Conduct the institutional Host Training Establishment (HTE) compliance & quality audit (INST-03)'
+                  : 'Institutional 360-degree evaluation forms (CHED Practicum Standards & Quality Assurance)'}
               </div>
             </div>
           </div>
@@ -233,10 +346,23 @@ export default function OfficialEvaluationModal({
           </button>
         </div>
 
-        {/* 4-WAY INSTRUMENT SELECTOR BAR */}
-        <div className="no-print" style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-default)', background: 'var(--bg-subtle)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-            {EVALUATION_INSTRUMENTS.map((inst) => {
+        {/* ROLE-SCOPED INSTRUMENT SELECTOR BAR */}
+        <div
+          className="no-print"
+          style={{
+            padding: '12px 24px',
+            borderBottom: '1px solid var(--border-default)',
+            background: 'var(--bg-subtle)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            className="eval-instrument-grid"
+            style={{ '--eval-tab-cols': Math.max(1, visibleInstruments.length) }}
+          >
+            {visibleInstruments.map((inst) => {
               const active = inst.id === selectedInstrumentId;
               return (
                 <button
@@ -257,25 +383,46 @@ export default function OfficialEvaluationModal({
               );
             })}
           </div>
+
+          {(existingRecord || (userRole === 'student' && onOpenSignedEvalUpload && !isBlankPrintMode)) && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+              <div>
+                {existingRecord && !isBlankPrintMode && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '3px 10px',
+                      borderRadius: '999px',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      color: '#047857',
+                    }}
+                  >
+                    Submitted on {existingRecord.date_evaluated} (Rating: {Number(existingRecord.rating).toFixed(2)}) · Saving updates existing record
+                  </span>
+                )}
+              </div>
+              {userRole === 'student' && onOpenSignedEvalUpload && !isBlankPrintMode && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs"
+                  onClick={() => {
+                    onClose();
+                    onOpenSignedEvalUpload();
+                  }}
+                >
+                  Upload Signed Supervisor INST-02 Scan
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* CONTROLS STRIP: PLACEMENT SELECTOR & COMPOSITE SCORE SUMMARY */}
-        <div
-          className="no-print"
-          style={{
-            padding: '12px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--bg-surface)',
-            borderBottom: '1px solid var(--border-default)',
-            gap: '20px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 360px', maxWidth: '520px' }}>
+        <div className="no-print eval-controls-strip">
+          <div className="eval-placement-group">
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Placement:</span>
-            <div style={{ flex: 1, minWidth: '240px' }}>
+            <div className="eval-placement-select-wrap">
               <MaterialSelect
                 className="select-sm"
                 value={selectedPlacementId}
@@ -291,29 +438,33 @@ export default function OfficialEvaluationModal({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weighted Mean</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand)' }} className="mono tabular-nums">
-                {computedRating.toFixed(2)}{' '}
-                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>/ 5.00</span>
-              </div>
-            </div>
+          <div className="eval-score-group">
+            {!isBlankPrintMode && (
+              <>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weighted Mean</div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand)' }} className="mono tabular-nums">
+                    {computedRating.toFixed(2)}{' '}
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>/ 5.00</span>
+                  </div>
+                </div>
 
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-pill)',
-                background: 'var(--success-bg, rgba(16, 185, 129, 0.12))',
-                color: 'var(--success-fg, #059669)',
-                border: '1px solid var(--success-border, rgba(16, 185, 129, 0.25))',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {interpretation.label}
-            </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-pill)',
+                    background: 'var(--success-bg, rgba(16, 185, 129, 0.12))',
+                    color: 'var(--success-fg, #059669)',
+                    border: '1px solid var(--success-border, rgba(16, 185, 129, 0.25))',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {interpretation.label}
+                </span>
+              </>
+            )}
 
             <button
               type="button"
@@ -322,7 +473,7 @@ export default function OfficialEvaluationModal({
               title="Print official paper form formatted with signature blocks"
             >
               <IconPrinter size={13} />
-              Print Form
+              {isBlankPrintMode ? 'Print Blank INST-02' : 'Print Form'}
             </button>
           </div>
         </div>
@@ -365,10 +516,8 @@ export default function OfficialEvaluationModal({
 
             {/* METADATA FORM BOX */}
             <div
+              className="modal-info-grid-2"
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '10px',
                 padding: '12px 14px',
                 background: 'var(--bg-subtle)',
                 borderRadius: 'var(--radius-md)',
@@ -398,19 +547,11 @@ export default function OfficialEvaluationModal({
             </div>
 
             {/* QUICK PRESET BUTTONS */}
-            <div
-              className="no-print"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px',
-              }}
-            >
+            <div className="no-print eval-preset-bar">
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 Rating Scale: 5 (Outstanding) · 4 (Very Satisfactory) · 3 (Satisfactory) · 2 (Fair) · 1 (Poor)
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div className="action-row-wrap" style={{ gap: '6px' }}>
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs"
@@ -559,33 +700,30 @@ export default function OfficialEvaluationModal({
               )}
             </div>
 
+            {!isBlankPrintMode && currentUser && (
+              <div style={{ marginTop: '16px' }}>
+                <SessionSignatureControl
+                  role={userRole}
+                  userId={userId}
+                  signerName={evaluatorName || currentUser.display_name}
+                />
+              </div>
+            )}
+
             {/* OFFICIAL SIGNATURE BLOCKS (PRINT READY) */}
-            <div
-              className="cert-signatures-eval"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '24px',
-                marginTop: '28px',
-                paddingTop: '16px',
-                borderTop: '1px solid var(--border-default)',
-              }}
-            >
-              {activeInstrument.signatories.map((sig, idx) => (
-                <div key={idx} style={{ textAlign: 'center' }}>
-                  <div
-                    style={{
-                      borderBottom: '1px solid var(--text-primary)',
-                      height: '36px',
-                      marginBottom: '4px',
-                    }}
+            <div className="cert-signatures-eval">
+              {activeInstrument.signatories.map((sig, idx) => {
+                const slotRole = slotRoles[idx];
+                return (
+                  <PrintableSignatoryBlock
+                    key={idx}
+                    printedName={sig.label}
+                    roleLabel={sig.role}
+                    signature={activeSignature}
+                    matchesRole={!isBlankPrintMode && userRole === slotRole}
                   />
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {sig.label}
-                  </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{sig.role}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -593,18 +731,24 @@ export default function OfficialEvaluationModal({
         {/* MODAL FOOTER */}
         <div className="modal-footer no-print" style={{ padding: '12px 24px', borderTop: '1px solid var(--border-default)' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>
-            Cancel
+            {isBlankPrintMode ? 'Close' : 'Cancel'}
           </button>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleSaveEvaluation}
-            disabled={isSubmitting}
-          >
-            <IconCheckCircle size={14} />
-            {isSubmitting ? 'Recording...' : `Record ${activeInstrument.shortTitle} (${computedRating.toFixed(2)})`}
-          </button>
+          {!isBlankPrintMode && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSaveEvaluation}
+              disabled={isSubmitting}
+            >
+              <IconCheckCircle size={14} />
+              {isSubmitting
+                ? 'Saving...'
+                : existingRecord
+                ? `Update ${activeInstrument.code} (${computedRating.toFixed(2)})`
+                : `Submit ${activeInstrument.code} (${computedRating.toFixed(2)})`}
+            </button>
+          )}
         </div>
       </div>
     </div>

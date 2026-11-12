@@ -74,12 +74,34 @@ class Database
         return $this->connectMysql($options);
     }
 
+    private function resolveSqlitePath(): string
+    {
+        $envPath = getenv('DB_SQLITE_PATH');
+        if ($envPath !== false && trim($envPath) !== '') {
+            $target = trim($envPath);
+            $dir = dirname($target);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0777, true);
+            }
+            if (!file_exists($target) || filesize($target) === 0) {
+                $bundled = realpath(__DIR__ . '/../../database/ojt_tracking.db');
+                if ($bundled && is_file($bundled) && filesize($bundled) > 0) {
+                    $tmpCopy = $target . '.tmp.' . getmypid();
+                    if (@copy($bundled, $tmpCopy)) {
+                        @rename($tmpCopy, $target);
+                    }
+                }
+            }
+            return $target;
+        }
+
+        $sqliteFile = realpath(__DIR__ . '/../../database/ojt_tracking.db');
+        return $sqliteFile ?: (__DIR__ . '/../../database/ojt_tracking.db');
+    }
+
     private function connectSqlite(array $options): PDO
     {
-        $sqliteFile = realpath(__DIR__ . '/../../database/ojt_tracking.db');
-        if (!$sqliteFile) {
-            $sqliteFile = __DIR__ . '/../../database/ojt_tracking.db';
-        }
+        $sqliteFile = $this->resolveSqlitePath();
 
         $isNew = !file_exists($sqliteFile) || filesize($sqliteFile) === 0;
 
@@ -173,10 +195,13 @@ class Database
         // Direct SQL calculation (works on both SQLite and MySQL)
         $stmt = $pdo->prepare("
             SELECT p.required_hours, p.status,
+                   p.signed_eval_file, p.signed_eval_filename,
                    COALESCE((SELECT SUM(hours_rendered) FROM TimeLog WHERE placement_id = p.placement_id AND approval_status != 'flagged'), 0.00) AS total_hours,
                    COALESCE((SELECT COUNT(*) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS eval_count,
-                   COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS emp_eval,
-                   COALESCE((SELECT MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS adv_eval,
+                   COALESCE((SELECT MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS online_emp_eval,
+                   COALESCE((SELECT MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS adv_eval,
+                   COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS stu_sup_eval,
+                   COALESCE((SELECT MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) FROM Evaluation WHERE placement_id = p.placement_id), 0) AS stu_adv_eval,
                    (SELECT ROUND(AVG(rating), 2) FROM Evaluation WHERE placement_id = p.placement_id) AS avg_rating
             FROM Placement p
             WHERE p.placement_id = :pid
@@ -187,27 +212,42 @@ class Database
             return;
         }
 
-        $totalHours = (float)$row['total_hours'];
-        $reqHours   = (float)$row['required_hours'];
-        $evalCount  = (int)$row['eval_count'];
-        $status     = $row['status'];
+        $totalHours   = (float)$row['total_hours'];
+        $reqHours     = (float)$row['required_hours'];
+        $status       = $row['status'];
+        $hasSignedSup = trim((string)($row['signed_eval_filename'] ?? '')) !== '' || trim((string)($row['signed_eval_file'] ?? '')) !== '';
+        $hasSupEval   = ((int)$row['online_emp_eval'] === 1 || $hasSignedSup) ? 1 : 0;
+        $hasAdvEval   = (int)$row['adv_eval'];
+        $hasStuSup    = (int)$row['stu_sup_eval'];
+        $hasStuAdv    = (int)$row['stu_adv_eval'];
 
-        $reqMet = ($totalHours >= $reqHours && $status !== 'dropped') ? 1 : 0;
+        $reqMet = (
+            $totalHours >= $reqHours &&
+            $status !== 'dropped' &&
+            $hasSupEval === 1 &&
+            $hasAdvEval === 1 &&
+            $hasStuSup === 1 &&
+            $hasStuAdv === 1
+        ) ? 1 : 0;
         $clearanceRef = $reqMet ? sprintf('MIT-CPE-CLR-2026-%04d', $placementId) : null;
 
         if ($isSqlite) {
             $up = $pdo->prepare("
                 INSERT INTO ComplianceReport (
                     placement_id, total_hours_completed, requirement_met,
-                    has_employer_eval, has_adviser_eval, average_rating, clearance_reference, generated_date
+                    has_employer_eval, has_adviser_eval,
+                    has_student_supervisor_eval, has_student_adviser_eval,
+                    average_rating, clearance_reference, generated_date
                 ) VALUES (
-                    :pid, :th, :rm, :ee, :ae, :ar, :cr, datetime('now')
+                    :pid, :th, :rm, :ee, :ae, :sse, :sae, :ar, :cr, datetime('now')
                 )
                 ON CONFLICT(placement_id) DO UPDATE SET
                     total_hours_completed = excluded.total_hours_completed,
                     requirement_met = excluded.requirement_met,
                     has_employer_eval = excluded.has_employer_eval,
                     has_adviser_eval = excluded.has_adviser_eval,
+                    has_student_supervisor_eval = excluded.has_student_supervisor_eval,
+                    has_student_adviser_eval = excluded.has_student_adviser_eval,
                     average_rating = excluded.average_rating,
                     clearance_reference = excluded.clearance_reference,
                     generated_date = datetime('now')
@@ -216,15 +256,19 @@ class Database
             $up = $pdo->prepare("
                 INSERT INTO ComplianceReport (
                     placement_id, total_hours_completed, requirement_met,
-                    has_employer_eval, has_adviser_eval, average_rating, clearance_reference, generated_date
+                    has_employer_eval, has_adviser_eval,
+                    has_student_supervisor_eval, has_student_adviser_eval,
+                    average_rating, clearance_reference, generated_date
                 ) VALUES (
-                    :pid, :th, :rm, :ee, :ae, :ar, :cr, NOW()
+                    :pid, :th, :rm, :ee, :ae, :sse, :sae, :ar, :cr, NOW()
                 )
                 ON DUPLICATE KEY UPDATE
                     total_hours_completed = VALUES(total_hours_completed),
                     requirement_met = VALUES(requirement_met),
                     has_employer_eval = VALUES(has_employer_eval),
                     has_adviser_eval = VALUES(has_adviser_eval),
+                    has_student_supervisor_eval = VALUES(has_student_supervisor_eval),
+                    has_student_adviser_eval = VALUES(has_student_adviser_eval),
                     average_rating = VALUES(average_rating),
                     clearance_reference = VALUES(clearance_reference),
                     generated_date = NOW()
@@ -235,8 +279,10 @@ class Database
             ':pid' => $placementId,
             ':th'  => $totalHours,
             ':rm'  => $reqMet,
-            ':ee'  => (int)$row['emp_eval'],
-            ':ae'  => (int)$row['adv_eval'],
+            ':ee'  => $hasSupEval,
+            ':ae'  => $hasAdvEval,
+            ':sse' => $hasStuSup,
+            ':sae' => $hasStuAdv,
             ':ar'  => $row['avg_rating'],
             ':cr'  => $clearanceRef,
         ]);

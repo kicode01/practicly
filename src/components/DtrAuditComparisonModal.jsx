@@ -153,18 +153,8 @@ export default function DtrAuditComparisonModal({
         </div>
 
         {/* VIEW MODE SELECTOR */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 16px',
-            background: 'var(--bg-surface)',
-            borderBottom: '1px solid var(--border-default)',
-            flexShrink: 0
-          }}
-        >
-          <div style={{ display: 'flex', gap: '6px' }}>
+        <div className="dtr-audit-bar">
+          <div className="dtr-audit-tabs">
             <button
               type="button"
               className={`btn btn-xs ${activeTab === 'side_by_side' ? 'btn-primary' : 'btn-secondary'}`}
@@ -188,7 +178,7 @@ export default function DtrAuditComparisonModal({
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+          <div className="dtr-audit-stats">
             <span>Supervisor Verified: <strong>{supervisorVerifiedCount}</strong></span>
             <span>·</span>
             <span>Adviser Endorsed: <strong>{approvedCount}</strong></span>
@@ -198,21 +188,11 @@ export default function DtrAuditComparisonModal({
         </div>
 
         {/* AUDIT BODY */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', gap: '16px', minHeight: '380px' }}>
+        <div className="dtr-audit-panes">
           {/* LEFT: DIGITAL LOGS (Shown in side_by_side or digital_only) */}
           {(activeTab === 'side_by_side' || activeTab === 'digital_only') && (
             <div
-              style={{
-                flex: activeTab === 'side_by_side' ? '1 1 50%' : '1 1 100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                border: '1px solid var(--border-default)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px',
-                background: 'var(--bg-surface)',
-                overflowY: 'auto'
-              }}
+              className={`dtr-audit-pane ${activeTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -325,17 +305,7 @@ export default function DtrAuditComparisonModal({
           {/* RIGHT: SIGNED PHYSICAL DOCUMENT (Shown in side_by_side or document_only) */}
           {(activeTab === 'side_by_side' || activeTab === 'document_only') && (
             <div
-              style={{
-                flex: activeTab === 'side_by_side' ? '1 1 50%' : '1 1 100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                border: '1px solid var(--border-default)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px',
-                background: 'var(--bg-surface)',
-                overflowY: 'auto'
-              }}
+              className={`dtr-audit-pane ${activeTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -409,18 +379,7 @@ export default function DtrAuditComparisonModal({
                   </div>
 
                   {/* PREVIEW CONTAINER */}
-                  <div
-                    style={{
-                      border: '1px solid var(--border-default)',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'hidden',
-                      background: '#1e293b',
-                      minHeight: '400px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
+                  <div className="dtr-audit-preview-box">
                     {placement.signed_dtr_data && placement.signed_dtr_data.startsWith('data:image/') ? (
                       <img
                         src={placement.signed_dtr_data}
@@ -463,22 +422,12 @@ export default function DtrAuditComparisonModal({
         </div>
 
         {/* FOOTER & ENDORSEMENT BAR */}
-        <div
-          className="modal-footer"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexShrink: 0,
-            borderTop: '1px solid var(--border-default)',
-            background: 'var(--bg-surface)'
-          }}
-        >
+        <div className="modal-footer dtr-audit-footer">
           <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
             Status: {supervisorVerifiedCount} shifts verified by HTE Supervisor · {approvedCount} shifts endorsed by Adviser
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="action-row-wrap">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Close
             </button>

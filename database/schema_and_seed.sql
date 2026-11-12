@@ -122,6 +122,16 @@ CREATE TABLE Placement (
     end_date DATE NOT NULL,
     required_hours DECIMAL(6,2) NOT NULL DEFAULT 300.00,
     status ENUM('ongoing', 'completed', 'dropped') NOT NULL DEFAULT 'ongoing',
+    signed_dtr_file VARCHAR(255) NULL,
+    signed_dtr_filename VARCHAR(255) NULL,
+    signed_dtr_uploaded_at DATETIME NULL,
+    signed_dtr_notes TEXT NULL,
+    signed_dtr_data LONGTEXT NULL,
+    signed_eval_file VARCHAR(255) NULL,
+    signed_eval_filename VARCHAR(255) NULL,
+    signed_eval_uploaded_at DATETIME NULL,
+    signed_eval_notes TEXT NULL,
+    signed_eval_data LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_placement_student
         FOREIGN KEY (student_id) REFERENCES Student(student_id)
@@ -165,7 +175,8 @@ CREATE TABLE TimeLog (
 CREATE TABLE Evaluation (
     eval_id INT AUTO_INCREMENT PRIMARY KEY,
     placement_id INT NOT NULL,
-    evaluator_type ENUM('employer', 'adviser') NOT NULL,
+    instrument_type VARCHAR(40) NOT NULL DEFAULT 'supervisor_to_student',
+    evaluator_type ENUM('employer', 'adviser', 'student') NOT NULL,
     evaluator_name VARCHAR(120) NOT NULL,
     technical_score DECIMAL(4,2) NOT NULL DEFAULT 4.50 COMMENT 'Scale 1.00 to 5.00',
     attitude_score DECIMAL(4,2) NOT NULL DEFAULT 4.50 COMMENT 'Scale 1.00 to 5.00',
@@ -177,7 +188,8 @@ CREATE TABLE Evaluation (
     CONSTRAINT fk_evaluation_placement
         FOREIGN KEY (placement_id) REFERENCES Placement(placement_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    INDEX idx_evaluation_placement_type (placement_id, evaluator_type)
+    INDEX idx_evaluation_placement_type (placement_id, evaluator_type),
+    INDEX idx_evaluation_instrument (placement_id, instrument_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
@@ -190,6 +202,8 @@ CREATE TABLE ComplianceReport (
     requirement_met TINYINT(1) NOT NULL DEFAULT 0,
     has_employer_eval TINYINT(1) NOT NULL DEFAULT 0,
     has_adviser_eval TINYINT(1) NOT NULL DEFAULT 0,
+    has_student_supervisor_eval TINYINT(1) NOT NULL DEFAULT 0,
+    has_student_adviser_eval TINYINT(1) NOT NULL DEFAULT 0,
     average_rating DECIMAL(4,2) NULL,
     clearance_reference VARCHAR(50) NULL,
     generated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -212,13 +226,21 @@ BEGIN
     DECLARE v_eval_count INT DEFAULT 0;
     DECLARE v_emp_eval INT DEFAULT 0;
     DECLARE v_adv_eval INT DEFAULT 0;
+    DECLARE v_stu_sup_eval INT DEFAULT 0;
+    DECLARE v_stu_adv_eval INT DEFAULT 0;
+    DECLARE v_has_signed_eval INT DEFAULT 0;
     DECLARE v_avg_rating DECIMAL(4,2) DEFAULT NULL;
     DECLARE v_req_met TINYINT(1) DEFAULT 0;
     DECLARE v_clearance_ref VARCHAR(50) DEFAULT NULL;
 
-    -- 1. Get placement required hours and current status
-    SELECT required_hours, status
-      INTO v_required_hours, v_current_status
+    -- 1. Get placement required hours, status, and signed INST-02 scan state
+    SELECT required_hours,
+           status,
+           CASE
+               WHEN COALESCE(TRIM(signed_eval_filename), '') != '' OR COALESCE(TRIM(signed_eval_file), '') != ''
+               THEN 1 ELSE 0
+           END
+      INTO v_required_hours, v_current_status, v_has_signed_eval
       FROM Placement
      WHERE placement_id = p_placement_id;
 
@@ -229,21 +251,31 @@ BEGIN
      WHERE placement_id = p_placement_id
        AND approval_status != 'flagged';
 
-    -- 3. Aggregate Evaluation metrics for this placement
+    -- 3. Aggregate 4-Instrument Evaluation metrics for this placement
     SELECT COUNT(*),
-           MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END),
-           MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END),
+           MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END),
+           MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END),
+           MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END),
+           MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END),
            ROUND(AVG(rating), 2)
-      INTO v_eval_count, v_emp_eval, v_adv_eval, v_avg_rating
+      INTO v_eval_count, v_emp_eval, v_adv_eval, v_stu_sup_eval, v_stu_adv_eval, v_avg_rating
       FROM Evaluation
      WHERE placement_id = p_placement_id;
 
-    SET v_emp_eval = COALESCE(v_emp_eval, 0);
+    SET v_emp_eval = CASE WHEN COALESCE(v_emp_eval, 0) = 1 OR COALESCE(v_has_signed_eval, 0) = 1 THEN 1 ELSE 0 END;
     SET v_adv_eval = COALESCE(v_adv_eval, 0);
+    SET v_stu_sup_eval = COALESCE(v_stu_sup_eval, 0);
+    SET v_stu_adv_eval = COALESCE(v_stu_adv_eval, 0);
 
-    -- 4. Core Eligibility Logic from Proposal:
-    --    total_hours_completed >= required_hours AND evaluation exists -> mark as eligible
-    IF v_total_hours >= v_required_hours AND v_eval_count > 0 AND v_current_status != 'dropped' THEN
+    -- 4. 4-Instrument Eligibility Logic:
+    --    total_hours_completed >= required_hours AND all 4 instruments satisfied -> eligible
+    IF v_total_hours >= v_required_hours
+       AND v_emp_eval = 1
+       AND v_adv_eval = 1
+       AND v_stu_sup_eval = 1
+       AND v_stu_adv_eval = 1
+       AND v_current_status != 'dropped'
+    THEN
         SET v_req_met = 1;
         SET v_clearance_ref = CONCAT('MIT-CPE-CLR-2026-', LPAD(p_placement_id, 4, '0'));
     ELSE
@@ -258,6 +290,8 @@ BEGIN
         requirement_met,
         has_employer_eval,
         has_adviser_eval,
+        has_student_supervisor_eval,
+        has_student_adviser_eval,
         average_rating,
         clearance_reference,
         generated_date
@@ -267,6 +301,8 @@ BEGIN
         v_req_met,
         v_emp_eval,
         v_adv_eval,
+        v_stu_sup_eval,
+        v_stu_adv_eval,
         v_avg_rating,
         v_clearance_ref,
         NOW()
@@ -276,6 +312,8 @@ BEGIN
         requirement_met = VALUES(requirement_met),
         has_employer_eval = VALUES(has_employer_eval),
         has_adviser_eval = VALUES(has_adviser_eval),
+        has_student_supervisor_eval = VALUES(has_student_supervisor_eval),
+        has_student_adviser_eval = VALUES(has_student_adviser_eval),
         average_rating = VALUES(average_rating),
         clearance_reference = VALUES(clearance_reference),
         generated_date = NOW();
@@ -394,14 +432,30 @@ SELECT
     COALESCE(tl_agg.log_count, 0) AS total_log_days,
     tl_agg.last_logged_date,
     COALESCE(ev_agg.eval_count, 0) AS evaluation_count,
-    COALESCE(ev_agg.has_employer_eval, 0) AS has_employer_eval,
+    CASE
+        WHEN COALESCE(ev_agg.has_employer_eval, 0) = 1
+             OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+             OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+        THEN 1 ELSE 0
+    END AS has_employer_eval,
     COALESCE(ev_agg.has_adviser_eval, 0) AS has_adviser_eval,
+    COALESCE(ev_agg.has_student_supervisor_eval, 0) AS has_student_supervisor_eval,
+    COALESCE(ev_agg.has_student_adviser_eval, 0) AS has_student_adviser_eval,
     ev_agg.employer_rating,
     ev_agg.adviser_rating,
+    ev_agg.student_supervisor_rating,
+    ev_agg.student_adviser_rating,
     ev_agg.average_rating,
     CASE
         WHEN COALESCE(tl_agg.total_hours_rendered, 0.00) >= p.required_hours
-             AND COALESCE(ev_agg.eval_count, 0) > 0
+             AND (
+                 COALESCE(ev_agg.has_employer_eval, 0) = 1
+                 OR COALESCE(TRIM(p.signed_eval_filename), '') != ''
+                 OR COALESCE(TRIM(p.signed_eval_file), '') != ''
+             )
+             AND COALESCE(ev_agg.has_adviser_eval, 0) = 1
+             AND COALESCE(ev_agg.has_student_supervisor_eval, 0) = 1
+             AND COALESCE(ev_agg.has_student_adviser_eval, 0) = 1
              AND p.status != 'dropped'
         THEN 1
         ELSE 0
@@ -426,10 +480,14 @@ LEFT JOIN (
     SELECT
         placement_id,
         COUNT(eval_id) AS eval_count,
-        MAX(CASE WHEN evaluator_type = 'employer' THEN 1 ELSE 0 END) AS has_employer_eval,
-        MAX(CASE WHEN evaluator_type = 'adviser' THEN 1 ELSE 0 END) AS has_adviser_eval,
-        MAX(CASE WHEN evaluator_type = 'employer' THEN rating ELSE NULL END) AS employer_rating,
-        MAX(CASE WHEN evaluator_type = 'adviser' THEN rating ELSE NULL END) AS adviser_rating,
+        MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN 1 ELSE 0 END) AS has_employer_eval,
+        MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN 1 ELSE 0 END) AS has_adviser_eval,
+        MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN 1 ELSE 0 END) AS has_student_supervisor_eval,
+        MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN 1 ELSE 0 END) AS has_student_adviser_eval,
+        MAX(CASE WHEN instrument_type = 'supervisor_to_student' OR evaluator_type = 'employer' THEN rating ELSE NULL END) AS employer_rating,
+        MAX(CASE WHEN instrument_type = 'adviser_to_hte' OR evaluator_type = 'adviser' THEN rating ELSE NULL END) AS adviser_rating,
+        MAX(CASE WHEN instrument_type = 'student_to_supervisor' THEN rating ELSE NULL END) AS student_supervisor_rating,
+        MAX(CASE WHEN instrument_type = 'student_to_adviser' THEN rating ELSE NULL END) AS student_adviser_rating,
         ROUND(AVG(rating), 2) AS average_rating
     FROM Evaluation
     GROUP BY placement_id
@@ -828,35 +886,55 @@ INSERT INTO TimeLog (placement_id, date, time_in, time_out, break_minutes, hours
 (24, '2026-09-25', '08:00:00', '17:00:00', 60, 40.00, 'Week 7 Consolidated Block: Resolved 6 CTS (Compatibility Test Suite) camera test cases.', 'approved'),
 (24, '2026-11-05', '08:00:00', '17:00:00', 60, 12.00, 'Completed final HAL benchmark comparisons and technical slide deck.', 'approved');
 
--- 7. Seed 29 Evaluations across Completed and Near-Completion Placements
-INSERT INTO Evaluation (eval_id, placement_id, evaluator_type, evaluator_name, technical_score, attitude_score, attendance_score, rating, comments, date_evaluated) VALUES
-(1,  1,  'employer', 'Engr. Paolo M. Sarmiento (Accenture)',          4.90, 5.00, 4.95, 4.95, 'Kian demonstrated exceptional mastery of React architecture, state management, and accessible UI engineering. Delivered production-ready dashboards ahead of schedule.', '2026-10-28'),
-(2,  1,  'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.90, 4.95, 5.00, 4.95, 'All weekly accomplishment logs and DTR sheets were submitted promptly with comprehensive technical documentation. Cleared for OJT completion.', '2026-10-30'),
-(3,  2,  'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           5.00, 4.90, 4.95, 4.95, 'Emmanuel designed highly optimized SQL queries, stored procedures, and REST endpoints. His relational schema work directly improved our reporting pipeline.', '2026-10-27'),
-(4,  2,  'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 4.90, 5.00, 4.95, 'Outstanding backend engineering performance and complete compliance requirements. Highly recommended for clearance.', '2026-10-30'),
-(5,  3,  'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.85, 5.00, 4.90, 4.92, 'Sophia produced meticulous system documentation, UAT test matrices, and QA reports. She only needs 16 more hours to complete her 300-hour practicum.', '2026-11-04'),
-(6,  6,  'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.95, 5.00, 4.97, 'Clarisse showed strong analytical rigor in RTL verification and scripting automation. Exceeded expectations for an undergraduate intern.', '2026-10-26'),
-(7,  6,  'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 5.00, 5.00, 4.97, 'Completed 310 hours with exemplary evaluations from Samsung R&D. Approved for final OJT clearance.', '2026-10-29'),
-(8,  9,  'employer', 'Engr. Roberto V. Salazar (Texas Instruments)',  4.90, 4.95, 5.00, 4.95, 'Justine quickly grasped ATE mixed-signal test programming and STDF data analytics, reducing probe test overhead by 14%.', '2026-10-27'),
-(9,  9,  'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.85, 4.95, 5.00, 4.93, 'Verified 308 hours of semiconductor test engineering practicum at Texas Instruments. Endorsed for institutional clearance.', '2026-10-29'),
-(10, 10, 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    5.00, 4.95, 4.95, 4.97, 'Bea delivered production-grade idempotency middleware and k6 load testing scripts for our payment gateway squad.', '2026-10-28'),
-(11, 10, 'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 5.00, 4.95, 4.97, 'Exemplary FinTech software engineering practicum portfolio and complete DTR records. Cleared.', '2026-10-30'),
-(12, 12, 'employer', 'Engr. Hideki K. Taniguchi (Rohm Electronics)',  4.85, 4.95, 5.00, 4.93, 'Hannah demonstrated high precision in CMOS analog layout, DRC/LVS verification, and parasitic extraction.', '2026-10-28'),
-(13, 12, 'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.90, 4.90, 5.00, 4.93, 'All 305 hours and LSI layout deliverables verified. Approved for final OJT clearance.', '2026-10-30'),
-(14, 13, 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.80, 4.90, 4.95, 4.88, 'John Paul contributed across both Next.js and NestJS microservices with strong automated test coverage.', '2026-11-02'),
-(15, 13, 'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'Completed 300 hours of full-stack cloud native development with complete documentation. Cleared.', '2026-11-04'),
-(16, 14, 'employer', 'Engr. Victor M. Manansala (Trend Micro)',       5.00, 4.95, 5.00, 4.98, 'Angelica authored 18 high-accuracy YARA detection rules and automated IOC enrichment tools for our threat hunting lab.', '2026-10-27'),
-(17, 14, 'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.95, 5.00, 5.00, 4.98, 'Exceptional cybersecurity research performance and complete 304-hour DTR compliance. Cleared with distinction.', '2026-10-29'),
-(18, 16, 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    4.90, 4.90, 4.95, 4.92, 'Danielle built reliable Terraform and ArgoCD GitOps pipelines and improved our Kubernetes autoscaling playbooks.', '2026-10-28'),
-(19, 16, 'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 4.95, 4.95, 4.93, 'Satisfied all 300 required hours and SRE competency milestones. Endorsed for clearance.', '2026-10-30'),
-(20, 18, 'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           4.85, 4.95, 4.90, 4.90, 'Trisha designed clean dimensional schemas and automated data quality checks that strengthened our analytics pipeline.', '2026-10-28'),
-(21, 18, 'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'All 300 practicum hours and data engineering deliverables verified. Cleared for graduation requirements.', '2026-10-30'),
-(22, 20, 'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.90, 4.95, 4.95, 4.93, 'Alyssa automated 45 end-to-end Cypress regression specs and significantly improved nightly build stability.', '2026-10-29'),
-(23, 20, 'adviser',  'Engr. Christian Paul D. Vergara, MSc',          4.90, 4.90, 5.00, 4.93, 'Completed 304 hours with strong QA automation output. Approved for OJT clearance.', '2026-10-30'),
-(24, 11, 'employer', 'Engr. Dennis A. Villareal (Smart / PLDT)',      4.80, 4.90, 4.85, 4.85, 'Mid-term evaluation: Raphael is performing very well in 5G core and optical transport validation.', '2026-10-30'),
-(25, 17, 'employer', 'Engr. Teresa L. Valenzuela (Analog Devices)',   4.90, 4.85, 4.95, 4.90, 'Mid-term evaluation: Christian demonstrated strong Verilog HDL and Vivado timing closure skills.', '2026-11-02'),
-(26, 22, 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.90, 5.00, 4.95, 4.95, 'Samantha built our reusable React component library and Storybook documentation; only 24 hours remaining.', '2026-11-03'),
-(27, 24, 'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.90, 4.95, 4.93, 'Katrina resolved 6 Android CTS camera test cases and optimized HAL3 frame latency; 8 hours remaining.', '2026-11-04');
+-- 7. Seed 47 Evaluations across Completed and Near-Completion Placements (all 4 instruments)
+INSERT INTO Evaluation (eval_id, placement_id, instrument_type, evaluator_type, evaluator_name, technical_score, attitude_score, attendance_score, rating, comments, date_evaluated) VALUES
+(1,  1,  'supervisor_to_student', 'employer', 'Engr. Paolo M. Sarmiento (Accenture)',          4.90, 5.00, 4.95, 4.95, 'Kian demonstrated exceptional mastery of React architecture, state management, and accessible UI engineering. Delivered production-ready dashboards ahead of schedule.', '2026-10-28'),
+(2,  1,  'adviser_to_hte',        'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.90, 4.95, 5.00, 4.95, 'All weekly accomplishment logs and DTR sheets were submitted promptly with comprehensive technical documentation. HTE supervision verified.', '2026-10-30'),
+(3,  2,  'supervisor_to_student', 'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           5.00, 4.90, 4.95, 4.95, 'Emmanuel designed highly optimized SQL queries, stored procedures, and REST endpoints. His relational schema work directly improved our reporting pipeline.', '2026-10-27'),
+(4,  2,  'adviser_to_hte',        'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 4.90, 5.00, 4.95, 'Outstanding backend engineering performance and complete compliance requirements. Highly recommended for clearance.', '2026-10-30'),
+(5,  3,  'supervisor_to_student', 'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.85, 5.00, 4.90, 4.92, 'Sophia produced meticulous system documentation, UAT test matrices, and QA reports. She only needs 16 more hours to complete her 300-hour practicum.', '2026-11-04'),
+(6,  6,  'supervisor_to_student', 'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.95, 5.00, 4.97, 'Clarisse showed strong analytical rigor in RTL verification and scripting automation. Exceeded expectations for an undergraduate intern.', '2026-10-26'),
+(7,  6,  'adviser_to_hte',        'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 5.00, 5.00, 4.97, 'Completed 310 hours with exemplary evaluations from Samsung R&D. Approved for final OJT clearance.', '2026-10-29'),
+(8,  9,  'supervisor_to_student', 'employer', 'Engr. Roberto V. Salazar (Texas Instruments)',  4.90, 4.95, 5.00, 4.95, 'Justine quickly grasped ATE mixed-signal test programming and STDF data analytics, reducing probe test overhead by 14%.', '2026-10-27'),
+(9,  9,  'adviser_to_hte',        'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.85, 4.95, 5.00, 4.93, 'Verified 308 hours of semiconductor test engineering practicum at Texas Instruments. Endorsed for institutional clearance.', '2026-10-29'),
+(10, 10, 'supervisor_to_student', 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    5.00, 4.95, 4.95, 4.97, 'Bea delivered production-grade idempotency middleware and k6 load testing scripts for our payment gateway squad.', '2026-10-28'),
+(11, 10, 'adviser_to_hte',        'adviser',  'Engr. Arlene R. Dela Cruz, MSc',                4.95, 5.00, 4.95, 4.97, 'Exemplary FinTech software engineering practicum portfolio and complete DTR records. Cleared.', '2026-10-30'),
+(12, 12, 'supervisor_to_student', 'employer', 'Engr. Hideki K. Taniguchi (Rohm Electronics)',  4.85, 4.95, 5.00, 4.93, 'Hannah demonstrated high precision in CMOS analog layout, DRC/LVS verification, and parasitic extraction.', '2026-10-28'),
+(13, 12, 'adviser_to_hte',        'adviser',  'Engr. Ramon C. Tolentino, MEng',                4.90, 4.90, 5.00, 4.93, 'All 305 hours and LSI layout deliverables verified. Approved for final OJT clearance.', '2026-10-30'),
+(14, 13, 'supervisor_to_student', 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.80, 4.90, 4.95, 4.88, 'John Paul contributed across both Next.js and NestJS microservices with strong automated test coverage.', '2026-11-02'),
+(15, 13, 'adviser_to_hte',        'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'Completed 300 hours of full-stack cloud native development with complete documentation. Cleared.', '2026-11-04'),
+(16, 14, 'supervisor_to_student', 'employer', 'Engr. Victor M. Manansala (Trend Micro)',       5.00, 4.95, 5.00, 4.98, 'Angelica authored 18 high-accuracy YARA detection rules and automated IOC enrichment tools for our threat hunting lab.', '2026-10-27'),
+(17, 14, 'adviser_to_hte',        'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.95, 5.00, 5.00, 4.98, 'Exceptional cybersecurity research performance and complete 304-hour DTR compliance. Cleared with distinction.', '2026-10-29'),
+(18, 16, 'supervisor_to_student', 'employer', 'Engr. Camille D. Ilagan (Maya Philippines)',    4.90, 4.90, 4.95, 4.92, 'Danielle built reliable Terraform and ArgoCD GitOps pipelines and improved our Kubernetes autoscaling playbooks.', '2026-10-28'),
+(19, 16, 'adviser_to_hte',        'adviser',  'Dr. Evelyn S. Bautista, PECE',                  4.90, 4.95, 4.95, 4.93, 'Satisfied all 300 required hours and SRE competency milestones. Endorsed for clearance.', '2026-10-30'),
+(20, 18, 'supervisor_to_student', 'employer', 'Mr. Carlo J. Pangilinan (Pointwest)',           4.85, 4.95, 4.90, 4.90, 'Trisha designed clean dimensional schemas and automated data quality checks that strengthened our analytics pipeline.', '2026-10-28'),
+(21, 18, 'adviser_to_hte',        'adviser',  'Dr. Lorna M. Macapagal, PCpE',                  4.85, 4.90, 4.95, 4.90, 'All 300 practicum hours and data engineering deliverables verified. Cleared for graduation requirements.', '2026-10-30'),
+(22, 20, 'supervisor_to_student', 'employer', 'Ms. Hannah G. Soriano (Azeus Systems)',         4.90, 4.95, 4.95, 4.93, 'Alyssa automated 45 end-to-end Cypress regression specs and significantly improved nightly build stability.', '2026-10-29'),
+(23, 20, 'adviser_to_hte',        'adviser',  'Engr. Christian Paul D. Vergara, MSc',          4.90, 4.90, 5.00, 4.93, 'Completed 304 hours with strong QA automation output. Approved for OJT clearance.', '2026-10-30'),
+(24, 11, 'supervisor_to_student', 'employer', 'Engr. Dennis A. Villareal (Smart / PLDT)',      4.80, 4.90, 4.85, 4.85, 'Mid-term evaluation: Raphael is performing very well in 5G core and optical transport validation.', '2026-10-30'),
+(25, 17, 'supervisor_to_student', 'employer', 'Engr. Teresa L. Valenzuela (Analog Devices)',   4.90, 4.85, 4.95, 4.90, 'Mid-term evaluation: Christian demonstrated strong Verilog HDL and Vivado timing closure skills.', '2026-11-02'),
+(26, 22, 'supervisor_to_student', 'employer', 'Ms. Katrina S. Policarpio (Yondu)',             4.90, 5.00, 4.95, 4.95, 'Samantha built our reusable React component library and Storybook documentation; only 24 hours remaining.', '2026-11-03'),
+(27, 24, 'supervisor_to_student', 'employer', 'Dr. Kenneth Y. Lim (Samsung R&D)',              4.95, 4.90, 4.95, 4.93, 'Katrina resolved 6 Android CTS camera test cases and optimized HAL3 frame latency; 8 hours remaining.', '2026-11-04'),
+(28, 2,  'student_to_supervisor', 'student',  'Calangian, Emmanuel G.',                        4.95, 4.90, 5.00, 4.95, 'Mr. Carlo J. Pangilinan provided clear architecture reviews and backend optimization mentorship.', '2026-10-28'),
+(29, 2,  'student_to_adviser',    'student',  'Calangian, Emmanuel G.',                        4.95, 4.95, 5.00, 4.97, 'Engr. Dela Cruz guided all DTR deliverables and capstone alignment weekly.', '2026-10-28'),
+(30, 6,  'student_to_supervisor', 'student',  'Villanueva, Clarisse Anne T.',                  4.95, 5.00, 4.95, 4.97, 'Dr. Kenneth Y. Lim mentored RTL verification best practices consistently.', '2026-10-28'),
+(31, 6,  'student_to_adviser',    'student',  'Villanueva, Clarisse Anne T.',                  4.95, 4.95, 5.00, 4.97, 'Dr. Bautista monitored progress closely and checked laboratory reports promptly.', '2026-10-28'),
+(32, 9,  'student_to_supervisor', 'student',  'Alcantara, Justine Mark D.',                    4.90, 4.95, 4.95, 4.93, 'Engr. Salazar provided hands-on ATE probe instrumentation coaching.', '2026-10-28'),
+(33, 9,  'student_to_adviser',    'student',  'Alcantara, Justine Mark D.',                    4.90, 4.95, 4.95, 4.93, 'Engr. Tolentino checked semiconductor compliance logs consistently.', '2026-10-28'),
+(34, 10, 'student_to_supervisor', 'student',  'Pascual, Bea Katrina S.',                       4.95, 4.95, 5.00, 4.97, 'Engr. Ilagan gave constructive API scalability feedback every sprint.', '2026-10-29'),
+(35, 10, 'student_to_adviser',    'student',  'Pascual, Bea Katrina S.',                       4.95, 4.95, 5.00, 4.97, 'Engr. Dela Cruz endorsed verification milestones on schedule.', '2026-10-29'),
+(36, 12, 'student_to_supervisor', 'student',  'Evangelista, Hannah Camille B.',                4.90, 4.95, 4.95, 4.93, 'Engr. Taniguchi taught strict DRC/LVS verification workflows.', '2026-10-29'),
+(37, 12, 'student_to_adviser',    'student',  'Evangelista, Hannah Camille B.',                4.90, 4.90, 5.00, 4.93, 'Engr. Tolentino supported HTE coordination throughout the term.', '2026-10-29'),
+(38, 13, 'student_to_supervisor', 'student',  'Bautista, John Paul V.',                        4.85, 4.90, 4.95, 4.90, 'Ms. Policarpio guided full-stack PR reviews and CI pipelines.', '2026-11-03'),
+(39, 13, 'student_to_adviser',    'student',  'Bautista, John Paul V.',                        4.85, 4.90, 4.95, 4.90, 'Dr. Macapagal provided clear practicum documentation guidance.', '2026-11-03'),
+(40, 14, 'student_to_supervisor', 'student',  'Castillo, Angelica Joy M.',                     4.95, 5.00, 5.00, 4.98, 'Engr. Manansala shared threat hunting workflows and YARA feedback.', '2026-10-28'),
+(41, 14, 'student_to_adviser',    'student',  'Castillo, Angelica Joy M.',                     4.95, 4.95, 5.00, 4.97, 'Dr. Macapagal validated research milestones and compliance reports.', '2026-10-28'),
+(42, 16, 'student_to_supervisor', 'student',  'Aquino, Danielle Faith R.',                     4.90, 4.90, 4.95, 4.92, 'Engr. Ilagan reviewed Kubernetes IaC rollouts thoroughly.', '2026-10-29'),
+(43, 16, 'student_to_adviser',    'student',  'Aquino, Danielle Faith R.',                     4.90, 4.95, 4.95, 4.93, 'Dr. Bautista checked HTE site visits and attendance verification.', '2026-10-29'),
+(44, 18, 'student_to_supervisor', 'student',  'Ocampo, Trisha Nicole G.',                      4.90, 4.95, 4.90, 4.92, 'Mr. Pangilinan structured weekly ETL quality walkthroughs.', '2026-10-29'),
+(45, 18, 'student_to_adviser',    'student',  'Ocampo, Trisha Nicole G.',                      4.90, 4.90, 4.95, 4.92, 'Dr. Macapagal confirmed endorsement readiness ahead of deadline.', '2026-10-29'),
+(46, 20, 'student_to_supervisor', 'student',  'Mercado, Alyssa Marie F.',                      4.90, 4.95, 4.95, 4.93, 'Ms. Soriano coached Cypress regression design and QA triaging.', '2026-10-29'),
+(47, 20, 'student_to_adviser',    'student',  'Mercado, Alyssa Marie F.',                      4.90, 4.90, 5.00, 4.93, 'Engr. Vergara guided weekly accomplishment reviews effectively.', '2026-10-29');
 
 -- 8. Run initial synchronization for all ComplianceReports
 CALL sp_sync_all_compliance_reports();

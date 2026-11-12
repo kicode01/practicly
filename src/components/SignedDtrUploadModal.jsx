@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IconClose,
   IconUpload,
@@ -7,27 +7,89 @@ import {
   IconAlert,
   IconTrash,
   IconEye,
-  IconShieldCheck
+  IconShieldCheck,
+  IconPrinter,
 } from './Icons';
+
+const DOC_CONFIGS = {
+  dtr: {
+    modalTitleNew: 'Upload Signed Physical DTR',
+    modalTitleManage: 'Manage Signed Physical DTR',
+    subtitle: 'Official scanned copy signed by HTE Company Supervisor for Academic Adviser comparison',
+    bannerTitle: 'Verification Requirement Prior to Faculty Endorsement',
+    bannerDesc:
+      "Per university practicum guidelines, your Faculty Adviser requires a scanned copy of your signed DTR (with your supervisor's wet signature or company stamp) to cross-reference with your digital time entries before endorsing hours to the Coordinator / Admin.",
+    uploadEndpoint: '/api/placements/upload-signed-dtr',
+    removeEndpoint: '/api/placements/remove-signed-dtr',
+    removedMsg: 'Signed DTR document removed.',
+    emptyErr: 'Please select a scanned PDF or image copy of your signed DTR.',
+    defaultFilename: 'Signed_DTR_Document.pdf',
+    badgeHint: 'Available for Adviser Audit',
+    notesPlaceholder:
+      'E.g., Signed by Engr. Paolo M. Sarmiento (HTE Technical Supervisor) covering Weeks 1 to 8...',
+    notesHint: "Provide signatory details or shift coverage for your Faculty Adviser's reference.",
+    submitLabel: 'Upload Signed DTR',
+    fieldPrefix: 'signed_dtr',
+  },
+  eval: {
+    modalTitleNew: 'Upload Signed INST-02 Evaluation',
+    modalTitleManage: 'Manage Signed INST-02 Evaluation',
+    subtitle: 'Scanned Trainee & School Performance Evaluation (INST-02) signed by your HTE Supervisor',
+    bannerTitle: 'Supervisor Evaluation Fallback / Physical Proof (INST-02)',
+    bannerDesc:
+      'If your HTE Supervisor completed and signed a printed INST-02 rubric instead of submitting online via the Supervisor Portal link, upload the signed PDF or clear photo here to satisfy INST-02 for clearance.',
+    uploadEndpoint: '/api/placements/upload-signed-eval',
+    removeEndpoint: '/api/placements/remove-signed-eval',
+    removedMsg: 'Signed INST-02 evaluation document removed.',
+    emptyErr: 'Please select a scanned PDF or image copy of your signed INST-02 form.',
+    defaultFilename: 'Signed_INST02_Evaluation.pdf',
+    badgeHint: 'Satisfies INST-02 Supervisor Evaluation Requirement',
+    notesPlaceholder:
+      'E.g., Signed physical INST-02 rated 4.95/5.00 by HTE Supervisor on Oct 28...',
+    notesHint: 'Include the supervisor name and evaluation date printed on the signed INST-02 form.',
+    submitLabel: 'Upload Signed INST-02',
+    fieldPrefix: 'signed_eval',
+  },
+};
 
 export default function SignedDtrUploadModal({
   isOpen,
   onClose,
   placement,
-  onSuccess
+  onSuccess,
+  documentKind = 'dtr',
+  onOpenBlankForm = null,
 }) {
+  const cfg = DOC_CONFIGS[documentKind] || DOC_CONFIGS.dtr;
+  const p = cfg.fieldPrefix;
+
+  const existingFilename = placement?.[`${p}_filename`] || '';
+  const existingFile = placement?.[`${p}_file`] || '';
+  const existingData = placement?.[`${p}_data`] || '';
+  const existingNotes = placement?.[`${p}_notes`] || '';
+  const existingUploadedAt = placement?.[`${p}_uploaded_at`] || '';
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileDataUri, setFileDataUri] = useState('');
-  const [notes, setNotes] = useState(placement?.signed_dtr_notes || '');
+  const [notes, setNotes] = useState(existingNotes);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedFile(null);
+      setFileDataUri('');
+      setNotes(existingNotes);
+      setErrorMsg('');
+    }
+  }, [isOpen, placement?.placement_id, documentKind, existingNotes]);
+
   if (!isOpen || !placement) return null;
 
-  const hasExistingDoc = Boolean(placement.signed_dtr_filename || placement.signed_dtr_file);
+  const hasExistingDoc = Boolean(existingFilename || existingFile);
 
   const processFile = (file) => {
     setErrorMsg('');
@@ -72,20 +134,20 @@ export default function SignedDtrUploadModal({
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile && !hasExistingDoc) {
-      setErrorMsg('Please select a scanned PDF or image copy of your signed DTR.');
+      setErrorMsg(cfg.emptyErr);
       return;
     }
 
     setIsUploading(true);
     setErrorMsg('');
     try {
-      const res = await fetch('/api/placements/upload-signed-dtr', {
+      const res = await fetch(cfg.uploadEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           placement_id: placement.placement_id,
-          filename: selectedFile ? selectedFile.name : placement.signed_dtr_filename,
-          file_data: fileDataUri || placement.signed_dtr_data || '',
+          filename: selectedFile ? selectedFile.name : existingFilename,
+          file_data: fileDataUri || existingData || '',
           notes: notes,
         }),
       });
@@ -105,13 +167,13 @@ export default function SignedDtrUploadModal({
   };
 
   const handleRemoveExisting = async () => {
-    if (!window.confirm('Are you sure you want to remove the current signed DTR document?')) {
+    if (!window.confirm(`Are you sure you want to remove the current ${documentKind === 'eval' ? 'signed INST-02 evaluation' : 'signed DTR'} document?`)) {
       return;
     }
 
     setIsDeleting(true);
     try {
-      const res = await fetch('/api/placements/remove-signed-dtr', {
+      const res = await fetch(cfg.removeEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,7 +185,7 @@ export default function SignedDtrUploadModal({
       if (json.ok) {
         setSelectedFile(null);
         setFileDataUri('');
-        if (onSuccess) onSuccess('Signed DTR document removed.');
+        if (onSuccess) onSuccess(cfg.removedMsg);
         onClose();
       } else {
         setErrorMsg(json.error || 'Failed to remove document.');
@@ -146,10 +208,10 @@ export default function SignedDtrUploadModal({
             </div>
             <div>
               <div className="modal-title">
-                {hasExistingDoc ? 'Manage Signed Physical DTR' : 'Upload Signed Physical DTR'}
+                {hasExistingDoc ? cfg.modalTitleManage : cfg.modalTitleNew}
               </div>
               <div className="modal-subtitle">
-                Official scanned copy signed by HTE Company Supervisor for Academic Adviser comparison
+                {cfg.subtitle}
               </div>
             </div>
           </div>
@@ -173,26 +235,39 @@ export default function SignedDtrUploadModal({
               }}
             >
               <IconShieldCheck size={18} style={{ color: 'var(--brand)', flexShrink: 0, marginTop: '2px' }} />
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Verification Requirement Prior to Faculty Endorsement
+                  {cfg.bannerTitle}
                 </div>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.5 }}>
-                  Per university practicum guidelines, your Faculty Adviser requires a scanned copy of your signed DTR (with your supervisor's wet signature or company stamp) to cross-reference with your digital time entries before endorsing hours to the Coordinator / Admin.
+                  {cfg.bannerDesc}
                 </div>
+                {documentKind === 'eval' && onOpenBlankForm && (
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={() => {
+                        onClose();
+                        onOpenBlankForm();
+                      }}
+                    >
+                      <IconPrinter size={12} />
+                      Print Blank INST-02 Form for Supervisor
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* PLACEMENT CONTEXT */}
             <div
+              className="modal-info-grid-2"
               style={{
                 padding: '10px 14px',
                 background: 'var(--bg-subtle)',
                 borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-default)',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '10px',
                 fontSize: '11.5px'
               }}
             >
@@ -225,10 +300,11 @@ export default function SignedDtrUploadModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
                   gap: '12px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 200px' }}>
                   <div
                     style={{
                       width: '36px',
@@ -245,10 +321,10 @@ export default function SignedDtrUploadModal({
                   </div>
                   <div>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {placement.signed_dtr_filename || 'Signed_DTR_Document.pdf'}
+                      {existingFilename || cfg.defaultFilename}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Uploaded on {placement.signed_dtr_uploaded_at || 'Recorded on file'} · Available for Adviser Audit
+                      Uploaded on {existingUploadedAt || 'Recorded on file'} · {cfg.badgeHint}
                     </div>
                   </div>
                 </div>
@@ -258,11 +334,11 @@ export default function SignedDtrUploadModal({
                     type="button"
                     className="btn btn-secondary btn-xs"
                     onClick={() => {
-                      if (placement.signed_dtr_data) {
+                      if (existingData) {
                         const win = window.open();
-                        win.document.write('<iframe src="' + placement.signed_dtr_data + '" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');
-                      } else if (placement.signed_dtr_file) {
-                        window.open(placement.signed_dtr_file, '_blank');
+                        win.document.write('<iframe src="' + existingData + '" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');
+                      } else if (existingFile) {
+                        window.open(existingFile, '_blank');
                       }
                     }}
                     title="View uploaded document"
@@ -350,12 +426,12 @@ export default function SignedDtrUploadModal({
               <textarea
                 className="input"
                 rows={2}
-                placeholder="E.g., Signed by Engr. Juan Dela Cruz (HTE Technical Supervisor) covering Weeks 1 to 8..."
+                placeholder={cfg.notesPlaceholder}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
               <span className="field-hint">
-                Provide signatory details or shift coverage for your Faculty Adviser's reference.
+                {cfg.notesHint}
               </span>
             </div>
           </div>
@@ -376,7 +452,7 @@ export default function SignedDtrUploadModal({
               disabled={isUploading || (!selectedFile && !notes)}
             >
               <IconCheckCircle size={14} />
-              {isUploading ? 'Uploading...' : hasExistingDoc && !selectedFile ? 'Save Remarks' : 'Upload Signed DTR'}
+              {isUploading ? 'Uploading...' : hasExistingDoc && !selectedFile ? 'Save Remarks' : cfg.submitLabel}
             </button>
           </div>
         </form>

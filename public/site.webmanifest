@@ -1,0 +1,27 @@
+{
+  "name": "Practicly — OJT & Internship Tracking System",
+  "short_name": "Practicly",
+  "description": "Where classroom theory meets real-world experience.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0b57d0",
+  "background_color": "#f0f4f9",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

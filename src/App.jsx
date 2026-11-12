@@ -51,8 +51,10 @@ import PublicSupervisorVerifyView from './components/PublicSupervisorVerifyView'
 import SignedDtrUploadModal from './components/SignedDtrUploadModal';
 import DtrAuditComparisonModal from './components/DtrAuditComparisonModal';
 import StudentProfileModal from './components/StudentProfileModal';
-import { SegmentedControl, Switch, MaterialSelect } from './components/MaterialComponents';
+import { SegmentedControl, Switch, MaterialSelect, Snackbar } from './components/MaterialComponents';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
+import { clearAllSessionSignatures } from './utils/sessionSignature';
+import { getInstrumentById, getPlacementInstrumentStatus } from './utils/evaluationRubrics';
 
 const DEMO_PRESETS = [
   {
@@ -145,12 +147,7 @@ function WorkspaceSkeleton({ activeTab, role }) {
       {/* KPI Metric Strip or 6-Card Adviser Grid Skeleton */}
       {showMetricStrip && (
         <div
-          className="metric-strip"
-          style={
-            isAdviserGridTab
-              ? { gridTemplateColumns: 'repeat(3, 1fr)' }
-              : undefined
-          }
+          className={isAdviserGridTab ? 'metric-strip metric-strip-advisers' : 'metric-strip'}
         >
           {(isAdviserGridTab ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4]).map((idx) => (
             <div key={idx} className="metric-cell">
@@ -377,12 +374,17 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
   const [selectedClearanceReport, setSelectedClearanceReport] = useState(null);
   const [selectedDtrPlacement, setSelectedDtrPlacement] = useState(null);
   const [dtrTransferModalOpen, setDtrTransferModalOpen] = useState(false);
   const [officialEvalModalOpen, setOfficialEvalModalOpen] = useState(false);
+  const [evalInitialInstrumentId, setEvalInitialInstrumentId] = useState(null);
+  const [forcedEvalInstrumentId, setForcedEvalInstrumentId] = useState(null);
   const [supervisorShareModalOpen, setSupervisorShareModalOpen] = useState(false);
   const [signedDtrModalOpen, setSignedDtrModalOpen] = useState(false);
+  const [signedEvalModalOpen, setSignedEvalModalOpen] = useState(false);
+  const [signedEvalPlacement, setSignedEvalPlacement] = useState(null);
   const [auditModalOpen, setAuditModalOpen] = useState(false);
   const [auditPlacement, setAuditPlacement] = useState(null);
   const [publicSupervisorPlacementId, setPublicSupervisorPlacementId] = useState(() => {
@@ -545,6 +547,7 @@ export default function App() {
   const [evalForm, setEvalForm] = useState({
     placement_id: '',
     evaluator_type: 'adviser',
+    instrument_type: 'adviser_to_hte',
     evaluator_name: '',
     technical_score: '4.90',
     attitude_score: '4.95',
@@ -638,11 +641,29 @@ export default function App() {
     is_active: 1,
   });
 
+  const dismissNotice = useCallback(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToast(null);
+  }, []);
+
   const showNotice = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => {
-      setToast((prev) => (prev?.message === message ? null : prev));
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast((prev) => ({ id: (prev?.id || 0) + 1, message, type }));
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
+      setToast(null);
     }, 3800);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
   }, []);
 
   const isFetchingRef = useRef(false);
@@ -786,6 +807,7 @@ export default function App() {
           ...prev,
           placement_id: String(target.placement_id),
           evaluator_type: currentUser?.role === 'adviser' ? 'adviser' : 'employer',
+          instrument_type: currentUser?.role === 'adviser' ? 'adviser_to_hte' : 'supervisor_to_student',
           evaluator_name:
             currentUser?.role === 'supervisor'
               ? currentUser.display_name
@@ -836,6 +858,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    clearAllSessionSignatures();
     setCurrentUser(null);
     localStorage.removeItem('mit_ojt_user');
     localStorage.removeItem('pup_ojt_user');
@@ -929,9 +952,11 @@ export default function App() {
   const jumpToEvaluatePlacement = (placement) => {
     setEditingEvalId(null);
     const defaultType = currentUser.role === 'adviser' ? 'adviser' : 'employer';
+    const defaultInstrument = defaultType === 'adviser' ? 'adviser_to_hte' : 'supervisor_to_student';
     setEvalForm({
       placement_id: String(placement.placement_id),
       evaluator_type: defaultType,
+      instrument_type: defaultInstrument,
       evaluator_name:
         defaultType === 'adviser'
           ? placement.adviser_name || currentUser.display_name
@@ -1232,6 +1257,13 @@ export default function App() {
     setEvalForm({
       placement_id: String(ev.placement_id),
       evaluator_type: ev.evaluator_type,
+      instrument_type:
+        ev.instrument_type ||
+        (ev.evaluator_type === 'employer'
+          ? 'supervisor_to_student'
+          : ev.evaluator_type === 'adviser'
+          ? 'adviser_to_hte'
+          : 'student_to_supervisor'),
       evaluator_name: ev.evaluator_name,
       technical_score: String(ev.technical_score),
       attitude_score: String(ev.attitude_score),
@@ -1951,9 +1983,11 @@ export default function App() {
             },
             {
               id: 'evaluations',
-              label: 'Evaluations & Clearance',
+              label: 'Evals & Clearance',
               icon: IconShieldCheck,
-              count: myEvaluations.length,
+              count: myPlacement
+                ? `${getPlacementInstrumentStatus(myPlacement).completedCount}/4`
+                : myEvaluations.length,
             },
           ],
         },
@@ -2252,7 +2286,7 @@ export default function App() {
         if (!myPlacement || Number(ev.placement_id) !== Number(myPlacement.placement_id)) return false;
       } else if (currentUser?.role === 'supervisor') {
         const pids = new Set(supervisorPlacements.map((p) => Number(p.placement_id)));
-        if (!pids.has(Number(ev.placement_id))) return false;
+        if (!pids.has(Number(ev.placement_id)) || ev.evaluator_type !== 'employer') return false;
       } else if (currentUser?.role === 'adviser' && adviserScopeOnly) {
         const pids = new Set(
           data.placements
@@ -2315,6 +2349,7 @@ export default function App() {
       <PublicSupervisorVerifyView
         placement={targetPlacement}
         timelogs={data.timelogs}
+        evaluations={data.evaluations}
         onClose={() => {
           setPublicSupervisorPlacementId(null);
           try {
@@ -2344,7 +2379,7 @@ export default function App() {
         </div>
 
         <div className="auth-card">
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+          <div className="action-row-wrap" style={{ gap: '6px', marginBottom: '14px' }}>
             <button
               type="button"
               className={`btn btn-sm ${authMode === 'login' ? 'btn-primary' : 'btn-secondary'}`}
@@ -2603,11 +2638,12 @@ export default function App() {
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
+              flexWrap: 'wrap',
               textAlign: 'left',
               boxShadow: 'var(--shadow-xs)'
             }}
           >
-            <div>
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 HTE Company Supervisor?
               </div>
@@ -2649,6 +2685,7 @@ export default function App() {
     dtrTransferModalOpen ||
     supervisorShareModalOpen ||
     signedDtrModalOpen ||
+    signedEvalModalOpen ||
     auditModalOpen
   );
 
@@ -2672,7 +2709,15 @@ export default function App() {
           <div
             className="sidebar-brand-wrapper"
             title={sidebarCollapsed ? 'Expand sidebar' : undefined}
-            onClick={sidebarCollapsed ? handleToggleSidebar : undefined}
+            onClick={
+              sidebarCollapsed
+                ? () => {
+                    if (typeof window !== 'undefined' && window.innerWidth > 960) {
+                      handleToggleSidebar();
+                    }
+                  }
+                : undefined
+            }
             style={{ cursor: sidebarCollapsed ? 'pointer' : 'default' }}
           >
             <div className="sidebar-brand-icon-wrap">
@@ -2965,6 +3010,8 @@ export default function App() {
                 onOpenDtrModal={(pl) => setSelectedDtrPlacement(pl)}
                 onOpenClearanceModal={(pl) => handleOpenClearanceCertificate(pl)}
                 onOpenOfficialEval={() => {
+                  setForcedEvalInstrumentId(null);
+                  setEvalInitialInstrumentId('student_to_supervisor');
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
@@ -3033,14 +3080,23 @@ export default function App() {
                         {myPlacement.total_log_days} {Number(myPlacement.total_log_days) === 1 ? 'entry' : 'entries'}
                       </span>
                     </div>
-                    <div className="gws-mini-stat">
-                      <span className="gws-mini-label">HTE Evaluation</span>
-                      <span className="gws-mini-value mono">
-                        {Number(myPlacement.has_employer_eval)
-                          ? `${myPlacement.employer_rating} / 5.00`
-                          : 'Pending'}
-                      </span>
-                    </div>
+                    {(() => {
+                      const st = getPlacementInstrumentStatus(myPlacement);
+                      return (
+                        <div className="gws-mini-stat">
+                          <span className="gws-mini-label">Evaluations ({st.completedCount}/4)</span>
+                          <span className="gws-mini-value mono">
+                            {Number(myPlacement.requirement_met) === 1
+                              ? '4/4 Cleared'
+                              : st.inst02Online
+                              ? `INST-02: ${myPlacement.employer_rating}/5.0`
+                              : st.inst02Signed
+                              ? 'INST-02 Scan Ready'
+                              : `${st.completedCount}/4 Completed`}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="gws-deployment-foot">
@@ -3224,6 +3280,7 @@ export default function App() {
                   setEvalForm({
                     placement_id: String(targetPl?.placement_id || 1),
                     evaluator_type: 'adviser',
+                    instrument_type: 'adviser_to_hte',
                     evaluator_name: currentUser.display_name,
                     technical_score: '5.00',
                     attitude_score: '5.00',
@@ -3234,6 +3291,8 @@ export default function App() {
                   setEvalModalOpen(true);
                 }}
                 onOpenOfficialEval={() => {
+                  setForcedEvalInstrumentId(null);
+                  setEvalInitialInstrumentId('adviser_to_hte');
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
@@ -3302,7 +3361,7 @@ export default function App() {
                         Register a new BS CpE intern or assign an existing student under {currentUser.display_name}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div className="action-row-wrap" style={{ gap: '6px' }}>
                       <button
                         type="button"
                         className={`btn btn-sm ${superviseMode === 'new' ? 'btn-primary' : 'btn-secondary'}`}
@@ -3453,7 +3512,7 @@ export default function App() {
                           </div>
                         </div>
                       )}
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
                         <button type="submit" className="btn btn-primary" disabled={syncing}>
                           {superviseMode === 'new' ? 'Register & Supervise Student' : 'Assign to My Supervision'}
                         </button>
@@ -3551,14 +3610,24 @@ export default function App() {
                               </div>
                             </td>
                             <td>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                <StatusChip variant={Number(pl.has_employer_eval) ? 'success' : 'neutral'}>
-                                  HTE: {Number(pl.has_employer_eval) ? pl.employer_rating : '—'}
-                                </StatusChip>
-                                <StatusChip variant={Number(pl.has_adviser_eval) ? 'success' : 'neutral'}>
-                                  Adv: {Number(pl.has_adviser_eval) ? pl.adviser_rating : '—'}
-                                </StatusChip>
-                              </div>
+                              {(() => {
+                                const inst = getPlacementInstrumentStatus(pl);
+                                const studentDoneCount =
+                                  (inst.inst01 ? 1 : 0) + (inst.inst04 ? 1 : 0);
+                                return (
+                                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                    <StatusChip variant={inst.inst02 ? 'success' : 'neutral'}>
+                                      INST-02: {inst.inst02Online ? pl.employer_rating : inst.inst02Signed ? 'Scan' : '—'}
+                                    </StatusChip>
+                                    <StatusChip variant={inst.inst03 ? 'success' : 'neutral'}>
+                                      INST-03: {inst.inst03 ? pl.adviser_rating : '—'}
+                                    </StatusChip>
+                                    <StatusChip variant={studentDoneCount === 2 ? 'success' : 'neutral'}>
+                                      Stud: {studentDoneCount}/2
+                                    </StatusChip>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td>
                               {isEligible ? (
@@ -3602,6 +3671,19 @@ export default function App() {
                                 >
                                   {pl.signed_dtr_filename ? 'Audit*' : 'Audit'}
                                 </button>
+                                {pl.signed_eval_filename && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-tonal"
+                                    onClick={() => {
+                                      setSignedEvalPlacement(pl);
+                                      setSignedEvalModalOpen(true);
+                                    }}
+                                    title={`View signed physical INST-02 copy: ${pl.signed_eval_filename}`}
+                                  >
+                                    Scan
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   className="btn btn-ghost"
@@ -3654,6 +3736,7 @@ export default function App() {
                   setEvalForm({
                     placement_id: String(firstPl?.placement_id || 1),
                     evaluator_type: 'employer',
+                    instrument_type: 'supervisor_to_student',
                     evaluator_name: currentUser.display_name,
                     technical_score: '5.00',
                     attitude_score: '5.00',
@@ -3664,6 +3747,8 @@ export default function App() {
                   setEvalModalOpen(true);
                 }}
                 onOpenOfficialEval={() => {
+                  setForcedEvalInstrumentId(null);
+                  setEvalInitialInstrumentId('supervisor_to_student');
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
@@ -4024,6 +4109,8 @@ export default function App() {
                 currentUser={currentUser}
                 kpis={data.kpis}
                 onOpenOfficialEval={() => {
+                  setForcedEvalInstrumentId(null);
+                  setEvalInitialInstrumentId(null);
                   setOfficialEvalModalOpen(true);
                 }}
                 onUploadSignedDtr={() => {
@@ -4205,7 +4292,8 @@ export default function App() {
                                   )}
                                 </div>
                                 <div className="row-sub mono" style={{ marginTop: '3px' }}>
-                                  {Number(pl.evaluation_count) > 0 ? `Rated ${pl.average_rating}/5.0` : 'Eval pending'}
+                                  {getPlacementInstrumentStatus(pl).completedCount}/4 instruments
+                                  {Number(pl.evaluation_count) > 0 ? ` · Mean ${pl.average_rating}/5.0` : ''}
                                 </div>
                               </td>
                               <td className="text-right">
@@ -4684,7 +4772,7 @@ export default function App() {
                         </div>
                         <div className="field">
                           <label className="field-label">Phone &amp; Email</label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div className="form-inline-pair">
                             <input
                               type="text"
                               className="input"
@@ -4705,7 +4793,7 @@ export default function App() {
                         </div>
                         <div className="field">
                           <label className="field-label">MOA Status &amp; Expiry</label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div className="form-inline-pair">
                             <MaterialSelect
                               className="select"
                               value={employerForm.moa_status}
@@ -4724,7 +4812,7 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
                         <button type="submit" className="btn btn-primary" disabled={syncing}>
                           {editingEmployerId ? 'Save Changes' : 'Save Partner HTE'}
                         </button>
@@ -5072,7 +5160,7 @@ export default function App() {
                         </div>
                         <div className="field">
                           <label className="field-label">Start &amp; End Date</label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div className="form-inline-pair">
                             <input
                               type="date"
                               className="input"
@@ -5091,11 +5179,10 @@ export default function App() {
                         </div>
                         <div className="field">
                           <label className="field-label">Required Hours &amp; Term</label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div className="form-inline-pair">
                             <input
                               type="number"
-                              className="input tabular-nums"
-                              style={{ width: '96px' }}
+                              className="input tabular-nums input-code-sm"
                               value={placementForm.required_hours}
                               onChange={(e) => setPlacementForm({ ...placementForm, required_hours: e.target.value })}
                               required
@@ -5110,7 +5197,7 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
                         <button type="submit" className="btn btn-primary" disabled={syncing}>
                           {editingPlacementId ? 'Save Changes' : 'Create Placement'}
                         </button>
@@ -5486,34 +5573,12 @@ export default function App() {
 
               {/* UNASSIGNED STUDENT NOTICE */}
               {currentUser.role === 'student' && !myPlacement && (
-                <div
-                  style={{
-                    marginBottom: '16px',
-                    padding: '16px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-default)',
-                    background: 'var(--bg-surface)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '16px',
-                    flexWrap: 'wrap',
-                    boxShadow: 'var(--shadow-xs)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div
-                      style={{
-                        padding: '10px',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'var(--brand-subtle)',
-                        color: 'var(--brand)',
-                        flexShrink: 0
-                      }}
-                    >
+                <div className="notice-banner-card is-lg">
+                  <div className="notice-banner-main is-center">
+                    <div className="notice-banner-icon">
                       <IconAlert size={22} />
                     </div>
-                    <div>
+                    <div className="notice-banner-copy">
                       <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
                         OJT Placement Not Activated
                       </div>
@@ -5522,47 +5587,33 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setActiveTab('dashboard')}
-                  >
-                    <IconDashboard size={13} />
-                    Activate Placement
-                  </button>
+                  <div className="notice-banner-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setActiveTab('dashboard')}
+                    >
+                      <IconDashboard size={13} />
+                      Activate Placement
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* STUDENT SIGNED PHYSICAL DTR CARD */}
               {currentUser.role === 'student' && myPlacement && (
                 <div
-                  style={{
-                    marginBottom: '16px',
-                    padding: '16px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-default)',
-                    background: myPlacement?.signed_dtr_filename ? 'var(--bg-surface)' : 'var(--brand-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '16px',
-                    flexWrap: 'wrap',
-                    boxShadow: 'var(--shadow-xs)'
-                  }}
+                  className={`notice-banner-card is-lg ${myPlacement?.signed_dtr_filename ? '' : 'is-highlight'}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', maxWidth: '680px' }}>
+                  <div className="notice-banner-main">
                     <div
-                      style={{
-                        padding: '10px',
-                        borderRadius: 'var(--radius-md)',
-                        background: myPlacement?.signed_dtr_filename ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-surface)',
-                        color: myPlacement?.signed_dtr_filename ? 'var(--color-success, #10b981)' : 'var(--brand)',
-                        flexShrink: 0
-                      }}
+                      className={`notice-banner-icon ${
+                        myPlacement?.signed_dtr_filename ? 'is-success' : 'is-surface'
+                      }`}
                     >
                       <IconFileText size={22} />
                     </div>
-                    <div>
+                    <div className="notice-banner-copy">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           Official Signed Physical DTR (Supervisor Sign-off)
@@ -5588,7 +5639,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  <div className="notice-banner-actions">
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
@@ -5615,33 +5666,12 @@ export default function App() {
 
               {/* ADVISER CROSS-AUDIT & ENDORSEMENT BANNER */}
               {currentUser.role === 'adviser' && (
-                <div
-                  style={{
-                    marginBottom: '16px',
-                    padding: '14px 16px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-default)',
-                    background: 'var(--bg-surface)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '16px',
-                    flexWrap: 'wrap',
-                    boxShadow: 'var(--shadow-xs)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div
-                      style={{
-                        padding: '10px',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'var(--brand-subtle)',
-                        color: 'var(--brand)'
-                      }}
-                    >
+                <div className="notice-banner-card">
+                  <div className="notice-banner-main is-center">
+                    <div className="notice-banner-icon">
                       <IconShieldCheck size={20} />
                     </div>
-                    <div>
+                    <div className="notice-banner-copy">
                       <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
                         Advisory DTR Cross-Audit &amp; Academic Endorsement
                       </div>
@@ -5651,7 +5681,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="notice-banner-actions">
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
@@ -6024,96 +6054,348 @@ export default function App() {
             <>
               {currentUser.role === 'student' ? (
                 <>
-                  <div className="page-header">
-                    <div>
-                      <h1 className="page-title">My Evaluations &amp; Clearance</h1>
-                      <p className="page-subtitle">
-                        Performance ratings from your HTE supervisor and faculty OJT adviser
-                      </p>
-                    </div>
-                    {myPlacement && (
-                      <div className="page-actions">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => {
-                            setOfficialEvalModalOpen(true);
-                          }}
-                        >
-                          <IconEvaluation size={13} />
-                          Evaluate Supervisor / Adviser
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleOpenClearanceCertificate(myPlacement)}
-                        >
-                          <IconPrinter size={13} />
-                          Print Clearance Certificate
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {myEvaluations.length === 0 ? (
-                    <div className="panel">
-                      <div className="panel-body" style={{ padding: '28px', textAlign: 'center', color: '#6b7280' }}>
-                        No performance evaluations have been submitted for your placement yet. Once your HTE
-                        supervisor or faculty adviser submits your rating, it will appear here automatically.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="equal-grid">
-                      {myEvaluations.map((ev) => (
-                        <div key={ev.eval_id} className="panel">
-                          <div className="panel-header">
-                            <div>
-                              <div className="panel-title">{ev.evaluator_name}</div>
-                              <div className="panel-desc">
-                                {ev.evaluator_type === 'employer'
-                                  ? 'HTE Training Supervisor Evaluation'
-                                  : 'Faculty Practicum Adviser Evaluation'}{' '}
-                                · {ev.date_evaluated}
-                              </div>
-                            </div>
-                            <StatusChip variant="success">
-                              {Number(ev.rating).toFixed(2)} / 5.00
-                            </StatusChip>
+                  {(() => {
+                    const instStatus = getPlacementInstrumentStatus(myPlacement || {});
+                    return (
+                      <>
+                        <div className="page-header">
+                          <div>
+                            <h1 className="page-title">My Evaluations &amp; Clearance</h1>
+                            <p className="page-subtitle">
+                              Complete your Student Feedback forms (INST-01 &amp; INST-04), manage signed INST-02 copies, and track 4-instrument clearance
+                            </p>
                           </div>
-                          <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div className="field-grid-3">
-                              <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
-                                <div className="kv-label">Technical</div>
-                                <div className="kv-value mono">{ev.technical_score} / 5.00</div>
-                              </div>
-                              <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
-                                <div className="kv-label">Work Ethic</div>
-                                <div className="kv-value mono">{ev.attitude_score} / 5.00</div>
-                              </div>
-                              <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
-                                <div className="kv-label">Attendance</div>
-                                <div className="kv-value mono">{ev.attendance_score} / 5.00</div>
-                              </div>
+                          {myPlacement && (
+                            <div className="page-actions">
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => {
+                                  setForcedEvalInstrumentId(null);
+                                  setEvalInitialInstrumentId('student_to_supervisor');
+                                  setOfficialEvalModalOpen(true);
+                                }}
+                              >
+                                <IconEvaluation size={13} />
+                                Evaluate Supervisor / Adviser
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleOpenClearanceCertificate(myPlacement)}
+                              >
+                                <IconPrinter size={13} />
+                                Print Clearance Certificate
+                              </button>
                             </div>
-                            <div>
-                              <div className="kv-label">Evaluator Remarks</div>
-                              <p style={{ fontSize: '12.5px', color: '#374151', marginTop: '4px', lineHeight: 1.55 }}>
-                                &ldquo;{ev.comments}&rdquo;
-                              </p>
-                            </div>
-                          </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        {myPlacement && (
+                          <>
+                            <div className="panel" style={{ marginBottom: '16px' }}>
+                              <div className="panel-header">
+                                <div>
+                                  <div className="panel-title">4-Instrument Practicum Evaluation Checklist</div>
+                                  <div className="panel-desc">
+                                    All 4 official instruments must be satisfied together with required training hours before clearance endorsement
+                                  </div>
+                                </div>
+                                <StatusChip variant={instStatus.allInstrumentsMet ? 'success' : 'warning'}>
+                                  {instStatus.completedCount} / 4 Completed
+                                </StatusChip>
+                              </div>
+                              <div className="panel-body">
+                                <div className="equal-grid">
+                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-01</span>
+                                        <StatusChip variant={instStatus.inst01 ? 'success' : 'warning'}>
+                                          {instStatus.inst01 ? `Submitted (${myPlacement.student_supervisor_rating}/5.0)` : 'Action Required'}
+                                        </StatusChip>
+                                      </div>
+                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        Student &rarr; HTE Supervisor
+                                      </div>
+                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                        Rate workplace mentorship &amp; training quality from your Host Company supervisor.
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <button
+                                        type="button"
+                                        className={`btn btn-sm ${instStatus.inst01 ? 'btn-secondary' : 'btn-primary'}`}
+                                        onClick={() => {
+                                          setForcedEvalInstrumentId(null);
+                                          setEvalInitialInstrumentId('student_to_supervisor');
+                                          setOfficialEvalModalOpen(true);
+                                        }}
+                                      >
+                                        <IconEvaluation size={13} />
+                                        {instStatus.inst01 ? 'Review / Update INST-01' : 'Complete INST-01'}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-02</span>
+                                        <StatusChip variant={instStatus.inst02 ? 'success' : 'neutral'}>
+                                          {instStatus.inst02Online
+                                            ? `Online (${myPlacement.employer_rating}/5.0)`
+                                            : instStatus.inst02Signed
+                                            ? 'Signed Scan on File'
+                                            : 'Pending Supervisor'}
+                                        </StatusChip>
+                                      </div>
+                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        Supervisor &rarr; Trainee &amp; School
+                                      </div>
+                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                        Submitted online by your supervisor via the shareable portal link, or upload a wet-ink signed scan.
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => {
+                                          setForcedEvalInstrumentId('supervisor_to_student');
+                                          setEvalInitialInstrumentId('supervisor_to_student');
+                                          setOfficialEvalModalOpen(true);
+                                        }}
+                                      >
+                                        <IconPrinter size={13} />
+                                        Print Blank INST-02
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-tonal btn-sm"
+                                        onClick={() => {
+                                          setSignedEvalPlacement(myPlacement);
+                                          setSignedEvalModalOpen(true);
+                                        }}
+                                      >
+                                        <IconUpload size={13} />
+                                        {myPlacement.signed_eval_filename ? 'Manage Scan' : 'Upload Signed Scan'}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-03</span>
+                                        <StatusChip variant={instStatus.inst03 ? 'success' : 'neutral'}>
+                                          {instStatus.inst03 ? `Completed (${myPlacement.adviser_rating}/5.0)` : 'Pending Adviser'}
+                                        </StatusChip>
+                                      </div>
+                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        Faculty Adviser &rarr; HTE Quality Audit
+                                      </div>
+                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                        Submitted by your Faculty Practicum Adviser ({myPlacement.adviser_name}) upon auditing your placement.
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                      Adviser-exclusive institutional audit instrument
+                                    </div>
+                                  </div>
+
+                                  <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'space-between' }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)' }}>INST-04</span>
+                                        <StatusChip variant={instStatus.inst04 ? 'success' : 'warning'}>
+                                          {instStatus.inst04 ? `Submitted (${myPlacement.student_adviser_rating}/5.0)` : 'Action Required'}
+                                        </StatusChip>
+                                      </div>
+                                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        Student &rarr; Faculty OJT Adviser
+                                      </div>
+                                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                        Evaluate faculty supervision, monitoring responsiveness, and academic guidance.
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <button
+                                        type="button"
+                                        className={`btn btn-sm ${instStatus.inst04 ? 'btn-secondary' : 'btn-primary'}`}
+                                        onClick={() => {
+                                          setForcedEvalInstrumentId(null);
+                                          setEvalInitialInstrumentId('student_to_adviser');
+                                          setOfficialEvalModalOpen(true);
+                                        }}
+                                      >
+                                        <IconEvaluation size={13} />
+                                        {instStatus.inst04 ? 'Review / Update INST-04' : 'Complete INST-04'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* STUDENT SIGNED PHYSICAL INST-02 CARD */}
+                            <div
+                              className={`notice-banner-card is-lg ${myPlacement?.signed_eval_filename ? '' : 'is-highlight'}`}
+                            >
+                              <div className="notice-banner-main">
+                                <div
+                                  className={`notice-banner-icon ${
+                                    myPlacement?.signed_eval_filename ? 'is-success' : 'is-surface'
+                                  }`}
+                                >
+                                  <IconFileText size={22} />
+                                </div>
+                                <div className="notice-banner-copy">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                      Signed Physical INST-02 Evaluation Copy (Paper Alternative)
+                                    </span>
+                                    <span
+                                      className={`badge ${myPlacement?.signed_eval_filename ? 'badge-success' : 'badge-warning'}`}
+                                      style={{ fontSize: '10.5px' }}
+                                    >
+                                      {myPlacement?.signed_eval_filename ? 'Signed Scan on File' : 'Optional Paper Fallback'}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+                                    {myPlacement?.signed_eval_filename ? (
+                                      <>
+                                        File: <strong>{myPlacement.signed_eval_filename}</strong> (Uploaded on {myPlacement.signed_eval_uploaded_at || 'Recent'}) &middot; Accepted toward your INST-02 supervisor evaluation requirement for adviser &amp; admin clearance verification.
+                                      </>
+                                    ) : (
+                                      <>
+                                        If your HTE Supervisor prefers wet-ink signing over the shareable portal link, print the blank INST-02 form, have your supervisor sign it, and upload the PDF or photo scan here.
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="notice-banner-actions">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => setSupervisorShareModalOpen(true)}
+                                >
+                                  <IconLink size={13} />
+                                  Share Supervisor Portal
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => {
+                                    setSignedEvalPlacement(myPlacement);
+                                    setSignedEvalModalOpen(true);
+                                  }}
+                                >
+                                  <IconUpload size={13} />
+                                  {myPlacement?.signed_eval_filename ? 'Manage Signed INST-02' : 'Upload Signed INST-02'}
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {myEvaluations.length === 0 ? (
+                          <div className="panel">
+                            <div className="panel-body" style={{ padding: '28px', textAlign: 'center', color: '#6b7280' }}>
+                              No evaluation records have been submitted for your placement yet. Start by submitting your own feedback for your HTE Supervisor (INST-01) and Faculty OJT Adviser (INST-04).
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="equal-grid">
+                            {myEvaluations.map((ev) => {
+                              const instMeta = ev.instrument_type ? getInstrumentById(ev.instrument_type) : null;
+                              const isOwnStudentFeedback = ev.evaluator_type === 'student';
+                              const subtitleLabel = instMeta
+                                ? `${instMeta.code} · ${instMeta.shortTitle || instMeta.title}`
+                                : ev.evaluator_type === 'employer'
+                                ? 'INST-02 · HTE Training Supervisor Evaluation'
+                                : 'INST-03 · Faculty Practicum Adviser Evaluation';
+                              return (
+                                <div key={ev.eval_id} className="panel">
+                                  <div className="panel-header">
+                                    <div>
+                                      <div className="panel-title">{ev.evaluator_name}</div>
+                                      <div className="panel-desc">
+                                        {subtitleLabel} &middot; {ev.date_evaluated}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <StatusChip variant="success">
+                                        {Number(ev.rating).toFixed(2)} / 5.00
+                                      </StatusChip>
+                                      {isOwnStudentFeedback && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-ghost btn-xs"
+                                          onClick={() => {
+                                            setForcedEvalInstrumentId(null);
+                                            setEvalInitialInstrumentId(
+                                              ev.instrument_type || 'student_to_supervisor'
+                                            );
+                                            setOfficialEvalModalOpen(true);
+                                          }}
+                                          title="Update your submitted evaluation"
+                                        >
+                                          <IconEdit size={12} />
+                                          Edit
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div className="field-grid-3">
+                                      <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
+                                        <div className="kv-label">{instMeta ? 'Domain I' : 'Technical'}</div>
+                                        <div className="kv-value mono">{ev.technical_score} / 5.00</div>
+                                      </div>
+                                      <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
+                                        <div className="kv-label">{instMeta ? 'Domain II' : 'Work Ethic'}</div>
+                                        <div className="kv-value mono">{ev.attitude_score} / 5.00</div>
+                                      </div>
+                                      <div style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: '5px' }}>
+                                        <div className="kv-label">{instMeta ? 'Domain III' : 'Attendance'}</div>
+                                        <div className="kv-value mono">{ev.attendance_score} / 5.00</div>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="kv-label">Evaluator Remarks</div>
+                                      <p style={{ fontSize: '12.5px', color: '#374151', marginTop: '4px', lineHeight: 1.55 }}>
+                                        &ldquo;{ev.comments}&rdquo;
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </>
               ) : (
                 <>
                   <div className="page-header">
                     <div>
-                      <h1 className="page-title">Student Performance Evaluations</h1>
+                      <h1 className="page-title">
+                        {currentUser.role === 'adviser'
+                          ? 'Faculty HTE Audits & Placement Evaluations'
+                          : currentUser.role === 'supervisor'
+                          ? 'Company Intern Evaluations (INST-02)'
+                          : 'Student Performance Evaluations'}
+                      </h1>
                       <p className="page-subtitle">
-                        Submit faculty adviser assessments or record HTE supervisor evaluation scores
+                        {currentUser.role === 'adviser'
+                          ? 'Submit Institutional HTE Quality Audits (INST-03) and review trainee evaluations & uploaded signed INST-02 scans'
+                          : currentUser.role === 'supervisor'
+                          ? 'Evaluate assigned student trainees using the official INST-02 Trainee & School rubric'
+                          : 'Full 360-degree rubric oversight across all 4 practicum evaluation instruments (INST-01 to INST-04)'}
                       </p>
                     </div>
                     <div className="page-actions">
@@ -6121,11 +6403,23 @@ export default function App() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => {
+                          setForcedEvalInstrumentId(null);
+                          setEvalInitialInstrumentId(
+                            currentUser.role === 'adviser'
+                              ? 'adviser_to_hte'
+                              : currentUser.role === 'supervisor'
+                              ? 'supervisor_to_student'
+                              : null
+                          );
                           setOfficialEvalModalOpen(true);
                         }}
                       >
                         <IconEvaluation size={13} />
-                        Official 360° Rubrics &amp; Forms
+                        {currentUser.role === 'adviser'
+                          ? 'HTE Quality Audit Form (INST-03)'
+                          : currentUser.role === 'supervisor'
+                          ? 'Official INST-02 Rubric Form'
+                          : 'Official 360° Rubrics & Forms'}
                       </button>
 
                       <button
@@ -6143,6 +6437,8 @@ export default function App() {
                           setEvalForm({
                             placement_id: String(targetPl?.placement_id || 1),
                             evaluator_type: currentUser.role === 'supervisor' ? 'employer' : 'adviser',
+                            instrument_type:
+                              currentUser.role === 'supervisor' ? 'supervisor_to_student' : 'adviser_to_hte',
                             evaluator_name: currentUser.display_name,
                             technical_score: '5.00',
                             attitude_score: '5.00',
@@ -6154,7 +6450,11 @@ export default function App() {
                         }}
                       >
                         <IconPlus size={13} />
-                        Submit Quick Evaluation
+                        {currentUser.role === 'adviser'
+                          ? 'Quick HTE Audit (INST-03)'
+                          : currentUser.role === 'supervisor'
+                          ? 'Quick Intern Eval (INST-02)'
+                          : 'Submit Quick Evaluation'}
                       </button>
                     </div>
                   </div>
@@ -6264,13 +6564,13 @@ export default function App() {
                                           }}
                                         >
                                           {ev.instrument_type === 'supervisor_to_student'
-                                            ? 'Trainee Rubric'
+                                            ? 'INST-02 · Trainee Rubric'
                                             : ev.instrument_type === 'student_to_supervisor'
-                                            ? 'Supervisor Eval'
+                                            ? 'INST-01 · Supervisor Eval'
                                             : ev.instrument_type === 'adviser_to_hte'
-                                            ? 'HTE Compliance'
+                                            ? 'INST-03 · HTE Audit'
                                             : ev.instrument_type === 'student_to_adviser'
-                                            ? 'Faculty Eval'
+                                            ? 'INST-04 · Faculty Eval'
                                             : ev.instrument_type}
                                         </span>
                                       )}
@@ -6287,6 +6587,10 @@ export default function App() {
                                         className="btn btn-ghost"
                                         title="Open Official Rubrics & Print Form"
                                         onClick={() => {
+                                          setForcedEvalInstrumentId(null);
+                                          if (currentUser.role === 'admin' && ev.instrument_type) {
+                                            setEvalInitialInstrumentId(ev.instrument_type);
+                                          }
                                           setOfficialEvalModalOpen(true);
                                         }}
                                       >
@@ -6393,7 +6697,7 @@ export default function App() {
                         Register a new student or assign/transfer an existing student to a Faculty OJT Adviser
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div className="action-row-wrap" style={{ gap: '6px' }}>
                       <button
                         type="button"
                         className={`btn btn-sm ${superviseMode === 'new' ? 'btn-primary' : 'btn-secondary'}`}
@@ -6458,11 +6762,10 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="field-label">Section &amp; Email</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div className="form-inline-pair">
                               <input
                                 type="text"
-                                className="input"
-                                style={{ width: '115px' }}
+                                className="input input-code-md"
                                 value={superviseForm.section}
                                 onChange={(e) =>
                                   setSuperviseForm({ ...superviseForm, section: e.target.value })
@@ -6564,7 +6867,7 @@ export default function App() {
                           </div>
                         </div>
                       )}
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
                         <button type="submit" className="btn btn-primary" disabled={syncing}>
                           {superviseMode === 'new' ? 'Register & Supervise Student' : 'Assign Student to Adviser'}
                         </button>
@@ -6665,7 +6968,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
                         <button type="submit" className="btn btn-primary" disabled={syncing}>
                           {editingAdviserId ? 'Save Changes' : 'Save Adviser'}
                         </button>
@@ -6685,7 +6988,10 @@ export default function App() {
                 </div>
               )}
 
-              <div className="metric-strip" style={{ gridTemplateColumns: `repeat(${Math.min(3, Math.max(1, data.advisers.length))}, 1fr)` }}>
+              <div
+                className="metric-strip metric-strip-advisers"
+                style={{ '--adviser-cols': Math.min(3, Math.max(1, data.advisers.length)) }}
+              >
                 {data.advisers.map((adv) => {
                   const isSelected = String(selectedAdviserFilter) === String(adv.adviser_id);
                   return (
@@ -6893,14 +7199,23 @@ export default function App() {
                             </div>
                           </td>
                           <td>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <StatusChip variant={Number(pl.has_employer_eval) ? 'success' : 'neutral'}>
-                                HTE: {Number(pl.has_employer_eval) ? pl.employer_rating : '—'}
-                              </StatusChip>
-                              <StatusChip variant={Number(pl.has_adviser_eval) ? 'success' : 'neutral'}>
-                                Adv: {Number(pl.has_adviser_eval) ? pl.adviser_rating : '—'}
-                              </StatusChip>
-                            </div>
+                            {(() => {
+                              const inst = getPlacementInstrumentStatus(pl);
+                              const studCount = (inst.inst01 ? 1 : 0) + (inst.inst04 ? 1 : 0);
+                              return (
+                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                  <StatusChip variant={inst.inst02 ? 'success' : 'neutral'}>
+                                    INST-02: {inst.inst02Online ? pl.employer_rating : inst.inst02Signed ? 'Scan' : '—'}
+                                  </StatusChip>
+                                  <StatusChip variant={inst.inst03 ? 'success' : 'neutral'}>
+                                    INST-03: {inst.inst03 ? pl.adviser_rating : '—'}
+                                  </StatusChip>
+                                  <StatusChip variant={studCount === 2 ? 'success' : 'neutral'}>
+                                    Stud: {studCount}/2
+                                  </StatusChip>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td>
                             {Number(pl.requirement_met) === 1 ? (
@@ -6925,6 +7240,19 @@ export default function App() {
                               >
                                 DTR
                               </button>
+                              {pl.signed_eval_filename && (
+                                <button
+                                  type="button"
+                                  className="btn btn-tonal"
+                                  onClick={() => {
+                                    setSignedEvalPlacement(pl);
+                                    setSignedEvalModalOpen(true);
+                                  }}
+                                  title={`View signed physical INST-02 scan: ${pl.signed_eval_filename}`}
+                                >
+                                  Scan
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="btn btn-ghost"
@@ -7040,8 +7368,9 @@ export default function App() {
                           );
                         })
                         .map((cr) => {
+                          const instStatus = getPlacementInstrumentStatus(cr);
                           const hoursMet = Number(cr.total_hours_completed) >= Number(cr.required_hours);
-                          const evalMet = Number(cr.evaluation_count) > 0;
+                          const evalMet = instStatus.allInstrumentsMet;
                           const isEligible = Number(cr.requirement_met) === 1;
 
                           return (
@@ -7078,10 +7407,17 @@ export default function App() {
                               <td>
                                 {evalMet ? (
                                   <StatusChip variant="success">
-                                    Verified ({cr.average_rating}/5.0)
+                                    4/4 Verified ({cr.average_rating}/5.0)
                                   </StatusChip>
                                 ) : (
-                                  <StatusChip variant="neutral">Missing</StatusChip>
+                                  <StatusChip variant={instStatus.completedCount > 0 ? 'warning' : 'neutral'}>
+                                    {instStatus.completedCount}/4 Instruments
+                                  </StatusChip>
+                                )}
+                                {cr.signed_eval_filename && (
+                                  <div className="row-sub" style={{ marginTop: '3px' }}>
+                                    Signed INST-02 scan on file
+                                  </div>
                                 )}
                               </td>
                               <td>
@@ -7104,6 +7440,19 @@ export default function App() {
                                     >
                                       <IconCheckCircle size={12} />
                                       Endorse &amp; Clear
+                                    </button>
+                                  )}
+                                  {cr.signed_eval_filename && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-tonal btn-sm"
+                                      onClick={() => {
+                                        setSignedEvalPlacement(cr);
+                                        setSignedEvalModalOpen(true);
+                                      }}
+                                      title={`View signed INST-02 scan: ${cr.signed_eval_filename}`}
+                                    >
+                                      Signed INST-02
                                     </button>
                                   )}
                                   <button
@@ -7282,7 +7631,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                      <div className="action-row-wrap" style={{ marginTop: '14px' }}>
                         <button type="submit" className="btn btn-primary" disabled={syncing}>
                           {editingUserId ? 'Save Changes' : 'Create Account'}
                         </button>
@@ -7541,6 +7890,7 @@ export default function App() {
 
       <ClearanceModal
         report={selectedClearanceReport}
+        currentUser={currentUser}
         onClose={() => setSelectedClearanceReport(null)}
       />
 
@@ -7553,6 +7903,7 @@ export default function App() {
               )
             : []
         }
+        currentUser={currentUser}
         onClose={() => setSelectedDtrPlacement(null)}
       />
 
@@ -7625,9 +7976,31 @@ export default function App() {
       />
 
       <SignedDtrUploadModal
+        documentKind="dtr"
         isOpen={signedDtrModalOpen}
         onClose={() => setSignedDtrModalOpen(false)}
         placement={myPlacement || data.placements[0]}
+        onSuccess={(msg) => {
+          showNotice(msg);
+          fetchSystemData(true);
+        }}
+      />
+
+      <SignedDtrUploadModal
+        documentKind="eval"
+        isOpen={signedEvalModalOpen}
+        onClose={() => {
+          setSignedEvalModalOpen(false);
+          setSignedEvalPlacement(null);
+        }}
+        placement={signedEvalPlacement || myPlacement || data.placements[0]}
+        onOpenBlankForm={() => {
+          setSignedEvalModalOpen(false);
+          setSignedEvalPlacement(null);
+          setForcedEvalInstrumentId('supervisor_to_student');
+          setEvalInitialInstrumentId('supervisor_to_student');
+          setOfficialEvalModalOpen(true);
+        }}
         onSuccess={(msg) => {
           showNotice(msg);
           fetchSystemData(true);
@@ -7692,7 +8065,11 @@ export default function App() {
 
       <OfficialEvaluationModal
         isOpen={officialEvalModalOpen}
-        onClose={() => setOfficialEvalModalOpen(false)}
+        onClose={() => {
+          setOfficialEvalModalOpen(false);
+          setEvalInitialInstrumentId(null);
+          setForcedEvalInstrumentId(null);
+        }}
         placements={
           currentUser?.role === 'student' && myPlacement
             ? [myPlacement]
@@ -7702,19 +8079,24 @@ export default function App() {
             ? data.placements.filter((p) => Number(p.adviser_id) === Number(currentUser.linked_id))
             : data.placements
         }
+        evaluations={data.evaluations}
         currentUser={currentUser}
+        initialInstrumentId={evalInitialInstrumentId}
+        forcedInstrumentId={forcedEvalInstrumentId}
+        onOpenSignedEvalUpload={(pl) => {
+          setOfficialEvalModalOpen(false);
+          setEvalInitialInstrumentId(null);
+          setForcedEvalInstrumentId(null);
+          setSignedEvalPlacement(pl || myPlacement || data.placements[0]);
+          setSignedEvalModalOpen(true);
+        }}
         onSuccess={(msg) => {
           showNotice(msg);
           fetchSystemData(true);
         }}
       />
 
-      {toast && (
-        <div className={`toast ${toast.type === 'error' ? 'toast-error' : 'toast-success'}`} role="status">
-          {toast.type === 'error' ? <IconAlert size={15} /> : <IconCheckCircle size={15} />}
-          <span>{toast.message}</span>
-        </div>
-      )}
+      <Snackbar key={toast?.id} message={toast?.message} type={toast?.type} onClose={dismissNotice} />
     </div>
   );
 }
