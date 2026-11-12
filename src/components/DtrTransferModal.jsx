@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { SegmentedControl, Button, MaterialSelect } from './MaterialComponents';
 import { apiFetch } from '../utils/apiClient';
+import usePresence, { useSmoothSwitch } from '../utils/usePresence';
 import {
   IconClose,
   IconDownload,
@@ -354,14 +355,17 @@ export default function DtrTransferModal({
     return parsedRows.reduce((sum, r) => sum + Number(r.hours_rendered || 0), 0);
   }, [parsedRows]);
 
+  const { rendered, exiting } = usePresence(isOpen, 150);
+  const transferTabSwitch = useSmoothSwitch(activeTab, 85);
+
   const signedHoursNum = parseFloat(signedHoursInput) || 0;
   const isHoursMatched = Math.abs(databaseHours - signedHoursNum) < 0.5;
 
-  if (!isOpen) return null;
+  if (!rendered) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal-card modal-entry-card" style={{ maxWidth: '820px' }} onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+      <div className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`} style={{ maxWidth: '820px' }} onClick={(e) => e.stopPropagation()}>
         {/* MODAL HEADER */}
         <div className="modal-header">
           <div className="modal-header-identity">
@@ -431,6 +435,14 @@ export default function DtrTransferModal({
         )}
 
         <div className="modal-body modal-entry-body">
+          <div
+            key={transferTabSwitch.displayedKey}
+            className={`view-stage ${transferTabSwitch.phase === 'exiting' ? 'is-exiting' : ''}`}
+          >
+            {(() => {
+              const activeTab = transferTabSwitch.displayedKey;
+              return (
+                <>
           {/* TAB 1: EXCEL / CSV BATCH TRANSFER */}
           {activeTab === 'import' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1077,6 +1089,10 @@ export default function DtrTransferModal({
               </div>
             </div>
           )}
+                </>
+              );
+            })()}
+          </div>
         </div>
       </div>
     </div>

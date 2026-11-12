@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { IconClose, IconCheckCircle } from './Icons';
+import usePresence from '../utils/usePresence';
 
 /**
  * Reusable Google Material Design 3 Form Dialog container.
@@ -19,6 +20,7 @@ export default function M3FormModal({
   children,
 }) {
   const modalRef = useRef(null);
+  const { rendered, exiting } = usePresence(isOpen, 150);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -31,17 +33,17 @@ export default function M3FormModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, syncing]);
 
-  if (!isOpen) return null;
+  if (!rendered) return null;
 
   return (
     <div
-      className="modal-backdrop"
-      onClick={syncing ? undefined : onClose}
+      className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`}
+      onClick={syncing || exiting ? undefined : onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="modal-card modal-entry-card"
+        className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
         style={{ maxWidth }}
         onClick={(e) => e.stopPropagation()}
         ref={modalRef}

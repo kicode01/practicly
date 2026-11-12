@@ -770,7 +770,7 @@ try {
         }
 
         if ((int)$user['is_active'] === 0) {
-            jsonResponse(['ok' => false, 'error' => 'This user account is currently deactivated.'], 403);
+            jsonResponse(['ok' => false, 'error' => 'This user account is pending coordinator activation or currently disabled.'], 403);
         }
 
         $storedHash = (string)$user['password_hash'];
@@ -798,28 +798,93 @@ try {
     // =========================================================================
     if ($method === 'POST' && $resource === 'register') {
         $body          = getJsonBody();
+        $role          = strtolower(trim((string)($body['role'] ?? 'student')));
+        if (!in_array($role, ['student', 'adviser'], true)) {
+            jsonResponse(['ok' => false, 'error' => 'Self-registration is only open to student interns and faculty advisers.'], 403);
+        }
+
         $fullName      = trim((string)($body['full_name'] ?? ''));
-        $studentNumber = trim((string)($body['student_number'] ?? ''));
-        $section       = trim((string)($body['section'] ?? 'BSCpE 4-1'));
         $email         = trim((string)($body['email'] ?? ''));
         $contactNumber = trim((string)($body['contact_number'] ?? ''));
         $username      = trim((string)($body['username'] ?? ''));
-        $password      = (string)($body['password'] ?? 'password123');
+        $hasPasswordKey = array_key_exists('password', $body);
+        $rawPassword   = $hasPasswordKey ? (string)$body['password'] : 'password123';
+        $password      = trim($rawPassword) === '' && $hasPasswordKey ? '' : $rawPassword;
 
         if ($fullName === '' || $email === '' || $username === '') {
             jsonResponse(['ok' => false, 'error' => 'Full name, institutional email, and username are required.'], 400);
         }
-        if ($studentNumber === '') {
-            $studentNumber = sprintf('2023-%05d-MN-0', random_int(300, 999));
-        }
-        if ($password === '') {
-            $password = 'password123';
+        if ($hasPasswordKey && trim($rawPassword) === '') {
+            jsonResponse(['ok' => false, 'error' => 'Password cannot be empty or whitespace.'], 400);
         }
 
         $checkUser = $pdo->prepare('SELECT COUNT(*) FROM Users WHERE LOWER(TRIM(username)) = LOWER(:u)');
         $checkUser->execute([':u' => $username]);
         if ((int)$checkUser->fetchColumn() > 0) {
             jsonResponse(['ok' => false, 'error' => 'That username is already taken.'], 409);
+        }
+
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+
+        if ($role === 'adviser') {
+            $employeeNumber = trim((string)($body['employee_number'] ?? ''));
+            if ($employeeNumber === '') {
+                $employeeNumber = sprintf('ADV-%s-%04d', date('Y'), random_int(1000, 9999));
+            }
+            $department = trim((string)($body['department'] ?? ($body['section'] ?? 'General Academic Department'))) ?: 'General Academic Department';
+
+            $checkAdv = $pdo->prepare('SELECT COUNT(*) FROM Adviser WHERE LOWER(TRIM(employee_number)) = LOWER(:eno) OR LOWER(TRIM(email)) = LOWER(:em)');
+            $checkAdv->execute([':eno' => $employeeNumber, ':em' => $email]);
+            if ((int)$checkAdv->fetchColumn() > 0) {
+                jsonResponse(['ok' => false, 'error' => 'Employee number or email is already registered in the Adviser directory.'], 409);
+            }
+
+            $aStmt = $pdo->prepare("
+                INSERT INTO Adviser (employee_number, full_name, department, email, contact_number)
+                VALUES (:eno, :fname, :dept, :em, :cnum)
+            ");
+            $aStmt->execute([
+                ':eno'   => $employeeNumber,
+                ':fname' => $fullName,
+                ':dept'  => $department,
+                ':em'    => $email,
+                ':cnum'  => $contactNumber !== '' ? $contactNumber : '0917-555-0100',
+            ]);
+            $newAdviserId = (int)$pdo->lastInsertId();
+
+            // Create faculty adviser account in pending coordinator-approval state (is_active = 0) to prevent unauthorized privilege escalation.
+            $uStmt = $pdo->prepare("
+                INSERT INTO Users (username, password_hash, role, linked_id, is_active)
+                VALUES (:u, :h, 'adviser', :lid, 0)
+            ");
+            $uStmt->execute([
+                ':u'   => $username,
+                ':h'   => $hash,
+                ':lid' => $newAdviserId,
+            ]);
+            $newUserId = (int)$pdo->lastInsertId();
+
+            jsonResponse([
+                'ok'               => true,
+                'pending_approval' => true,
+                'message'          => 'Faculty Adviser account request submitted. Ask your Practicum Coordinator to activate it under User Accounts before signing in.',
+                'user'             => [
+                    'user_id'         => $newUserId,
+                    'username'        => $username,
+                    'role'            => 'adviser',
+                    'linked_id'       => $newAdviserId,
+                    'is_active'       => 0,
+                    'display_name'    => $fullName,
+                    'identifier_code' => $employeeNumber,
+                    'unit_label'      => $department,
+                ],
+            ], 201);
+        }
+
+        $studentNumber = trim((string)($body['student_number'] ?? ''));
+        $section       = trim((string)($body['section'] ?? 'BSCpE 4-1'));
+        if ($studentNumber === '') {
+            $studentNumber = sprintf('2023-%05d-MN-0', random_int(300, 999));
         }
 
         $checkStu = $pdo->prepare('SELECT COUNT(*) FROM Student WHERE LOWER(TRIM(student_number)) = LOWER(:sn) OR LOWER(TRIM(email)) = LOWER(:em)');
@@ -846,7 +911,6 @@ try {
         ]);
         $newStudentId = (int)$pdo->lastInsertId();
 
-        $hash = password_hash($password, PASSWORD_BCRYPT);
         $uStmt = $pdo->prepare("
             INSERT INTO Users (username, password_hash, role, linked_id, is_active, last_login)
             VALUES (:u, :h, 'student', :lid, 1, NOW())
@@ -863,7 +927,7 @@ try {
             $advId = !empty($body['adviser_id'])
                 ? (int)$body['adviser_id']
                 : (int)($pdo->query('SELECT adviser_id FROM Adviser ORDER BY adviser_id ASC LIMIT 1')->fetchColumn() ?: 1);
-            $pos   = trim((string)($body['position_title'] ?? 'Computer Engineering Intern'));
+            $pos   = trim((string)($body['position_title'] ?? 'Intern Trainee'));
             $pStmt = $pdo->prepare("
                 INSERT INTO Placement (student_id, employer_id, adviser_id, academic_term, position_title, start_date, end_date, required_hours, status)
                 VALUES (:sid, :eid, :aid, 'AY 2026-2027 1st Sem', :pos, :sdate, :edate, 300.00, 'ongoing')

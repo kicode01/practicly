@@ -4,13 +4,14 @@ import { IconRefresh } from './Icons';
 const ERD_ENTITIES = [
   {
     name: 'Users',
-    role: 'Authentication & Role Access',
+    role: 'Authentication & RBAC Access',
     attrs: [
       { name: 'user_id', key: 'PK' },
-      { name: 'username', key: 'UQ' },
+      { name: 'username', key: 'UK' },
       { name: 'password_hash', key: '' },
-      { name: 'role', key: '' },
-      { name: 'linked_id', key: 'FK' },
+      { name: 'role (student | adviser | admin | supervisor)', key: '' },
+      { name: 'linked_id (polymorphic ref)', key: 'FK*' },
+      { name: 'is_active / last_login', key: '' },
     ],
   },
   {
@@ -18,21 +19,23 @@ const ERD_ENTITIES = [
     role: 'Intern Master Record',
     attrs: [
       { name: 'student_id', key: 'PK' },
-      { name: 'student_number', key: 'UQ' },
+      { name: 'student_number', key: 'UK' },
       { name: 'full_name', key: '' },
-      { name: 'program / year_level', key: '' },
-      { name: 'email / contact_number', key: '' },
+      { name: 'program / year_level / section', key: '' },
+      { name: 'email', key: 'UK' },
+      { name: 'contact_number / created_at', key: '' },
     ],
   },
   {
     name: 'Employer',
-    role: 'Host Training Establishment',
+    role: 'Host Training Establishment (HTE)',
     attrs: [
       { name: 'employer_id', key: 'PK' },
       { name: 'company_name', key: '' },
       { name: 'address / industry', key: '' },
-      { name: 'contact_person / email', key: '' },
-      { name: 'moa_status', key: '' },
+      { name: 'contact_person / contact_number', key: '' },
+      { name: 'email', key: '' },
+      { name: 'moa_status / moa_validity', key: '' },
     ],
   },
   {
@@ -40,7 +43,7 @@ const ERD_ENTITIES = [
     role: 'Faculty OJT Coordinator',
     attrs: [
       { name: 'adviser_id', key: 'PK' },
-      { name: 'employee_number', key: 'UQ' },
+      { name: 'employee_number', key: 'UK' },
       { name: 'full_name', key: '' },
       { name: 'department', key: '' },
       { name: 'email / contact_number', key: '' },
@@ -48,46 +51,53 @@ const ERD_ENTITIES = [
   },
   {
     name: 'Placement',
-    role: '3-Way Assignment Contract',
+    role: 'Core 3-Way Junction & Signed Scans',
     attrs: [
       { name: 'placement_id', key: 'PK' },
       { name: 'student_id', key: 'FK' },
       { name: 'employer_id', key: 'FK' },
       { name: 'adviser_id', key: 'FK' },
-      { name: 'required_hours / status', key: '' },
+      { name: 'academic_term / position_title', key: '' },
+      { name: 'start_date / end_date / required_hours / status', key: '' },
+      { name: 'signed_dtr_* / signed_eval_* (scan metadata + data)', key: '' },
     ],
   },
   {
     name: 'TimeLog',
-    role: 'Attendance Ledger (SUM)',
+    role: 'Attendance Ledger (UNIQUE per date)',
     attrs: [
       { name: 'log_id', key: 'PK' },
       { name: 'placement_id', key: 'FK' },
-      { name: 'date / time_in / time_out', key: '' },
+      { name: 'date (UNIQUE with placement_id)', key: 'UK' },
+      { name: 'time_in / time_out / break_minutes', key: '' },
       { name: 'hours_rendered', key: '' },
+      { name: 'approval_status (pending | supervisor_verified | approved | flagged)', key: '' },
       { name: 'task_description', key: '' },
     ],
   },
   {
     name: 'Evaluation',
-    role: 'Supervisor & Adviser Ratings',
+    role: '4-Instrument 360° Rubric Ratings',
     attrs: [
       { name: 'eval_id', key: 'PK' },
       { name: 'placement_id', key: 'FK' },
-      { name: 'evaluator_type', key: '' },
+      { name: 'instrument_type (INST-01..04)', key: '' },
+      { name: 'evaluator_type / evaluator_name', key: '' },
+      { name: 'technical_score / attitude_score / attendance_score', key: '' },
       { name: 'rating (1.00 - 5.00)', key: '' },
-      { name: 'comments / date_evaluated', key: '' },
+      { name: 'criteria_scores (JSON) / comments / date_evaluated', key: '' },
     ],
   },
   {
     name: 'ComplianceReport',
-    role: 'Computed Clearance Summary',
+    role: '1:1 Aggregated Clearance Summary',
     attrs: [
       { name: 'report_id', key: 'PK' },
-      { name: 'placement_id', key: 'FK' },
-      { name: 'total_hours_completed', key: '' },
-      { name: 'requirement_met', key: '' },
-      { name: 'generated_date', key: '' },
+      { name: 'placement_id', key: 'FK/UK' },
+      { name: 'total_hours_completed / requirement_met', key: '' },
+      { name: 'has_employer_eval / has_adviser_eval', key: '' },
+      { name: 'has_student_supervisor_eval / has_student_adviser_eval', key: '' },
+      { name: 'average_rating / clearance_reference / generated_date', key: '' },
     ],
   },
 ];
@@ -98,44 +108,57 @@ const CARDINALITY_MATRIX = [
     child: 'Placement (N)',
     type: '1 : N',
     fk: 'student_id',
-    rule: 'One student can hold multiple placement contracts across academic terms.',
+    rule: 'One student can hold multiple placement contracts across academic terms (CASCADE).',
   },
   {
     parent: 'Employer (1)',
     child: 'Placement (N)',
     type: '1 : N',
     fk: 'employer_id',
-    rule: 'One host company can accommodate multiple student placements.',
+    rule: 'One host company can accommodate multiple student placements (CASCADE).',
   },
   {
     parent: 'Adviser (1)',
     child: 'Placement (N)',
     type: '1 : N',
     fk: 'adviser_id',
-    rule: 'One faculty adviser supervises multiple student placements.',
+    rule: 'One faculty adviser supervises multiple student placements (CASCADE).',
   },
   {
     parent: 'Placement (1)',
     child: 'TimeLog (N)',
     type: '1 : N',
     fk: 'placement_id',
-    rule: 'One placement contract aggregates multiple attendance time logs.',
+    rule: 'One placement aggregates daily shift records with UNIQUE (placement_id, date) & approval_status.',
   },
   {
     parent: 'Placement (1)',
     child: 'Evaluation (N)',
     type: '1 : N',
     fk: 'placement_id',
-    rule: 'One placement contract receives employer and faculty adviser evaluations.',
+    rule: 'One placement stores INST-01 through INST-04 ratings, subscores, and JSON rubric scores.',
   },
   {
     parent: 'Placement (1)',
-    child: 'ComplianceReport (N)',
-    type: '1 : N',
-    fk: 'placement_id',
-    rule: 'One placement contract generates clearance reports from aggregated hours.',
+    child: 'ComplianceReport (1)',
+    type: '1 : 1',
+    fk: 'placement_id (UNIQUE)',
+    rule: 'Strict 1:1 clearance record auto-synced by triggers & Database::syncCompliance().',
+  },
+  {
+    parent: 'Users (Auth)',
+    child: 'Student / Adviser / Employer',
+    type: 'Polymorphic',
+    fk: 'role + linked_id',
+    rule: 'Logical RBAC link resolving Student, Adviser/Admin, or HTE Supervisor identity; AppSecret signs tokens.',
   },
 ];
+
+function getKeyTagClass(key) {
+  if (key.includes('PK')) return 'pk';
+  if (key.includes('FK')) return 'fk';
+  return 'uk';
+}
 
 export default function DatabaseInspectorView({
   systemInfo,
@@ -155,11 +178,13 @@ export default function DatabaseInspectorView({
       linked_id: r.linked_id ?? 'NULL',
       display_name: r.display_name,
       is_active: r.is_active,
+      last_login: r.last_login ?? 'Never',
     })),
     Student: (data?.students || []).map((r) => ({
       student_id: r.student_id,
       student_number: r.student_number,
       full_name: r.full_name,
+      program: r.program,
       section: r.section,
       email: r.email,
       contact_number: r.contact_number,
@@ -170,7 +195,7 @@ export default function DatabaseInspectorView({
       industry: r.industry,
       contact_person: r.contact_person,
       moa_status: r.moa_status,
-      moa_validity: r.moa_validity,
+      moa_validity: r.moa_validity ?? 'NULL',
     })),
     Adviser: (data?.advisers || []).map((r) => ({
       adviser_id: r.adviser_id,
@@ -185,15 +210,18 @@ export default function DatabaseInspectorView({
       student_id: `${r.student_id} (${r.student_name})`,
       employer_id: `${r.employer_id} (${r.company_name})`,
       adviser_id: `${r.adviser_id} (${r.adviser_name})`,
+      position_title: r.position_title,
       required_hours: r.required_hours,
       total_hours_completed: r.total_hours_completed,
+      signed_dtr: r.signed_dtr_filename || 'None',
+      signed_eval: r.signed_eval_filename || 'None',
       status: r.status,
     })),
     TimeLog: (data?.timelogs || []).map((r) => ({
       log_id: r.log_id,
       placement_id: `${r.placement_id} (${r.student_name})`,
       date: r.date,
-      shift: `${String(r.time_in).slice(0, 5)}-${String(r.time_out).slice(0, 5)}`,
+      shift: `${String(r.time_in).slice(0, 5)}-${String(r.time_out).slice(0, 5)} (${r.break_minutes ?? 60}m break)`,
       hours_rendered: r.hours_rendered,
       approval_status: r.approval_status,
       task_description: r.task_description,
@@ -201,6 +229,7 @@ export default function DatabaseInspectorView({
     Evaluation: (data?.evaluations || []).map((r) => ({
       eval_id: r.eval_id,
       placement_id: `${r.placement_id} (${r.student_name})`,
+      instrument_type: r.instrument_type || 'supervisor_to_student',
       evaluator_type: r.evaluator_type,
       evaluator_name: r.evaluator_name,
       rating: r.rating,
@@ -210,6 +239,7 @@ export default function DatabaseInspectorView({
       report_id: r.report_id,
       placement_id: `${r.placement_id} (${r.student_name})`,
       total_hours_completed: r.total_hours_completed,
+      instruments: `${Number(r.has_employer_eval || 0) + Number(r.has_adviser_eval || 0) + Number(r.has_student_supervisor_eval || 0) + Number(r.has_student_adviser_eval || 0)}/4`,
       requirement_met: Number(r.requirement_met) === 1 ? '1 (ELIGIBLE)' : '0 (PENDING)',
       average_rating: r.average_rating ?? 'NULL',
       clearance_reference: r.clearance_reference ?? 'NULL',
@@ -224,10 +254,10 @@ export default function DatabaseInspectorView({
       <div className="panel">
         <div className="panel-header">
           <div>
-            <div className="panel-title">Entity-Relationship Schema (8 Core Normalized Tables)</div>
+            <div className="panel-title">Entity-Relationship Schema (8 Core Entities + Runtime Token Key Store)</div>
             <div className="panel-desc">
-              {systemInfo?.engine || 'MySQL / MariaDB'} · Schema:{' '}
-              <span className="mono">{systemInfo?.database || 'ojt_tracking_db'}</span> · Click any table card to inspect live rows
+              {systemInfo?.engine || 'SQLite 3'} · Database:{' '}
+              <span className="mono">{systemInfo?.database || 'ojt_tracking.db'}</span> · Click any entity card to inspect live rows
             </div>
           </div>
           <div className="action-row-wrap">
@@ -238,7 +268,7 @@ export default function DatabaseInspectorView({
               disabled={syncing}
             >
               <IconRefresh size={13} />
-              Run sp_sync_all_compliance_reports()
+              Sync All Compliance Reports
             </button>
             <button
               type="button"
@@ -257,33 +287,23 @@ export default function DatabaseInspectorView({
               return (
                 <div
                   key={ent.name}
-                  className="erd-entity-card"
+                  className={`erd-entity-card ${isSelected ? 'is-selected' : ''}`}
                   onClick={() => setSelectedTable(ent.name)}
-                  style={{
-                    cursor: 'pointer',
-                    borderColor: isSelected ? '#7a1215' : undefined,
-                    boxShadow: isSelected ? '0 0 0 2px rgba(122, 18, 21, 0.12)' : undefined,
-                  }}
+                  style={{ cursor: 'pointer' }}
                 >
-                  <div
-                    className="erd-entity-head"
-                    style={{
-                      background: isSelected ? '#fdf2f2' : undefined,
-                      color: isSelected ? '#7a1215' : undefined,
-                    }}
-                  >
+                  <div className="erd-entity-head">
                     <span>{ent.name}</span>
-                    <span className="mono" style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500 }}>
+                    <span className="mono" style={{ fontSize: '11px', opacity: 0.78, fontWeight: 500 }}>
                       {counts[ent.name] ?? 0} rows
                     </span>
                   </div>
                   <div
                     style={{
                       padding: '5px 12px',
-                      background: '#fafafa',
-                      borderBottom: '1px solid #f1f3f5',
+                      background: 'var(--bg-subtle)',
+                      borderBottom: '1px solid var(--border-subtle)',
                       fontSize: '11px',
-                      color: '#6b7280',
+                      color: 'var(--text-muted)',
                     }}
                   >
                     {ent.role}
@@ -293,7 +313,7 @@ export default function DatabaseInspectorView({
                       <li key={a.name}>
                         <span>{a.name}</span>
                         {a.key && (
-                          <span className={`key-tag ${a.key === 'PK' ? 'pk' : 'fk'}`}>
+                          <span className={`key-tag ${getKeyTagClass(a.key)}`}>
                             {a.key}
                           </span>
                         )}
@@ -303,6 +323,15 @@ export default function DatabaseInspectorView({
                 </div>
               );
             })}
+          </div>
+
+          <div className="erd-runtime-strip">
+            <div>
+              <strong>Auxiliary Table:</strong> <span className="mono">AppSecret (id PK, secret TEXT)</span> — persists the runtime HMAC-SHA256 key for stateless signed session tokens.
+            </div>
+            <div>
+              <strong>SQL Objects:</strong> <span className="mono">3 views</span> (<span className="mono">vw_placement_progress</span>, <span className="mono">vw_employer_analytics</span>, <span className="mono">vw_adviser_monitoring</span>) &middot; <span className="mono">8 triggers</span>
+            </div>
           </div>
         </div>
       </div>
@@ -315,7 +344,7 @@ export default function DatabaseInspectorView({
               Live Table Data Browser: <span className="mono">SELECT * FROM {selectedTable};</span>
             </div>
             <div className="panel-desc">
-              Showing {activeRows.length} live row(s) from MySQL table <span className="mono">{selectedTable}</span>
+              Showing {activeRows.length} live row(s) from {systemInfo?.engine || 'SQLite'} table <span className="mono">{selectedTable}</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -370,7 +399,7 @@ export default function DatabaseInspectorView({
           <div className="panel-header">
             <div>
               <div className="panel-title">Relationships &amp; Cardinality Matrix</div>
-              <div className="panel-desc">1:N foreign key constraints enforced in SQLite &amp; relational engine</div>
+              <div className="panel-desc">Enforced foreign keys, 1:1 clearance uniqueness, and RBAC lookup links</div>
             </div>
           </div>
           <div className="table-wrap">
@@ -393,7 +422,7 @@ export default function DatabaseInspectorView({
                       <span className="status-chip info mono">{rel.type}</span>
                     </td>
                     <td className="mono">{rel.fk}</td>
-                    <td style={{ fontSize: '12px', color: '#4b5563' }}>{rel.rule}</td>
+                    <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{rel.rule}</td>
                   </tr>
                 ))}
               </tbody>
@@ -404,32 +433,28 @@ export default function DatabaseInspectorView({
         <div className="panel">
           <div className="panel-header">
             <div>
-              <div className="panel-title">Aggregation &amp; Eligibility SQL Logic</div>
-              <div className="panel-desc">Executed by views and triggers on TimeLog &amp; Evaluation updates</div>
+              <div className="panel-title">Aggregation &amp; 4-Instrument Clearance SQL Logic</div>
+              <div className="panel-desc">Executed by SQLite triggers and Database::syncCompliance()</div>
             </div>
           </div>
           <div className="panel-body">
-            <pre className="sql-code-block">{`-- Attendance Hour Aggregation (TimeLog Module)
-SELECT
-    p.placement_id,
-    s.full_name AS student_name,
-    e.company_name,
-    p.required_hours,
-    COALESCE(SUM(tl.hours_rendered), 0.00) AS total_hours_completed,
-    COUNT(tl.log_id) AS total_log_days
+            <pre className="sql-code-block">{`-- Non-Flagged Attendance Hour Aggregation (TimeLog)
+SELECT p.placement_id, p.required_hours,
+       COALESCE(SUM(tl.hours_rendered), 0.00) AS total_hours_completed
 FROM Placement p
-INNER JOIN Student s ON p.student_id = s.student_id
-INNER JOIN Employer e ON p.employer_id = e.employer_id
 LEFT JOIN TimeLog tl
        ON p.placement_id = tl.placement_id
       AND tl.approval_status != 'flagged'
 GROUP BY p.placement_id;
 
--- Clearance Eligibility Computation (ComplianceReport)
+-- 4-Instrument Clearance Eligibility (ComplianceReport)
 CASE
-    WHEN COALESCE(SUM(tl.hours_rendered), 0) >= p.required_hours
-     AND COUNT(DISTINCT ev.eval_id) > 0
+    WHEN total_hours >= p.required_hours
      AND p.status != 'dropped'
+     AND (has_inst02_supervisor_eval = 1 OR has_signed_eval_scan = 1)
+     AND has_inst03_adviser_eval = 1
+     AND has_inst01_student_supervisor = 1
+     AND has_inst04_student_adviser = 1
     THEN 1 ELSE 0
 END AS requirement_met`}</pre>
           </div>

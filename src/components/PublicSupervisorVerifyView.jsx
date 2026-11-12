@@ -17,6 +17,7 @@ import SessionSignatureControl, {
   PrintableSignatoryBlock,
   useSessionSignature,
 } from './SessionSignatureControl';
+import { usePresenceValue, useSmoothSwitch } from '../utils/usePresence';
 
 export default function PublicSupervisorVerifyView({
   placement,
@@ -26,12 +27,17 @@ export default function PublicSupervisorVerifyView({
   onRefresh,
 }) {
   const [portalTab, setPortalTab] = useState('dtr');
+  const portalTabSwitch = useSmoothSwitch(portalTab, 85);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
   const [actionError, setActionError] = useState('');
   const [flagModalOpen, setFlagModalOpen] = useState(false);
   const [selectedLogToFlag, setSelectedLogToFlag] = useState(null);
   const [flagReason, setFlagReason] = useState('Please verify and correct the recorded shift hours.');
+  const flagModalPresence = usePresenceValue(
+    flagModalOpen && selectedLogToFlag ? selectedLogToFlag : null,
+    150
+  );
 
   const inst02 = useMemo(() => getInstrumentById('supervisor_to_student'), []);
   const supervisorSig = useSessionSignature('supervisor', placement?.placement_id || 'portal');
@@ -256,7 +262,7 @@ export default function PublicSupervisorVerifyView({
                 Host Training Establishment (HTE) Attendance Verification Portal
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Metropolitan Institute of Technology · Department of Computer Engineering
+                Verified Host Workplace Portal · Any Academic Institution
               </div>
             </div>
           </div>
@@ -425,7 +431,11 @@ export default function PublicSupervisorVerifyView({
           </span>
         </div>
 
-        {portalTab === 'dtr' && (
+        <div
+          key={portalTabSwitch.displayedKey}
+          className={`view-stage ${portalTabSwitch.phase === 'exiting' ? 'is-exiting' : ''}`}
+        >
+        {portalTabSwitch.displayedKey === 'dtr' && (
           <>
         {/* ACTION TOOLBAR FOR SUPERVISOR */}
         <div className="public-verify-actionbar">
@@ -548,7 +558,7 @@ export default function PublicSupervisorVerifyView({
           </>
         )}
 
-        {portalTab === 'eval' && (
+        {portalTabSwitch.displayedKey === 'eval' && (
           <form onSubmit={handleSaveInst02} className="panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
             {evalSavedNotice && (
               <div className="public-verify-alert is-success" style={{ marginBottom: 0 }}>
@@ -709,6 +719,7 @@ export default function PublicSupervisorVerifyView({
             </div>
           </form>
         )}
+        </div>
 
         {/* FOOTER */}
         <footer style={{ textAlign: 'center', padding: '16px 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
@@ -717,9 +728,16 @@ export default function PublicSupervisorVerifyView({
       </div>
 
       {/* FLAG / REVISION MODAL */}
-      {flagModalOpen && selectedLogToFlag && (
-        <div className="modal-backdrop" onClick={() => setFlagModalOpen(false)}>
-          <div className="modal-card modal-entry-card" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+      {flagModalPresence.rendered && flagModalPresence.value && (
+        <div
+          className={`modal-backdrop ${flagModalPresence.exiting ? 'is-exiting' : ''}`}
+          onClick={flagModalPresence.exiting ? undefined : () => setFlagModalOpen(false)}
+        >
+          <div
+            className={`modal-card modal-entry-card ${flagModalPresence.exiting ? 'is-exiting' : ''}`}
+            style={{ maxWidth: '480px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <div className="modal-title">Request DTR Correction from Student</div>
               <button type="button" className="modal-close-btn" onClick={() => setFlagModalOpen(false)}>
@@ -728,7 +746,7 @@ export default function PublicSupervisorVerifyView({
             </div>
             <div className="modal-body modal-entry-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <p style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
-                Specify why this entry ({selectedLogToFlag.date} — {selectedLogToFlag.hours_rendered}h) is flagged. The student will be prompted to re-edit it in their portal.
+                Specify why this entry ({flagModalPresence.value.date} — {flagModalPresence.value.hours_rendered}h) is flagged. The student will be prompted to re-edit it in their portal.
               </p>
               <div className="field">
                 <label className="field-label">Correction Note / Reason</label>

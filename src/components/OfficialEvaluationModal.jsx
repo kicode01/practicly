@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SegmentedControl, Button, MaterialSelect } from './MaterialComponents';
 import { apiFetch } from '../utils/apiClient';
+import usePresence from '../utils/usePresence';
 import {
   IconEvaluation,
   IconClose,
@@ -306,14 +307,16 @@ export default function OfficialEvaluationModal({
     window.print();
   };
 
-  if (!isOpen) return null;
+  const { rendered, exiting } = usePresence(isOpen, 150);
+
+  if (!rendered) return null;
 
   const slotRoles = SIGNATORY_ROLE_SLOTS[activeInstrument.id] || ['supervisor', 'adviser'];
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-card modal-entry-card official-eval-modal"
+        className={`modal-card modal-entry-card official-eval-modal ${exiting ? 'is-exiting' : ''}`}
         style={{ maxWidth: '960px', width: '95vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -504,7 +507,7 @@ export default function OfficialEvaluationModal({
         {/* MODAL BODY (SCROLLABLE RUBRIC) */}
         <div className="modal-body modal-entry-body" style={{ overflowY: 'auto', flex: 1, padding: '20px 24px' }}>
           {/* PRINTABLE OFFICIAL INSTRUMENT VIEW CONTAINER */}
-          <div ref={printRef} className="official-instrument-print-area">
+          <div key={activeInstrument.id} ref={printRef} className="official-instrument-print-area view-stage">
             {/* OFFICIAL DOCUMENT HEADER */}
             <div
               style={{

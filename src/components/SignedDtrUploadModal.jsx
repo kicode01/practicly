@@ -12,6 +12,7 @@ import {
   IconPrinter,
 } from './Icons';
 import ConfirmDialog from './ConfirmDialog';
+import usePresence from '../utils/usePresence';
 
 const DOC_CONFIGS = {
   dtr: {
@@ -90,7 +91,9 @@ export default function SignedDtrUploadModal({
     }
   }, [isOpen, placement?.placement_id, documentKind, existingNotes]);
 
-  if (!isOpen || !placement) return null;
+  const { rendered, exiting } = usePresence(isOpen && Boolean(placement), 150);
+
+  if (!rendered || !placement) return null;
 
   const hasExistingDoc = Boolean(existingFilename || existingFile);
 
@@ -204,8 +207,8 @@ export default function SignedDtrUploadModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal-card modal-entry-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+      <div className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`} style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
         {/* HEADER */}
         <div className="modal-header">
           <div className="modal-header-identity">

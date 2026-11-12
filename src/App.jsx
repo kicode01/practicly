@@ -58,11 +58,13 @@ import AdviserModal from './components/AdviserModal';
 import UserAccountModal from './components/UserAccountModal';
 import SuperviseStudentModal from './components/SuperviseStudentModal';
 import ConfirmDialog from './components/ConfirmDialog';
+import AuthModal from './components/AuthModal';
 import { SegmentedControl, Switch, MaterialSelect, Snackbar } from './components/MaterialComponents';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
 import { clearAllSessionSignatures } from './utils/sessionSignature';
 import { getInstrumentById, getPlacementInstrumentStatus } from './utils/evaluationRubrics';
 import { apiFetch, getStoredUserSession, setVerifyContext } from './utils/apiClient';
+import usePresence, { useSmoothSwitch } from './utils/usePresence';
 
 const DEMO_PRESETS = [
   {
@@ -338,23 +340,50 @@ export default function App() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [regSuccessMessage, setRegSuccessMessage] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [showDemoAccounts, setShowDemoAccounts] = useState(false);
+  const [authScreenOpen, setAuthScreenOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login');
+  const [landingPreviewTab, setLandingPreviewTab] = useState('student');
+  const [landingPreviewPaused, setLandingPreviewPaused] = useState(false);
+
+  useEffect(() => {
+    if (currentUser || authScreenOpen || landingPreviewPaused) return undefined;
+    const roleOrder = ['student', 'supervisor', 'adviser', 'admin'];
+    const timer = setTimeout(() => {
+      setLandingPreviewTab((curr) => {
+        const idx = roleOrder.indexOf(curr);
+        return roleOrder[(idx + 1) % roleOrder.length];
+      });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [currentUser, authScreenOpen, landingPreviewPaused, landingPreviewTab]);
   const [registerForm, setRegisterForm] = useState({
+    role: 'student',
     full_name: '',
     student_number: '',
-    section: 'BSCpE 4-1',
+    employee_number: '',
+    section: '',
+    department: '',
     email: '',
     contact_number: '',
     username: '',
     password: 'password123',
-    employer_id: '1',
+    employer_id: '',
     adviser_id: '1',
-    position_title: 'Computer Engineering Intern',
+    position_title: 'Practicum Intern',
   });
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const mobileBackdropPresence = usePresence(mobileMenuOpen, 150);
+  const portalTabSwitch = useSmoothSwitch(
+    currentUser ? `${currentUser.role}:${activeTab}` : 'guest',
+    85
+  );
+  const displayedStageTab = portalTabSwitch.displayedKey.includes(':')
+    ? portalTabSwitch.displayedKey.split(':')[1]
+    : activeTab;
 
   const [data, setData] = useState({
     system_info: null,
@@ -959,6 +988,8 @@ export default function App() {
         setCurrentUser(cleanUser);
         localStorage.setItem('mit_ojt_user', JSON.stringify(cleanUser));
         localStorage.removeItem('pup_ojt_user');
+        setAuthScreenOpen(false);
+        setRegSuccessMessage('');
         setActiveTab('dashboard');
         setMobileMenuOpen(false);
         setLoginPassword('');
@@ -993,8 +1024,10 @@ export default function App() {
     }));
     setActiveTab('dashboard');
     setMobileMenuOpen(false);
+    setAuthScreenOpen(true);
     setAuthMode('login');
     setLoginError('');
+    setRegSuccessMessage('');
     setLoginPassword('');
     setShowLoginPassword(false);
     setShowRegPassword(false);
@@ -1047,6 +1080,7 @@ export default function App() {
     e.preventDefault();
     setAuthLoading(true);
     setLoginError('');
+    setRegSuccessMessage('');
     try {
       const res = await apiFetch('/api/register', {
         method: 'POST',
@@ -1056,6 +1090,27 @@ export default function App() {
       const json = await parseAuthResponse(res, 'Registration service');
       if (!json.ok) {
         setLoginError(json.error || 'Registration failed.');
+      } else if (json.pending_approval) {
+        const msg =
+          json.message ||
+          'Faculty Adviser account request submitted. Ask your Practicum Coordinator to activate it under User Accounts before signing in.';
+        setRegSuccessMessage(msg);
+        setAuthMode('login');
+        setLoginUsername(registerForm.username || '');
+        setLoginPassword('');
+        setRegisterForm((prev) => ({
+          ...prev,
+          full_name: '',
+          student_number: '',
+          employee_number: '',
+          section: '',
+          department: '',
+          email: '',
+          contact_number: '',
+          username: '',
+          password: 'password123',
+        }));
+        showNotice('Adviser account request submitted for coordinator activation.');
       } else {
         const cleanUser = {
           ...json.user,
@@ -1065,6 +1120,7 @@ export default function App() {
         setCurrentUser(cleanUser);
         localStorage.setItem('mit_ojt_user', JSON.stringify(cleanUser));
         localStorage.removeItem('pup_ojt_user');
+        setAuthScreenOpen(false);
         setActiveTab('dashboard');
         setMobileMenuOpen(false);
         await fetchSystemData(true);
@@ -2580,346 +2636,444 @@ export default function App() {
   }
 
   // ===========================================================================
-  // SIGN-IN SCREEN
+  // GENERALIZED INSTITUTIONAL LANDING & DEDICATED GOOGLE-STYLE AUTH PORTAL
   // ===========================================================================
   if (!currentUser) {
+    const openAuthScreen = (mode = 'login', defaultRegRole = null) => {
+      setAuthMode(mode);
+      setLoginError('');
+      setRegSuccessMessage('');
+      if (defaultRegRole) {
+        setRegisterForm((prev) => ({ ...prev, role: defaultRegRole }));
+      }
+      setAuthScreenOpen(true);
+    };
+
+    const selectPreviewRole = (role) => {
+      setLandingPreviewTab(role);
+    };
+
+    const previewOrder = ['student', 'supervisor', 'adviser', 'admin'];
+    const previewContentMap = {
+      student: {
+        tabTitle: 'Student Workspace',
+        roleBadge: 'Intern',
+        badgeClass: 'gws-chip-student',
+        headline: 'Hours & DTR Overview',
+        image: '/role-student.png',
+        imageAlt: 'Illustration of a student intern tracking daily shift hours, laptop progress bar, and verified DTR uploads',
+      },
+      supervisor: {
+        tabTitle: 'Host Supervisor Portal',
+        roleBadge: 'Mentor',
+        badgeClass: 'gws-chip-supervisor',
+        headline: 'Trainee Attendance & Competency Review',
+        image: '/role-supervisor.png',
+        imageAlt: 'Illustration of a host workplace supervisor tapping a verification checkmark next to approved trainee shifts and evaluation stars',
+      },
+      adviser: {
+        tabTitle: 'Faculty Adviser Console',
+        roleBadge: 'Adviser',
+        badgeClass: 'gws-chip-adviser',
+        headline: 'DTR Reconciliation & Clearance',
+        image: '/role-adviser.png',
+        imageAlt: 'Illustration of a faculty adviser reconciling digital attendance logs against signed DTR scans and graduation clearance',
+      },
+      admin: {
+        tabTitle: 'Coordinator Console',
+        roleBadge: 'Coordinator',
+        badgeClass: 'gws-chip-admin',
+        headline: 'Institution Registry & Approvals',
+        image: '/role-coordinator.png',
+        imageAlt: 'Illustration of a practicum coordinator managing industry partner MOAs, faculty approvals, and institutional ledgers',
+      },
+    };
+    const previewContent = previewContentMap[landingPreviewTab] || previewContentMap.student;
+
     return (
       <div className="auth-centered-shell">
-        <div className="auth-brand-block">
-          <IconBrandLogo size={58} />
-          <div className="auth-brand-title">Practicly</div>
-          <div className="auth-brand-tagline">Where classroom theory meets real-world experience.</div>
-          <div className="auth-brand-sub">
-            Metropolitan Institute of Technology · Department of Computer Engineering
-          </div>
+        {/* STICKY EDITORIAL TOP BAR — GOOGLE WORKSPACE STYLE */}
+        <div className="auth-topbar-wrap">
+          <header className="auth-topbar">
+            <div className="auth-topbar-brand">
+              <IconBrandLogo size={30} />
+              <span className="auth-topbar-wordmark">Practicly</span>
+              <span className="auth-topbar-divider" aria-hidden="true" />
+              <span className="auth-topbar-unit">
+                Academic Practicum &amp; Internship Platform
+              </span>
+            </div>
+
+            <nav className="auth-topbar-nav" aria-label="Landing sections">
+              <a href="#landing-preview">Workspaces</a>
+              <a href="#landing-workflow">Workflow</a>
+            </nav>
+
+            <div className="auth-topbar-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => openAuthScreen('login')}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => openAuthScreen('register', 'student')}
+              >
+                Get started
+              </button>
+            </div>
+          </header>
         </div>
 
-        <div className="auth-card">
-          <div className="action-row-wrap" style={{ gap: '6px', marginBottom: '14px' }}>
-            <button
-              type="button"
-              className={`btn btn-sm ${authMode === 'login' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flex: 1 }}
-              onClick={() => {
-                setAuthMode('login');
-                setLoginError('');
-              }}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${authMode === 'register' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flex: 1 }}
-              onClick={() => {
-                setAuthMode('register');
-                setLoginError('');
-              }}
-            >
-              Student Registration
-            </button>
-          </div>
+        {/* BAND 1: CLEAN GOOGLE WORKSPACE HERO + REAL PRODUCT WORKSPACE PREVIEW */}
+        <section className="auth-hero-band" aria-label="Practicly Overview">
+          <div className="auth-hero-container">
+            {/* LEFT: UNDERSTATED EDITORIAL COPY + CTAs */}
+            <div className="auth-hero-editorial">
+              <div>
+                <h1 className="auth-hero-headline">
+                  Manage student practicums in one shared workspace.
+                </h1>
 
-          <h2>{authMode === 'login' ? 'Sign in' : 'Create Student Account'}</h2>
-          <p className="auth-card-sub">
-            {authMode === 'login'
-              ? 'Use your student, HTE supervisor, faculty adviser, or administrator credentials.'
-              : 'Register your BS CpE student profile and OJT placement.'}
-          </p>
+                <p className="auth-hero-lead">
+                  Built for colleges and universities across any degree program. Coordinate daily DTR logs, supervisor sign-offs, and faculty clearances from day one.
+                </p>
 
-          {loginError && (
-            <div
-              style={{
-                padding: '8px 12px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                color: '#b91c1c',
-                fontSize: '12px',
-                marginBottom: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <IconAlert size={14} />
-              <span>{loginError}</span>
-            </div>
-          )}
-
-          {authMode === 'login' ? (
-            <form onSubmit={(e) => handleLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="field">
-                <label className="field-label" htmlFor="login-username">
-                  Username, Email, or ID Number
-                </label>
-                <input
-                  id="login-username"
-                  type="text"
-                  className="input"
-                  value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="e.g. kian.balanag or 2023-00108-MN-0"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  autoComplete="username"
-                  required
-                />
-              </div>
-
-              <div className="field">
-                <label className="field-label" htmlFor="login-password">
-                  Password
-                </label>
-                <div className="password-input-wrap">
-                  <input
-                    id="login-password"
-                    type={showLoginPassword ? 'text' : 'password'}
-                    className="input"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    required
-                  />
+                <div className="auth-hero-ctas">
                   <button
                     type="button"
-                    className="password-toggle-btn"
-                    onClick={() => setShowLoginPassword((v) => !v)}
-                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
-                    title={showLoginPassword ? 'Hide password' : 'Show password'}
+                    className="btn btn-primary"
+                    onClick={() => openAuthScreen('login')}
                   >
-                    {showLoginPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => openAuthScreen('register', 'student')}
+                  >
+                    Create an account
                   </button>
                 </div>
-                <div className="auth-hint-row">
-                  <span>Case-insensitive username/email lookup</span>
-                  <span>
-                    Demo password: <code className="mono">password123</code>
-                  </span>
+
+                <div className="auth-hero-suite-strip auth-desktop-showcase" aria-label="Included role workspaces">
+                  <span className="auth-hero-suite-label">Includes workspaces for</span>
+                  <div className="auth-hero-suite-items">
+                    <span className="auth-hero-suite-item">
+                      <IconStudent size={15} />
+                      <span>Students</span>
+                    </span>
+                    <span className="auth-hero-suite-item">
+                      <IconSupervisor size={15} />
+                      <span>Host Supervisors</span>
+                    </span>
+                    <span className="auth-hero-suite-item">
+                      <IconShieldCheck size={15} />
+                      <span>Faculty Advisers</span>
+                    </span>
+                    <span className="auth-hero-suite-item">
+                      <IconDashboard size={15} />
+                      <span>Coordinators</span>
+                    </span>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: '2px' }}
-                disabled={authLoading}
-              >
-                {authLoading ? 'Signing in...' : 'Continue'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
-              <div className="field">
-                <label className="field-label">Full Name (Last, First M.I.)</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Dela Rosa, Gabriel M."
-                  value={registerForm.full_name}
-                  onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
-                  required
+            {/* RIGHT: GOOGLE WORKSPACE EDITORIAL GRAPHIC (DESKTOP/TABLET ONLY) */}
+            <div className="auth-hero-showcase auth-desktop-showcase">
+              <div className="auth-hero-showcase-card auth-hero-graphic-wrap">
+                <img
+                  src="/hero-workspace.jpg"
+                  alt="Editorial illustration of a student intern clocking practicum hours with a verified DTR sheet, a host supervisor approving attendance, and a faculty adviser reviewing clearance"
+                  className="auth-hero-illustration"
                 />
               </div>
-              <div className="field-grid-2">
-                <div className="field">
-                  <label className="field-label">Student Number</label>
-                  <input
-                    type="text"
-                    className="input mono"
-                    placeholder="2023-00412-MN-0"
-                    value={registerForm.student_number}
-                    onChange={(e) => setRegisterForm({ ...registerForm, student_number: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Section</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={registerForm.section}
-                    onChange={(e) => setRegisterForm({ ...registerForm, section: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="field-grid-2">
-                <div className="field">
-                  <label className="field-label">Institutional Webmail</label>
-                  <input
-                    type="email"
-                    className="input"
-                    placeholder="gabriel.torres@mit.edu.ph"
-                    value={registerForm.email}
-                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Contact Number</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="0917-555-0144"
-                    value={registerForm.contact_number}
-                    onChange={(e) => setRegisterForm({ ...registerForm, contact_number: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="field-grid-2">
-                <div className="field">
-                  <label className="field-label">Username</label>
-                  <input
-                    type="text"
-                    className="input mono"
-                    placeholder="gabriel.delarosa"
-                    value={registerForm.username}
-                    onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Password</label>
-                  <div className="password-input-wrap">
-                    <input
-                      type={showRegPassword ? 'text' : 'password'}
-                      className="input"
-                      value={registerForm.password}
-                      onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                      autoComplete="new-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle-btn"
-                      onClick={() => setShowRegPassword((v) => !v)}
-                      aria-label={showRegPassword ? 'Hide password' : 'Show password'}
-                      title={showRegPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showRegPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {data.employers.length > 0 && (
-                <div className="field">
-                  <label className="field-label">Host Training Establishment (Optional)</label>
-                  <MaterialSelect
-                    className="select"
-                    value={registerForm.employer_id}
-                    onChange={(e) => setRegisterForm({ ...registerForm, employer_id: e.target.value })}
-                  >
-                    <option value="">Assign later in portal...</option>
-                    {data.employers.map((emp) => (
-                      <option key={emp.employer_id} value={emp.employer_id}>
-                        {emp.company_name} ({emp.industry})
-                      </option>
-                    ))}
-                  </MaterialSelect>
-                </div>
-              )}
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: '4px' }}
-                disabled={authLoading}
-              >
-                {authLoading ? 'Creating Account...' : 'Register & Enter Student Portal'}
-              </button>
-            </form>
-          )}
-        </div>
-
-        <div className="auth-demo-switcher">
-          <button
-            type="button"
-            className="auth-demo-toggle"
-            onClick={() => setShowDemoAccounts((v) => !v)}
-          >
-            <span>Quick-Switch Test Accounts (All Roles)</span>
-            <span>{showDemoAccounts ? 'Hide' : 'Show'}</span>
-          </button>
-          {showDemoAccounts && (
-            <div className="auth-demo-list">
-              {DEMO_PRESETS.map((preset) => (
-                <button
-                  key={preset.username}
-                  type="button"
-                  className="auth-demo-item"
-                  onClick={() => handleLogin(null, preset.username)}
-                >
-                  <div>
-                    <div style={{ fontWeight: 500, fontSize: '12px', color: '#111827' }}>
-                      {preset.name}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#6b7280' }}>{preset.desc}</div>
-                  </div>
-                  <StatusChip
-                    variant={
-                      preset.role === 'admin'
-                        ? 'danger'
-                        : preset.role === 'supervisor'
-                        ? 'warning'
-                        : preset.role === 'adviser'
-                        ? 'info'
-                        : 'success'
-                    }
-                  >
-                    {preset.role}
-                  </StatusChip>
-                </button>
-              ))}
             </div>
-          )}
-        </div>
-
-        <div style={{ marginTop: '14px', width: '100%', maxWidth: '440px' }}>
-          <div
-            style={{
-              padding: '12px 16px',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              flexWrap: 'wrap',
-              textAlign: 'left',
-              boxShadow: 'var(--shadow-xs)'
-            }}
-          >
-            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                HTE Company Supervisor?
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                No login required. Test the passwordless student verification link here.
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn-xs"
-              onClick={() => {
-                const targetId = data.placements[0]?.placement_id || '1';
-                setVerifyContext(targetId, data.placements[0]?.verify_token || null);
-                setPublicSupervisorPlacementId(targetId);
-              }}
-            >
-              Test Link
-            </button>
           </div>
+        </section>
+
+        {/* BAND 2: INTERACTIVE WORKSPACE PREVIEW (DESKTOP/TABLET) */}
+        <section id="landing-preview" className="auth-band is-tinted auth-desktop-showcase auth-anchor-section" aria-label="Interactive Product Overview">
+          <div className="auth-band-inner">
+            <div className="auth-section-header">
+              <div>
+                <h2 className="auth-section-title">Explore each workspace</h2>
+              </div>
+              <p className="auth-section-sub">
+                Select a role to see how each participant uses Practicly.
+              </p>
+            </div>
+
+            <div
+              className="auth-spotlight-grid"
+              onMouseEnter={() => setLandingPreviewPaused(true)}
+              onMouseLeave={() => setLandingPreviewPaused(false)}
+            >
+              <div className="auth-preview-window">
+                {previewOrder.map((roleKey) => {
+                  const slide = previewContentMap[roleKey];
+                  const isCurrent = landingPreviewTab === roleKey;
+                  return (
+                    <img
+                      key={roleKey}
+                      src={slide.image}
+                      alt={slide.imageAlt}
+                      aria-hidden={!isCurrent}
+                      className={`auth-preview-illustration ${isCurrent ? 'is-active' : ''}`}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="auth-spotlight-rail">
+                <div key={landingPreviewTab} className="auth-spotlight-slideshow-meta">
+                  <span className="auth-spotlight-slideshow-title">{previewContent.tabTitle}</span>
+                  <span className={`gws-role-chip ${previewContent.badgeClass}`} style={{ marginBottom: 0 }}>
+                    {previewContent.roleBadge}
+                  </span>
+                </div>
+
+                <div className="auth-spotlight-tabs" role="tablist" aria-label="Workspace role preview">
+                  {[
+                    {
+                      id: 'student',
+                      label: 'Student Intern',
+                      desc: 'Clock shifts with the live stopwatch, import attendance spreadsheets, and attach signed DTR PDFs.',
+                      icon: <IconStudent size={16} />,
+                    },
+                    {
+                      id: 'supervisor',
+                      label: 'Host Supervisor',
+                      desc: 'Approve logged trainee shifts and submit competency ratings via a direct verification link or mentor account.',
+                      icon: <IconSupervisor size={16} />,
+                    },
+                    {
+                      id: 'adviser',
+                      label: 'Faculty Adviser',
+                      desc: 'Compare digital attendance against wet-signed scans side by side, review forms, and issue final clearance.',
+                      icon: <IconShieldCheck size={16} />,
+                    },
+                    {
+                      id: 'admin',
+                      label: 'Practicum Coordinator',
+                      desc: 'Maintain host organization MOAs, set program hour targets, approve faculty accounts, and export reports.',
+                      icon: <IconDashboard size={16} />,
+                    },
+                  ].map((item) => {
+                    const isActive = landingPreviewTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        className={`auth-spotlight-tab ${isActive ? 'is-active' : ''}`}
+                        onClick={() => selectPreviewRole(item.id)}
+                      >
+                        <span className="auth-spotlight-tab-icon">{item.icon}</span>
+                        <div className="auth-spotlight-tab-body">
+                          <div className="auth-spotlight-tab-title">{item.label}</div>
+                          <div className="auth-spotlight-tab-desc-wrap">
+                            <div className="auth-spotlight-tab-desc">{item.desc}</div>
+                          </div>
+                        </div>
+                        {isActive && (
+                          <span
+                            key={`bar-${item.id}`}
+                            className={`auth-spotlight-progress ${landingPreviewPaused ? 'is-paused' : ''}`}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* BAND 3: OPEN 4-STEP CHRONOLOGICAL TERM LIFECYCLE */}
+        <section id="landing-workflow" className="auth-band is-white auth-desktop-showcase auth-anchor-section" aria-label="End-to-End Practicum Workflow">
+          <div className="auth-band-inner">
+            <div className="auth-section-header">
+              <div>
+                <h2 className="auth-section-title">How a practicum term runs</h2>
+              </div>
+              <p className="auth-section-sub">
+                Every attendance record and evaluation stays connected from onboarding through final clearance.
+              </p>
+            </div>
+
+            <div className="auth-timeline-grid">
+              <div className="auth-timeline-step">
+                <div className="auth-timeline-head">
+                  <span className="auth-timeline-badge">1</span>
+                  <span className="auth-timeline-line" aria-hidden="true" />
+                </div>
+                <div className="auth-timeline-title">Placement setup</div>
+                <div className="auth-timeline-desc">
+                  Pair interns with an approved partner organization, host supervisor, faculty adviser, and program hour goal.
+                </div>
+              </div>
+
+              <div className="auth-timeline-step">
+                <div className="auth-timeline-head">
+                  <span className="auth-timeline-badge">2</span>
+                  <span className="auth-timeline-line" aria-hidden="true" />
+                </div>
+                <div className="auth-timeline-title">Attendance &amp; DTR filing</div>
+                <div className="auth-timeline-desc">
+                  Record daily shifts throughout the term and attach signed physical timecards alongside digital logs.
+                </div>
+              </div>
+
+              <div className="auth-timeline-step">
+                <div className="auth-timeline-head">
+                  <span className="auth-timeline-badge">3</span>
+                  <span className="auth-timeline-line" aria-hidden="true" />
+                </div>
+                <div className="auth-timeline-title">Workplace verification</div>
+                <div className="auth-timeline-desc">
+                  Host mentors review submitted attendance shifts and file mid-term and final competency evaluations.
+                </div>
+              </div>
+
+              <div className="auth-timeline-step">
+                <div className="auth-timeline-head">
+                  <span className="auth-timeline-badge">4</span>
+                  <span className="auth-timeline-line" aria-hidden="true" />
+                </div>
+                <div className="auth-timeline-title">Cross-audit &amp; clearance</div>
+                <div className="auth-timeline-desc">
+                  Verify hours against DTR scans, complete required evaluation forms, and sign off on final completion.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* BAND 4: DESKTOP CLOSING WORKSPACE CTA / MOBILE COMPACT ROLE LIST */}
+        <section id="landing-roles" className="auth-band is-tinted auth-anchor-section" aria-label="Get Started">
+          <div className="auth-band-inner">
+            <div className="auth-closing-cta auth-desktop-showcase">
+              <h2 className="auth-section-title">Start using Practicly</h2>
+              <p className="auth-closing-sub">
+                Sign in to your account or register as a student intern or faculty adviser to begin.
+              </p>
+              <div className="auth-closing-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => openAuthScreen('login')}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => openAuthScreen('register', 'student')}
+                >
+                  Create an account
+                </button>
+              </div>
+            </div>
+
+            <div className="auth-roles-band auth-mobile-only-roles">
+              <div className="auth-role-card">
+                <span className="auth-role-icon is-student">
+                  <IconStudent size={17} />
+                </span>
+                <div className="auth-role-body">
+                  <div className="auth-role-title">Student Interns</div>
+                  <div className="auth-role-desc">
+                    Track daily hours, upload signed DTRs, and complete student evaluations.
+                  </div>
+                </div>
+              </div>
+
+              <div className="auth-role-card">
+                <span className="auth-role-icon is-supervisor">
+                  <IconSupervisor size={17} />
+                </span>
+                <div className="auth-role-body">
+                  <div className="auth-role-title">Host Supervisors</div>
+                  <div className="auth-role-desc">
+                    Verify trainee attendance in one click and submit mentor ratings.
+                  </div>
+                </div>
+              </div>
+
+              <div className="auth-role-card">
+                <span className="auth-role-icon is-adviser">
+                  <IconShieldCheck size={17} />
+                </span>
+                <div className="auth-role-body">
+                  <div className="auth-role-title">Faculty Advisers</div>
+                  <div className="auth-role-desc">
+                    Cross-audit signed DTR scans vs logs and endorse final clearances.
+                  </div>
+                </div>
+              </div>
+
+              <div className="auth-role-card">
+                <span className="auth-role-icon is-admin">
+                  <IconDashboard size={17} />
+                </span>
+                <div className="auth-role-body">
+                  <div className="auth-role-title">Coordinators</div>
+                  <div className="auth-role-desc">
+                    Manage partner MOAs, programs, user accounts, and institutional reports.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FULL-WIDTH GENERALIZED FOOTER */}
+        <div className="auth-footer-wrap">
+          <footer className="auth-footer">
+            <div>Practicly · Institutional Internship &amp; Practicum Platform</div>
+            <div style={{ textAlign: 'right' }}>Multi-School · All Academic Programs</div>
+          </footer>
         </div>
+
+        <AuthModal
+          isOpen={authScreenOpen}
+          onClose={() => {
+            setAuthScreenOpen(false);
+            setLoginError('');
+            setRegSuccessMessage('');
+          }}
+          authMode={authMode}
+          setAuthMode={setAuthMode}
+          loginUsername={loginUsername}
+          setLoginUsername={setLoginUsername}
+          loginPassword={loginPassword}
+          setLoginPassword={setLoginPassword}
+          showLoginPassword={showLoginPassword}
+          setShowLoginPassword={setShowLoginPassword}
+          showRegPassword={showRegPassword}
+          setShowRegPassword={setShowRegPassword}
+          loginError={loginError}
+          setLoginError={setLoginError}
+          regSuccessMessage={regSuccessMessage}
+          setRegSuccessMessage={setRegSuccessMessage}
+          authLoading={authLoading}
+          registerForm={registerForm}
+          setRegisterForm={setRegisterForm}
+          employers={data.employers}
+          showDemoAccounts={showDemoAccounts}
+          setShowDemoAccounts={setShowDemoAccounts}
+          demoPresets={DEMO_PRESETS}
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+        />
       </div>
     );
   }
@@ -2961,9 +3115,9 @@ export default function App() {
       data-role={currentUser?.role || 'student'}
     >
       {/* MOBILE BACKDROP */}
-      {mobileMenuOpen && (
+      {mobileBackdropPresence.rendered && (
         <div
-          className="sidebar-backdrop"
+          className={`sidebar-backdrop ${mobileBackdropPresence.exiting ? 'is-exiting' : ''}`}
           aria-hidden="true"
           onClick={() => setMobileMenuOpen(false)}
         />
@@ -3165,7 +3319,14 @@ export default function App() {
           {loading ? (
             <WorkspaceSkeleton activeTab={activeTab} role={currentUser.role} />
           ) : (
-            <div key={`${currentUser.role}-${activeTab}`} className="view-stage">
+            <div
+              key={portalTabSwitch.displayedKey}
+              className={`view-stage ${portalTabSwitch.phase === 'exiting' ? 'is-exiting' : ''}`}
+            >
+              {(() => {
+                const activeTab = displayedStageTab;
+                return (
+                  <>
           {/* =================================================================
               ROLE 1: STUDENT PORTAL — AWAITING OFFICIAL HTE PLACEMENT
               ================================================================= */}
@@ -7078,6 +7239,8 @@ export default function App() {
                             >
                               {Number(u.is_active) === 1 ? (
                                 <StatusChip variant="success">Active</StatusChip>
+                              ) : u.role === 'adviser' && !u.last_login ? (
+                                <StatusChip variant="warning">Pending Approval</StatusChip>
                               ) : (
                                 <StatusChip variant="danger">Disabled</StatusChip>
                               )}
@@ -7146,6 +7309,9 @@ export default function App() {
               />
             </>
           )}
+                </>
+                );
+              })()}
             </div>
           )}
         </main>
@@ -7522,7 +7688,7 @@ export default function App() {
         onClose={() => setConfirmDialog(null)}
       />
 
-      <Snackbar key={toast?.id} message={toast?.message} type={toast?.type} onClose={dismissNotice} />
+      <Snackbar message={toast?.message} type={toast?.type} onClose={dismissNotice} />
     </div>
   );
 }

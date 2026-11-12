@@ -8,6 +8,7 @@ import {
   IconClock,
   IconBriefcase
 } from './Icons';
+import usePresence from '../utils/usePresence';
 
 export default function SupervisorShareModal({
   isOpen,
@@ -16,8 +17,9 @@ export default function SupervisorShareModal({
   onOpenSupervisorView
 }) {
   const [copied, setCopied] = useState(false);
+  const { rendered, exiting } = usePresence(isOpen && Boolean(placement), 150);
 
-  if (!isOpen || !placement) return null;
+  if (!rendered || !placement) return null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000';
   const verifyTokenParam = placement.verify_token ? `&token=${encodeURIComponent(placement.verify_token)}` : '';
@@ -32,8 +34,8 @@ export default function SupervisorShareModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal-card modal-entry-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+      <div className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`} style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
         {/* HEADER */}
         <div className="modal-header">
           <div className="modal-header-identity">

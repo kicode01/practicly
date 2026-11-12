@@ -12,6 +12,7 @@ import {
   IconEdit
 } from './Icons';
 import { MaterialSelect } from './MaterialComponents';
+import usePresence, { usePresenceValue, useSmoothSwitch } from '../utils/usePresence';
 
 export default function DtrAuditComparisonModal({
   isOpen,
@@ -57,7 +58,16 @@ export default function DtrAuditComparisonModal({
     return placementLogs.filter((tl) => tl.approval_status === 'flagged').length;
   }, [placementLogs]);
 
-  if (!isOpen || !placement) return null;
+  const { rendered, exiting } = usePresence(isOpen && Boolean(placement), 150);
+  const flagModalPresence = usePresenceValue(
+    flagModalOpen && selectedLogToFlag ? selectedLogToFlag : null,
+    150
+  );
+  const auditTabSwitch = useSmoothSwitch(activeTab, 85);
+
+  if (!rendered || !placement) return null;
+
+  const displayedAuditTab = auditTabSwitch.displayedKey;
 
   const hasSignedDtr = Boolean(placement.signed_dtr_filename || placement.signed_dtr_file);
 
@@ -85,9 +95,9 @@ export default function DtrAuditComparisonModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-card modal-entry-card modal-audit-card"
+        className={`modal-card modal-entry-card modal-audit-card ${exiting ? 'is-exiting' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
@@ -218,11 +228,14 @@ export default function DtrAuditComparisonModal({
         </div>
 
         {/* AUDIT BODY */}
-        <div className="dtr-audit-panes">
+        <div
+          key={displayedAuditTab}
+          className={`dtr-audit-panes view-stage ${auditTabSwitch.phase === 'exiting' ? 'is-exiting' : ''}`}
+        >
           {/* LEFT: DIGITAL LOGS (Shown in side_by_side or digital_only) */}
-          {(activeTab === 'side_by_side' || activeTab === 'digital_only') && (
+          {(displayedAuditTab === 'side_by_side' || displayedAuditTab === 'digital_only') && (
             <div
-              className={`dtr-audit-pane ${activeTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
+              className={`dtr-audit-pane ${displayedAuditTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -333,9 +346,9 @@ export default function DtrAuditComparisonModal({
           )}
 
           {/* RIGHT: SIGNED PHYSICAL DOCUMENT (Shown in side_by_side or document_only) */}
-          {(activeTab === 'side_by_side' || activeTab === 'document_only') && (
+          {(displayedAuditTab === 'side_by_side' || displayedAuditTab === 'document_only') && (
             <div
-              className={`dtr-audit-pane ${activeTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
+              className={`dtr-audit-pane ${displayedAuditTab === 'side_by_side' ? 'is-half' : 'is-full'}`}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -482,14 +495,14 @@ export default function DtrAuditComparisonModal({
         </div>
 
         {/* FLAG DISCREPANCY REASON MODAL */}
-        {flagModalOpen && selectedLogToFlag && (
+        {flagModalPresence.rendered && flagModalPresence.value && (
           <div
-            className="modal-backdrop"
+            className={`modal-backdrop ${flagModalPresence.exiting ? 'is-exiting' : ''}`}
             style={{ zIndex: 1200 }}
-            onClick={() => setFlagModalOpen(false)}
+            onClick={flagModalPresence.exiting ? undefined : () => setFlagModalOpen(false)}
           >
             <div
-              className="modal-card modal-entry-card"
+              className={`modal-card modal-entry-card ${flagModalPresence.exiting ? 'is-exiting' : ''}`}
               style={{ maxWidth: '500px' }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -501,7 +514,7 @@ export default function DtrAuditComparisonModal({
                   <div>
                     <div className="modal-title">Flag Shift Discrepancy</div>
                     <div className="modal-subtitle">
-                      Return shift on {selectedLogToFlag.date} ({Number(selectedLogToFlag.hours_rendered).toFixed(2)} hrs) to student for correction
+                      Return shift on {flagModalPresence.value.date} ({Number(flagModalPresence.value.hours_rendered).toFixed(2)} hrs) to student for correction
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IconAlert, IconClose, IconLogOut, IconShieldCheck, IconTrash } from './Icons';
+import usePresence from '../utils/usePresence';
 
 /**
  * Reusable Material 3 Confirmation Dialog.
@@ -21,6 +22,7 @@ export default function ConfirmDialog({
   onClose,
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const { rendered, exiting } = usePresence(isOpen, 150);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -34,7 +36,7 @@ export default function ConfirmDialog({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, submitting, onClose]);
 
-  if (!isOpen || typeof document === 'undefined') return null;
+  if (!rendered || typeof document === 'undefined') return null;
 
   const renderIcon = () => {
     if (iconType === 'trash') return <IconTrash size={20} />;
@@ -55,17 +57,17 @@ export default function ConfirmDialog({
 
   return createPortal(
     <div
-      className="modal-backdrop confirm-dialog-backdrop"
+      className={`modal-backdrop confirm-dialog-backdrop ${exiting ? 'is-exiting' : ''}`}
       style={{ zIndex: 2700 }}
       onClick={() => {
-        if (!submitting && onClose) onClose();
+        if (!submitting && !exiting && onClose) onClose();
       }}
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
     >
       <div
-        className="modal-card confirm-dialog-card"
+        className={`modal-card confirm-dialog-card ${exiting ? 'is-exiting' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="confirm-dialog-header">

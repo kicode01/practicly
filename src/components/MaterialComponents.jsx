@@ -1,6 +1,7 @@
 import React, { forwardRef, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { IconSearch, IconChevronDown, IconCheck, IconAlert, IconClose } from './Icons';
+import usePresence, { usePresenceValue } from '../utils/usePresence';
 
 /**
  * Google Material Design 3 (M3) Web Component Implementations
@@ -212,9 +213,10 @@ export function MaterialSelect({
     });
   }, [align, isSmall, items.length]);
 
+  const menuPresence = usePresence(isOpen, 145);
+
   useLayoutEffect(() => {
     if (!isOpen) {
-      setMenuPosition(null);
       return undefined;
     }
     updateMenuPosition();
@@ -222,6 +224,12 @@ export function MaterialSelect({
     const rafId = window.requestAnimationFrame(() => updateMenuPosition());
     return () => window.cancelAnimationFrame(rafId);
   }, [isOpen, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!menuPresence.rendered && !isOpen) {
+      setMenuPosition(null);
+    }
+  }, [menuPresence.rendered, isOpen]);
 
   // Keep menu anchored on ancestor/window scroll and resize (ignore scrolling inside the menu itself)
   useEffect(() => {
@@ -313,10 +321,10 @@ export function MaterialSelect({
         <IconChevronDown size={isSmall ? 15 : 18} className={`m3-select-chevron ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen && typeof document !== 'undefined' && createPortal(
+      {menuPresence.rendered && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
-          className={`m3-select-menu is-portal ${menuPosition?.openUpward ? 'is-open-upward' : ''}`}
+          className={`m3-select-menu is-portal ${menuPosition?.openUpward ? 'is-open-upward' : ''} ${menuPresence.exiting ? 'is-exiting' : ''}`}
           role="listbox"
           style={
             menuPosition
@@ -375,10 +383,14 @@ export const Select = MaterialSelect;
  * Displays brief, low-emphasis status or feedback messages anchored to the viewport.
  */
 export function Snackbar({ message, type = 'success', onClose, className = '' }) {
-  if (!message) return null;
+  const { rendered, exiting, value } = usePresenceValue(
+    message ? { message, type } : null,
+    150
+  );
+  if (!rendered || !value) return null;
 
-  const isError = type === 'error';
-  const isWarning = type === 'warning';
+  const isError = value.type === 'error';
+  const isWarning = value.type === 'warning';
   const variantClass = isError
     ? 'm3-snackbar--error'
     : isWarning
@@ -387,7 +399,7 @@ export function Snackbar({ message, type = 'success', onClose, className = '' })
 
   return (
     <div
-      className={`m3-snackbar ${variantClass} ${className}`.trim()}
+      className={`m3-snackbar ${variantClass} ${exiting ? 'is-exiting' : ''} ${className}`.trim()}
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
     >
@@ -396,7 +408,7 @@ export function Snackbar({ message, type = 'success', onClose, className = '' })
           <IconAlert size={18} />
         </span>
       )}
-      <span className="m3-snackbar__label">{message}</span>
+      <span className="m3-snackbar__label">{value.message}</span>
       {onClose && (
         <button
           type="button"

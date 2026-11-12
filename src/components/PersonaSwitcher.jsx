@@ -12,6 +12,7 @@ import {
   IconLink,
   IconLogOut
 } from './Icons';
+import usePresence from '../utils/usePresence';
 
 export default function PersonaSwitcher({
   currentUser,
@@ -25,6 +26,7 @@ export default function PersonaSwitcher({
   const [roleFilter, setRoleFilter] = useState('all');
   const [search, setSearch] = useState('');
   const popoverRef = useRef(null);
+  const { rendered: dialogRendered, exiting: dialogExiting } = usePresence(isOpen, 150);
 
   // Close when clicking outside
   useEffect(() => {
@@ -143,8 +145,12 @@ export default function PersonaSwitcher({
       </button>
 
       {/* 3. GOOGLE MATERIAL 3 ACCOUNT SWITCHER DIALOG / MENU */}
-      {isOpen && (
-        <div className="m3-account-dialog" role="dialog" aria-label="Switch Active Persona">
+      {dialogRendered && (
+        <div
+          className={`m3-account-dialog ${dialogExiting ? 'is-exiting' : ''}`}
+          role="dialog"
+          aria-label="Switch Active Persona"
+        >
           {/* A. CURRENT ACTIVE USER HERO CARD */}
           <div className="m3-active-card">
             <div className={`m3-active-avatar m3-role-${currentUser?.role || 'student'}`}>

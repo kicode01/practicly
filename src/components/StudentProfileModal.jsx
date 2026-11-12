@@ -8,6 +8,7 @@ import {
   IconSupervisor,
 } from './Icons';
 import { MaterialSelect } from './MaterialComponents';
+import usePresence from '../utils/usePresence';
 
 /**
  * Material 3 modal dialog for editing a student's own profile/contacts
@@ -27,6 +28,7 @@ export default function StudentProfileModal({
   syncing = false,
 }) {
   const modalRef = useRef(null);
+  const { rendered, exiting } = usePresence(isOpen, 150);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -39,14 +41,14 @@ export default function StudentProfileModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, syncing]);
 
-  if (!isOpen) return null;
+  if (!rendered) return null;
 
   const HeaderIcon = isStudentRole ? IconUser : IconStudent;
 
   return (
-    <div className="modal-backdrop" onClick={syncing ? undefined : onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={syncing || exiting ? undefined : onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-card modal-entry-card"
+        className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
         style={{ maxWidth: '640px' }}
         onClick={(e) => e.stopPropagation()}
         ref={modalRef}

@@ -5,21 +5,24 @@ import SessionSignatureControl, {
   PrintableSignatoryBlock,
   useSessionSignature,
 } from './SessionSignatureControl';
+import { usePresenceValue } from '../utils/usePresence';
 
-export default function ClearanceModal({ report, currentUser = null, onClose }) {
-  if (!report) return null;
+export default function ClearanceModal({ report: reportProp, currentUser = null, onClose }) {
+  const { rendered, exiting, value: report } = usePresenceValue(reportProp, 150);
 
   const userRole = currentUser?.role || 'admin';
   const userId = currentUser?.user_id || currentUser?.linked_id || userRole;
   const activeSignature = useSessionSignature(userRole, userId);
+
+  if (!rendered || !report) return null;
 
   const instStatus = getPlacementInstrumentStatus(report);
   const isEligible = instStatus.isCleared;
   const hoursMet = instStatus.hoursMet;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card dtr-modal-card" onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose}>
+      <div className={`modal-card dtr-modal-card ${exiting ? 'is-exiting' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-header dtr-modal-header no-print">
           <div>
             <div className="panel-title">OJT Compliance &amp; Clearance Certificate</div>

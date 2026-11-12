@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Slider, MaterialSelect } from './MaterialComponents';
 import { IconEvaluation, IconClose, IconCheckCircle, IconPlus } from './Icons';
+import usePresence from '../utils/usePresence';
 
 export default function EvaluationEntryModal({
   isOpen,
@@ -15,6 +16,7 @@ export default function EvaluationEntryModal({
   syncing = false
 }) {
   const modalRef = useRef(null);
+  const { rendered, exiting } = usePresence(isOpen, 150);
 
   // Close on Escape
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function EvaluationEntryModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!rendered) return null;
 
   const applyScorePreset = (tech, att, punct, comments) => {
     setEvalForm((prev) => ({
@@ -59,9 +61,9 @@ export default function EvaluationEntryModal({
       : 'Needs Improvement / Retraining Required';
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-card modal-entry-card"
+        className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
         onClick={(e) => e.stopPropagation()}
         ref={modalRef}
       >
