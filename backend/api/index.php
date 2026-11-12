@@ -1398,6 +1398,16 @@ try {
                 jsonResponse(['ok' => false, 'error' => 'Student not found.'], 404);
             }
 
+            $profileOnly = !empty($body['profile_only']);
+            $fullName      = trim((string)($body['full_name'] ?? $existing['full_name']));
+            $section       = trim((string)($body['section'] ?? $existing['section']));
+            $email         = trim((string)($body['email'] ?? $existing['email']));
+            $contactNumber = trim((string)($body['contact_number'] ?? $existing['contact_number']));
+
+            if ($fullName === '' || $email === '') {
+                jsonResponse(['ok' => false, 'error' => 'Full name and institutional email are required.'], 400);
+            }
+
             $up = $pdo->prepare("
                 UPDATE Student
                 SET student_number = :snum,
@@ -1410,28 +1420,34 @@ try {
                 WHERE student_id = :id
             ");
             $up->execute([
-                ':snum'  => trim((string)($body['student_number'] ?? $existing['student_number'])),
-                ':fname' => trim((string)($body['full_name'] ?? $existing['full_name'])),
-                ':prog'  => trim((string)($body['program'] ?? $existing['program'])),
-                ':yr'    => trim((string)($body['year_level'] ?? $existing['year_level'])),
-                ':sec'   => trim((string)($body['section'] ?? $existing['section'])),
-                ':em'    => trim((string)($body['email'] ?? $existing['email'])),
-                ':cnum'  => trim((string)($body['contact_number'] ?? $existing['contact_number'])),
+                ':snum'  => $profileOnly ? $existing['student_number'] : trim((string)($body['student_number'] ?? $existing['student_number'])),
+                ':fname' => $fullName,
+                ':prog'  => $profileOnly ? $existing['program'] : trim((string)($body['program'] ?? $existing['program'])),
+                ':yr'    => $profileOnly ? $existing['year_level'] : trim((string)($body['year_level'] ?? $existing['year_level'])),
+                ':sec'   => $section,
+                ':em'    => $email,
+                ':cnum'  => $contactNumber,
                 ':id'    => $resourceId,
             ]);
 
-            // If employer_id and adviser_id are provided while editing, update or create the student's placement
-            if (!empty($body['employer_id']) && !empty($body['adviser_id'])) {
+            $pCheck = $pdo->prepare('SELECT placement_id, position_title, required_hours FROM Placement WHERE student_id = :sid ORDER BY placement_id DESC LIMIT 1');
+            $pCheck->execute([':sid' => $resourceId]);
+            $existingPlacement = $pCheck->fetch();
+
+            $placementUpdated = false;
+            if (!$profileOnly && !empty($body['employer_id']) && !empty($body['adviser_id'])) {
                 $empId    = (int)$body['employer_id'];
                 $advId    = (int)$body['adviser_id'];
-                $posTitle = trim((string)($body['position_title'] ?? 'Computer Engineering Intern'));
-                $reqHrs   = !empty($body['required_hours']) ? (float)$body['required_hours'] : 300.00;
+                $posTitle = trim((string)($body['position_title'] ?? ($existingPlacement['position_title'] ?? 'Computer Engineering Intern')));
+                if ($posTitle === '') {
+                    $posTitle = 'Computer Engineering Intern';
+                }
 
-                $pCheck = $pdo->prepare('SELECT placement_id FROM Placement WHERE student_id = :sid ORDER BY placement_id DESC LIMIT 1');
-                $pCheck->execute([':sid' => $resourceId]);
-                $existingPid = (int)$pCheck->fetchColumn();
-
-                if ($existingPid > 0) {
+                if ($existingPlacement) {
+                    $existingPid = (int)$existingPlacement['placement_id'];
+                    $reqHrs = !empty($body['required_hours'])
+                        ? (float)$body['required_hours']
+                        : (float)($existingPlacement['required_hours'] ?? 300.00);
                     $pUp = $pdo->prepare("
                         UPDATE Placement
                         SET employer_id = :eid,
@@ -1449,6 +1465,7 @@ try {
                     ]);
                     Database::syncCompliance($pdo, $existingPid);
                 } else {
+                    $reqHrs = !empty($body['required_hours']) ? (float)$body['required_hours'] : 300.00;
                     $pIns = $pdo->prepare("
                         INSERT INTO Placement (
                             student_id, employer_id, adviser_id, academic_term,
@@ -1470,9 +1487,24 @@ try {
                     $newPid = (int)$pdo->lastInsertId();
                     Database::syncCompliance($pdo, $newPid);
                 }
+                $placementUpdated = true;
+            } elseif ($existingPlacement && array_key_exists('position_title', $body)) {
+                $posTitle = trim((string)$body['position_title']);
+                if ($posTitle !== '') {
+                    $pUpPos = $pdo->prepare('UPDATE Placement SET position_title = :pos WHERE placement_id = :pid');
+                    $pUpPos->execute([
+                        ':pos' => $posTitle,
+                        ':pid' => (int)$existingPlacement['placement_id'],
+                    ]);
+                }
             }
 
-            jsonResponse(['ok' => true, 'message' => 'Student profile and supervision placement updated.']);
+            jsonResponse([
+                'ok'      => true,
+                'message' => $placementUpdated
+                    ? 'Student profile and supervision placement updated.'
+                    : 'Student profile updated.',
+            ]);
         }
 
         if ($method === 'DELETE' && $resourceId !== null) {

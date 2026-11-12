@@ -2278,20 +2278,20 @@ p {
 
 .field-grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
 .field-grid-3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
 @media (max-width: 640px) {
   .field-grid-2,
   .field-grid-3 {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2299,6 +2299,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .field-label {
@@ -2369,6 +2370,18 @@ textarea.input:focus {
   border-color: var(--brand);
   border-width: 2px;
   box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+.input[readonly] {
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.input[readonly]:focus {
+  border-color: var(--border-default);
+  border-width: 1px;
+  box-shadow: none;
 }
 
 /* ============================================================================
@@ -5131,14 +5144,47 @@ textarea.input:focus {
   vertical-align: middle;
 }
 
+/* Prevent MaterialSelect wrappers from inheriting legacy native .select border/chevron */
+.m3-select-container.select,
+.m3-select-container.select-sm {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+.m3-select-container.select:hover,
+.m3-select-container.select:focus,
+.m3-select-container.select-sm:hover,
+.m3-select-container.select-sm:focus {
+  border: none;
+  box-shadow: none;
+}
+
+.m3-select-container.is-disabled .m3-select-trigger {
+  opacity: 0.72;
+  cursor: not-allowed;
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
 /* Full-width styling when inside form fields */
 .field .m3-select-container {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: block;
 }
 
 .field .m3-select-container .m3-select-trigger {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 42px;
   border-radius: 10px;
   font-size: 13px;
@@ -5147,7 +5193,14 @@ textarea.input:focus {
 
 .field .m3-select-container .m3-select-menu {
   width: 100%;
+  min-width: 0;
   max-width: 100%;
+}
+
+.field .m3-select-container .m3-select-item-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .m3-select-trigger {
@@ -5169,6 +5222,8 @@ textarea.input:focus {
   transition: all 0.16s cubic-bezier(0.2, 0, 0, 1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .m3-select-sm .m3-select-trigger,
@@ -5190,6 +5245,9 @@ textarea.input:focus {
 }
 
 .m3-select-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7561,4 +7619,109 @@ textarea.input:focus {
   gap: 8px;
   flex-shrink: 0;
   flex-wrap: wrap;
+}
+
+/* Google Workspace Profile Modal Read-Only & Section Framing */
+.gws-profile-readonly-card {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gws-readonly-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 560px) {
+  .gws-readonly-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gws-readonly-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gws-readonly-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.gws-readonly-val-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gws-readonly-val {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.gws-readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--text-secondary);
+}
+
+.gws-readonly-divider {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gws-readonly-note {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.gws-modal-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+  margin-top: 2px;
+}
+
+.gws-modal-section-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+[data-theme="dark"] .gws-profile-readonly-card {
+  background: #22252b;
+  border-color: #3a3d45;
+}
+
+[data-theme="dark"] .gws-readonly-badge {
+  background: #30343c;
+  color: #c4c7c5;
 }

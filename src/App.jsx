@@ -50,6 +50,7 @@ import SupervisorShareModal from './components/SupervisorShareModal';
 import PublicSupervisorVerifyView from './components/PublicSupervisorVerifyView';
 import SignedDtrUploadModal from './components/SignedDtrUploadModal';
 import DtrAuditComparisonModal from './components/DtrAuditComparisonModal';
+import StudentProfileModal from './components/StudentProfileModal';
 import { SegmentedControl, Switch, MaterialSelect } from './components/MaterialComponents';
 import WorkflowPipelineIndicator from './components/WorkflowPipelineIndicator';
 
@@ -1530,13 +1531,39 @@ export default function App() {
     try {
       const url = editingStudentId ? `/api/students/${editingStudentId}` : '/api/students';
       const method = editingStudentId ? 'PUT' : 'POST';
+      const isStudentSelfEdit = currentUser?.role === 'student' && Boolean(editingStudentId);
+      const payload = isStudentSelfEdit
+        ? {
+            full_name: studentForm.full_name,
+            section: studentForm.section,
+            email: studentForm.email,
+            contact_number: studentForm.contact_number,
+            position_title: studentForm.position_title,
+            profile_only: true,
+          }
+        : studentForm;
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(studentForm),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json.ok) {
+        if (isStudentSelfEdit && Number(editingStudentId) === Number(currentUser?.linked_id)) {
+          const updatedUser = {
+            ...currentUser,
+            display_name: studentForm.full_name || currentUser.display_name,
+            name: studentForm.full_name || currentUser.name,
+            unit_label: studentForm.section || currentUser.unit_label,
+          };
+          setCurrentUser(updatedUser);
+          try {
+            localStorage.setItem('mit_ojt_user', JSON.stringify(updatedUser));
+          } catch {
+            // ignore
+          }
+        }
         showNotice(json.message);
         setShowStudentForm(false);
         setEditingStudentId(null);
@@ -1576,7 +1603,6 @@ export default function App() {
       position_title: existingPl ? existingPl.position_title : 'Computer Engineering Intern',
     });
     setShowStudentForm(true);
-    scrollWorkspaceToTop();
   };
 
   const handleDeleteStudent = async (studentId) => {
@@ -2959,129 +2985,6 @@ export default function App() {
                 }}
               />
 
-              {showStudentForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">Edit My Student Profile</div>
-                      <div className="panel-desc">Update your contact number, email, or section details</div>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveStudent}>
-                      <div className="field-grid-3">
-                        <div className="field">
-                          <label className="field-label">Student Number</label>
-                          <input
-                            type="text"
-                            className="input mono"
-                            value={studentForm.student_number}
-                            onChange={(e) => setStudentForm({ ...studentForm, student_number: e.target.value })}
-                            readOnly={currentUser?.role === 'student'}
-                            title={currentUser?.role === 'student' ? 'Official student number is managed by the institution (read-only)' : ''}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Full Name</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={studentForm.full_name}
-                            onChange={(e) => setStudentForm({ ...studentForm, full_name: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Section</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={studentForm.section}
-                            onChange={(e) => setStudentForm({ ...studentForm, section: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Institutional Email</label>
-                          <input
-                            type="email"
-                            className="input"
-                            value={studentForm.email}
-                            onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Contact Number</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={studentForm.contact_number}
-                            onChange={(e) => setStudentForm({ ...studentForm, contact_number: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Internship Designation / Role</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={studentForm.position_title || ''}
-                            onChange={(e) => setStudentForm({ ...studentForm, position_title: e.target.value })}
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Host Company (HTE)</label>
-                          <MaterialSelect
-                            className="select"
-                            value={studentForm.employer_id || ''}
-                            onChange={(e) => setStudentForm({ ...studentForm, employer_id: e.target.value })}
-                            disabled={currentUser?.role === 'student'}
-                          >
-                            {data.employers.map((emp) => (
-                              <option key={emp.employer_id} value={emp.employer_id}>
-                                {emp.company_name}
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Supervised by Faculty Adviser</label>
-                          <MaterialSelect
-                            className="select"
-                            value={studentForm.adviser_id || ''}
-                            onChange={(e) => setStudentForm({ ...studentForm, adviser_id: e.target.value })}
-                            disabled={currentUser?.role === 'student'}
-                          >
-                            {data.advisers.map((adv) => (
-                              <option key={adv.adviser_id} value={adv.adviser_id}>
-                                {adv.full_name}
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          Save Changes
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setShowStudentForm(false);
-                            setEditingStudentId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
               <div className="gws-student-bento">
                 <LiveShiftStopwatch
                   activeShift={activeShift}
@@ -4423,7 +4326,7 @@ export default function App() {
                         adviser_id: String(data.advisers[0]?.adviser_id || 1),
                         position_title: 'Computer Engineering Intern',
                       });
-                      setShowStudentForm((v) => !v);
+                      setShowStudentForm(true);
                     }}
                   >
                     <IconPlus size={13} />
@@ -4431,149 +4334,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-
-              {showStudentForm && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <div className="panel-title">
-                        {editingStudentId ? `Edit Student #${editingStudentId}` : 'Register New Student'}
-                      </div>
-                      <div className="panel-desc">
-                        {editingStudentId
-                          ? 'Update student academic profile and contact information'
-                          : 'Creates student record and provisions login credentials'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <form onSubmit={handleSaveStudent}>
-                      <div className="field-grid-3">
-                        <div className="field">
-                          <label className="field-label">Student Number</label>
-                          <input
-                            type="text"
-                            className="input mono"
-                            placeholder="2023-00255-MN-0"
-                            value={studentForm.student_number}
-                            onChange={(e) => setStudentForm({ ...studentForm, student_number: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Full Name (Last, First M.I.)</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="Cruz, Juan Miguel A."
-                            value={studentForm.full_name}
-                            onChange={(e) => setStudentForm({ ...studentForm, full_name: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Section</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={studentForm.section}
-                            onChange={(e) => setStudentForm({ ...studentForm, section: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Institutional Email</label>
-                          <input
-                            type="email"
-                            className="input"
-                            placeholder="juan.cruz@mit.edu.ph"
-                            value={studentForm.email}
-                            onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Contact Number</label>
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="0917-555-0199"
-                            value={studentForm.contact_number}
-                            onChange={(e) => setStudentForm({ ...studentForm, contact_number: e.target.value })}
-                            required
-                          />
-                        </div>
-                        {!editingStudentId && (
-                          <div className="field">
-                            <label className="field-label">Login Username (Optional)</label>
-                            <input
-                              type="text"
-                              className="input mono"
-                              placeholder="juan.cruz"
-                              value={studentForm.username}
-                              onChange={(e) => setStudentForm({ ...studentForm, username: e.target.value })}
-                            />
-                          </div>
-                        )}
-                        <div className="field">
-                          <label className="field-label">Supervised by Faculty Adviser</label>
-                          <MaterialSelect
-                            className="select"
-                            value={studentForm.adviser_id || ''}
-                            onChange={(e) => setStudentForm({ ...studentForm, adviser_id: e.target.value })}
-                          >
-                            <option value="">Assign later...</option>
-                            {data.advisers.map((adv) => (
-                              <option key={adv.adviser_id} value={adv.adviser_id}>
-                                {adv.full_name} ({adv.employee_number})
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Host Company (HTE)</label>
-                          <MaterialSelect
-                            className="select"
-                            value={studentForm.employer_id || ''}
-                            onChange={(e) => setStudentForm({ ...studentForm, employer_id: e.target.value })}
-                          >
-                            <option value="">Assign later...</option>
-                            {data.employers.map((emp) => (
-                              <option key={emp.employer_id} value={emp.employer_id}>
-                                {emp.company_name}
-                              </option>
-                            ))}
-                          </MaterialSelect>
-                        </div>
-                        <div className="field">
-                          <label className="field-label">Internship Designation / Role</label>
-                          <input
-                            type="text"
-                            className="input"
-                            value={studentForm.position_title || 'Computer Engineering Intern'}
-                            onChange={(e) => setStudentForm({ ...studentForm, position_title: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={syncing}>
-                          {editingStudentId ? 'Save Changes' : 'Save Student'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setShowStudentForm(false);
-                            setEditingStudentId(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
 
               <div className="panel">
                 <div className="panel-toolbar">
@@ -7907,6 +7667,27 @@ export default function App() {
           }
         }}
         onUpdateApproval={handleUpdateTimeLogApproval}
+      />
+
+      <StudentProfileModal
+        isOpen={showStudentForm}
+        onClose={() => {
+          setShowStudentForm(false);
+          setEditingStudentId(null);
+        }}
+        onSubmit={handleSaveStudent}
+        studentForm={studentForm}
+        setStudentForm={setStudentForm}
+        editingStudentId={editingStudentId}
+        isStudentRole={currentUser?.role === 'student'}
+        assignedPlacement={
+          editingStudentId
+            ? data.placements.find((p) => Number(p.student_id) === Number(editingStudentId)) || null
+            : null
+        }
+        employers={data.employers}
+        advisers={data.advisers}
+        syncing={syncing}
       />
 
       <OfficialEvaluationModal
