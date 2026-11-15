@@ -3412,11 +3412,12 @@ export default function App() {
             <div className="sidebar-user-signout">
               <button
                 type="button"
-                className="m3-icon-btn m3-icon-btn-danger"
-                title="Sign out"
+                className="sidebar-user-signout-btn"
+                title="Sign out of Practicly"
+                aria-label="Sign out of Practicly"
                 onClick={requestLogout}
               >
-                <IconLogOut size={15} />
+                <IconLogOut size={16} />
               </button>
             </div>
           </div>
