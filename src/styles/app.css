@@ -2249,7 +2249,7 @@ p {
 }
 
 .sidebar.collapsed .sidebar-brand-wrapper {
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
 }
 
@@ -2462,32 +2462,32 @@ p {
 
 .sidebar.collapsed .sidebar-group + .sidebar-group::before {
   opacity: 1;
-  margin: 8px auto;
+  margin: 8px 0 8px 12px;
 }
 
 .sidebar.collapsed .sidebar-group {
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
 }
 
 .sidebar.collapsed .sidebar-group-items {
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  gap: 0;
   margin-top: 0;
 }
 
 .sidebar.collapsed .sidebar-link {
-  width: 40px;
+  width: 100%;
   height: 40px;
   padding: 0;
-  margin: 2px auto;
-  border-radius: 12px;
-  justify-content: center;
+  margin: 2px 0;
+  border-radius: var(--radius-pill);
+  justify-content: flex-start;
   align-items: center;
   flex-shrink: 0;
 }
@@ -2495,14 +2495,14 @@ p {
 .sidebar.collapsed .sidebar-link-main {
   width: 100%;
   height: 100%;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 0;
-  flex: none;
+  flex: 1;
 }
 
 .sidebar.collapsed .sidebar-link-icon-wrap {
-  width: 100%;
+  width: 56px;
   height: 100%;
   display: inline-flex;
   align-items: center;
@@ -2512,8 +2512,8 @@ p {
 
 .sidebar.collapsed .sidebar-link-icon-wrap svg,
 .sidebar.collapsed .sidebar-link-icon-wrap .material-symbols-outlined {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar.collapsed .sidebar-link-label {
@@ -2525,7 +2525,6 @@ p {
 }
 
 .sidebar.collapsed .sidebar-count {
-  display: none !important;
   max-width: 0 !important;
   opacity: 0 !important;
   padding: 0 !important;
@@ -2788,16 +2787,19 @@ p {
   width: 100%;
   padding: 4px 0;
   margin: 0;
-  justify-content: center;
+  justify-content: flex-start;
   background: transparent;
   box-shadow: none;
 }
 
 .sidebar.collapsed .sidebar-user-avatar-wrap {
-  width: 40px;
+  width: 56px;
   height: 40px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  margin: 0 auto;
+  flex-shrink: 0;
+  margin: 0;
 }
 
 .sidebar.collapsed .sidebar-user-info {
