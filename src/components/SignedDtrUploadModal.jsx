@@ -4,7 +4,6 @@ import {
   IconClose,
   IconUpload,
   IconFileText,
-  IconCheckCircle,
   IconAlert,
   IconTrash,
   IconEye,
@@ -466,7 +465,6 @@ export default function SignedDtrUploadModal({
               className="btn btn-primary"
               disabled={isUploading || (!selectedFile && !notes)}
             >
-              <IconCheckCircle size={14} />
               {isUploading ? 'Uploading...' : hasExistingDoc && !selectedFile ? 'Save Remarks' : cfg.submitLabel}
             </button>
           </div>

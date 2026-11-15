@@ -3,7 +3,6 @@ import {
   IconUser,
   IconStudent,
   IconClose,
-  IconCheckCircle,
   IconBuilding,
   IconSupervisor,
 } from './Icons';
@@ -341,7 +340,6 @@ export default function StudentProfileModal({
               className="btn btn-primary"
               disabled={syncing}
             >
-              <IconCheckCircle size={14} />
               {activeEditingStudentId ? 'Save Changes' : 'Save Student'}
             </button>
           </div>

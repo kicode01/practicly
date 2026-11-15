@@ -5,7 +5,6 @@ import usePresence from '../utils/usePresence';
 import {
   IconEvaluation,
   IconClose,
-  IconCheckCircle,
   IconPrinter,
   IconDownload,
   IconShieldCheck,
@@ -782,7 +781,6 @@ export default function OfficialEvaluationModal({
               onClick={handleSaveEvaluation}
               disabled={isSubmitting}
             >
-              <IconCheckCircle size={14} />
               {isSubmitting
                 ? 'Saving...'
                 : existingRecord

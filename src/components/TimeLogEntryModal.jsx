@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { MaterialSelect } from './MaterialComponents';
-import { IconClock, IconClose, IconPlus, IconCheckCircle } from './Icons';
+import { IconClock, IconClose, IconPlus } from './Icons';
 import usePresence from '../utils/usePresence';
 
 export default function TimeLogEntryModal({
@@ -258,7 +258,6 @@ export default function TimeLogEntryModal({
               className="btn btn-primary"
               disabled={syncing}
             >
-              <IconCheckCircle size={14} />
               {editingLogId ? 'Save Changes' : 'Submit Attendance Entry'}
             </button>
           </div>

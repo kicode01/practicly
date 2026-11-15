@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Slider, MaterialSelect } from './MaterialComponents';
-import { IconEvaluation, IconClose, IconCheckCircle, IconPlus } from './Icons';
+import { IconEvaluation, IconClose, IconPlus } from './Icons';
 import usePresence from '../utils/usePresence';
 
 export default function EvaluationEntryModal({
@@ -385,7 +385,6 @@ export default function EvaluationEntryModal({
               className="btn btn-primary"
               disabled={syncing}
             >
-              <IconCheckCircle size={14} />
               {activeEditingEvalId ? 'Save Changes' : 'Submit Evaluation'}
             </button>
           </div>

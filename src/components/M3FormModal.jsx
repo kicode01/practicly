@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { IconClose, IconCheckCircle } from './Icons';
+import { IconClose } from './Icons';
 import usePresence from '../utils/usePresence';
 
 /**
@@ -100,7 +100,6 @@ export default function M3FormModal({
               className="btn btn-primary"
               disabled={syncing}
             >
-              <IconCheckCircle size={14} />
               {activeSubmitLabel}
             </button>
           </div>
