@@ -1261,9 +1261,7 @@ p {
 
 .auth-modal-backdrop {
   z-index: 1200;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.4); /* Authentic Google M3 Scrim */
   animation: authModalBackdropIn 0.24s var(--ease-out-expo) both;
 }
 
@@ -4360,9 +4358,7 @@ textarea.input:focus {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.48);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.4); /* Authentic Google M3 Scrim — zero frosted glass blur */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8157,22 +8153,22 @@ textarea.input:focus {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface-elevated, var(--bg-surface));
-  color: var(--text-muted);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.16s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   padding: 0;
 }
 
 .modal-close-btn:hover {
-  background: var(--bg-subtle);
+  background: rgba(60, 64, 67, 0.08);
   color: var(--text-primary);
-  border-color: var(--border-strong);
+  border: none;
 }
 
 .modal-body,
@@ -8280,13 +8276,13 @@ textarea.input:focus {
 }
 
 [data-theme="dark"] .modal-close-btn {
-  background: #282a30;
-  border-color: #44474e;
+  background: transparent;
+  border: none;
   color: #c4c7c5;
 }
 
 [data-theme="dark"] .modal-close-btn:hover {
-  background: #33353b;
+  background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 
@@ -11638,19 +11634,20 @@ textarea.input:focus {
   padding: 20px !important;
   align-items: center !important;
   justify-content: center !important;
+  background: rgba(0, 0, 0, 0.4) !important; /* Authentic Google M3 Scrim */
 }
 
 .confirm-dialog-card {
   width: 100%;
   max-width: 440px !important;
   background: var(--md-sys-color-surface-container-high, var(--bg-surface));
-  border-radius: 26px !important;
+  border-radius: 28px !important; /* Official Material 3 Dialog Spec */
   border: 1px solid var(--md-sys-color-outline-variant, var(--border-default));
-  box-shadow: var(--shadow-modal, 0 24px 48px rgba(15, 23, 42, 0.24));
+  box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15) !important;
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   margin: auto !important;
   animation: modalCardPop 0.24s var(--ease-out-expo) both;
 }
@@ -11658,7 +11655,7 @@ textarea.input:focus {
 .confirm-dialog-header {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
 }
 
 .confirm-dialog-heading {
@@ -11673,9 +11670,9 @@ textarea.input:focus {
 }
 
 .confirm-dialog-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -11683,8 +11680,8 @@ textarea.input:focus {
 }
 
 .confirm-dialog-icon.is-danger {
-  background: rgba(198, 40, 40, 0.12);
-  color: #c62828;
+  background: rgba(179, 38, 30, 0.12);
+  color: #b3261e;
 }
 
 .confirm-dialog-icon.is-warning {
@@ -11699,7 +11696,7 @@ textarea.input:focus {
 
 .confirm-dialog-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.3;
@@ -11707,18 +11704,18 @@ textarea.input:focus {
 }
 
 .confirm-dialog-message {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--text-secondary);
 }
 
 .confirm-dialog-detail {
-  padding: 10px 13px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: var(--bg-subtle);
   border: 1px solid var(--border-default);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.45;
@@ -11763,8 +11760,30 @@ textarea.input:focus {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 6px;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+/* Material 3 Secondary Action: Clean text/tonal button without harsh black border */
+.confirm-dialog-footer .btn-secondary {
+  background: transparent !important;
+  border: none !important;
+  color: var(--md-sys-color-primary, #0b57d0) !important;
+  font-weight: 500 !important;
+  padding: 0 16px !important;
+}
+
+.confirm-dialog-footer .btn-secondary:hover {
+  background: rgba(11, 87, 208, 0.08) !important;
+  color: var(--md-sys-color-primary, #0b57d0) !important;
+}
+
+[data-theme="dark"] .confirm-dialog-footer .btn-secondary {
+  color: #a8c7fa !important;
+}
+
+[data-theme="dark"] .confirm-dialog-footer .btn-secondary:hover {
+  background: rgba(168, 199, 250, 0.08) !important;
 }
 
 @media screen and (max-width: 520px) {

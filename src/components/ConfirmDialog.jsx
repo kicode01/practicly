@@ -81,15 +81,6 @@ export default function ConfirmDialog({
             </h3>
             <p id="confirm-dialog-message" className="confirm-dialog-message">{message}</p>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            aria-label="Close confirmation dialog"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            <IconClose size={16} />
-          </button>
         </div>
 
         {(detail || warning) && (
