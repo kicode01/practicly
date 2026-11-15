@@ -1071,7 +1071,7 @@ export default function DtrTransferModal({
               )}
 
               {/* ACTION FOOTER */}
-              <div className="action-row-wrap" style={{ justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-default)', margin: '16px -24px -24px -24px', padding: '16px 24px' }}>
                 <button type="button" className="btn btn-secondary" onClick={onClose}>
                   Close
                 </button>
