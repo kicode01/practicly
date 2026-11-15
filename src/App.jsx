@@ -1026,6 +1026,24 @@ export default function App() {
     return data.placements;
   }, [currentUser, myPlacement, supervisorPlacements, adviserScopeOnly, data.placements]);
 
+  const dtrPlacements = useMemo(() => {
+    const pool = auditablePlacements.length > 0 ? auditablePlacements : data.placements;
+    if (!selectedDtrPlacement) return pool;
+    if (pool.some((p) => String(p.placement_id) === String(selectedDtrPlacement.placement_id))) {
+      return pool;
+    }
+    return [selectedDtrPlacement, ...pool];
+  }, [auditablePlacements, data.placements, selectedDtrPlacement]);
+
+  const clearancePlacements = useMemo(() => {
+    const pool = auditablePlacements.length > 0 ? auditablePlacements : data.placements;
+    if (!selectedClearanceReport) return pool;
+    if (pool.some((p) => String(p.placement_id) === String(selectedClearanceReport.placement_id))) {
+      return pool;
+    }
+    return [selectedClearanceReport, ...pool];
+  }, [auditablePlacements, data.placements, selectedClearanceReport]);
+
   const openAuditModal = (explicitPlacement = null) => {
     const pool = auditablePlacements.length > 0 ? auditablePlacements : data.placements;
     const filteredMatch =
@@ -7573,12 +7591,16 @@ export default function App() {
 
       <ClearanceModal
         report={selectedClearanceReport}
+        placements={clearancePlacements}
+        onSelectPlacement={(pl) => setSelectedClearanceReport(pl)}
         currentUser={currentUser}
         onClose={() => setSelectedClearanceReport(null)}
       />
 
       <DtrModal
         placement={selectedDtrPlacement}
+        placements={dtrPlacements}
+        onSelectPlacement={(pl) => setSelectedDtrPlacement(pl)}
         logs={
           selectedDtrPlacement
             ? data.timelogs.filter(
@@ -7586,6 +7608,7 @@ export default function App() {
               )
             : []
         }
+        allLogs={data.timelogs}
         currentUser={currentUser}
         onClose={() => setSelectedDtrPlacement(null)}
       />

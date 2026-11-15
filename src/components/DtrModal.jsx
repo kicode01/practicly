@@ -1,23 +1,76 @@
-import React, { useRef } from 'react';
-import { IconPrinter, IconBrandLogo } from './Icons';
+import React, { useRef, useEffect } from 'react';
+import {
+  IconPrinter,
+  IconBrandLogo,
+  IconChevronLeft,
+  IconChevronRight,
+  IconStudent,
+} from './Icons';
+import { MaterialSelect } from './MaterialComponents';
 import SessionSignatureControl, {
   PrintableSignatoryBlock,
   useSessionSignature,
 } from './SessionSignatureControl';
 import { usePresenceValue } from '../utils/usePresence';
 
-export default function DtrModal({ placement: placementProp, logs = [], currentUser = null, onClose }) {
+export default function DtrModal({
+  placement: placementProp,
+  placements = [],
+  onSelectPlacement,
+  logs = [],
+  allLogs = [],
+  currentUser = null,
+  onClose,
+}) {
   const { rendered, exiting, value: placement } = usePresenceValue(placementProp, 150);
 
-  const lastLogsRef = useRef(logs);
-  if (placementProp && logs && logs.length > 0) {
-    lastLogsRef.current = logs;
+  // Directly derive accurate logs for active placement if allLogs is provided
+  const currentLogs = (placementProp && allLogs && allLogs.length > 0)
+    ? allLogs.filter((tl) => Number(tl.placement_id) === Number(placementProp.placement_id))
+    : logs;
+
+  const lastLogsRef = useRef(currentLogs);
+  if (placementProp) {
+    lastLogsRef.current = currentLogs;
   }
-  const activeLogs = (placementProp && logs && logs.length > 0) ? logs : lastLogsRef.current;
+  const activeLogs = placementProp ? currentLogs : lastLogsRef.current;
 
   const userRole = currentUser?.role || 'student';
   const userId = currentUser?.user_id || currentUser?.linked_id || userRole;
   const activeSignature = useSessionSignature(userRole, userId);
+
+  const currentPlacementId = placement?.placement_id;
+  const currentIndex = placements.findIndex(
+    (p) => String(p.placement_id) === String(currentPlacementId)
+  );
+
+  const handlePrevStudent = () => {
+    if (currentIndex > 0 && onSelectPlacement) {
+      onSelectPlacement(placements[currentIndex - 1]);
+    }
+  };
+
+  const handleNextStudent = () => {
+    if (currentIndex >= 0 && currentIndex < placements.length - 1 && onSelectPlacement) {
+      onSelectPlacement(placements[currentIndex + 1]);
+    }
+  };
+
+  useEffect(() => {
+    if (!placements || placements.length <= 1 || !onSelectPlacement) return;
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (e.key === 'ArrowLeft' && (e.altKey || e.metaKey)) {
+        e.preventDefault();
+        handlePrevStudent();
+      } else if (e.key === 'ArrowRight' && (e.altKey || e.metaKey)) {
+        e.preventDefault();
+        handleNextStudent();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIndex, placements, onSelectPlacement]);
 
   if (!rendered || !placement) return null;
 
@@ -52,6 +105,68 @@ export default function DtrModal({ placement: placementProp, logs = [], currentU
             </button>
           </div>
         </div>
+
+        {/* Material 3 Student Intern Switcher Toolbar */}
+        {placements && placements.length > 1 && onSelectPlacement && (
+          <div className="dtr-student-nav-bar no-print">
+            <div className="dtr-student-nav-selector">
+              <span className="dtr-student-nav-label">
+                <IconStudent size={15} />
+                <span>Student Intern:</span>
+              </span>
+              <div className="dtr-student-nav-select-wrap">
+                <MaterialSelect
+                  className="select-sm dtr-student-select"
+                  value={String(placement.placement_id)}
+                  onChange={(e) => {
+                    const next = placements.find((p) => String(p.placement_id) === String(e.target.value));
+                    if (next) onSelectPlacement(next);
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  {placements.map((p) => {
+                    const hrs = Number(p.total_hours_completed || 0).toFixed(0);
+                    const req = Number(p.required_hours || 300).toFixed(0);
+                    const pct = p.completion_percentage != null ? p.completion_percentage : Math.round((hrs / req) * 100);
+                    return (
+                      <option key={p.placement_id} value={String(p.placement_id)}>
+                        {p.student_name} ({p.student_number}) — {p.company_name || 'No HTE'} · {pct}% ({hrs}/{req} hrs)
+                      </option>
+                    );
+                  })}
+                </MaterialSelect>
+              </div>
+            </div>
+
+            <div className="dtr-student-nav-pager">
+              <span className="dtr-pager-counter">
+                {currentIndex >= 0 ? `${currentIndex + 1} of ${placements.length}` : `${placements.length} students`}
+              </span>
+              <div className="dtr-pager-btns">
+                <button
+                  type="button"
+                  className="dtr-pager-btn"
+                  disabled={currentIndex <= 0}
+                  onClick={handlePrevStudent}
+                  title="Previous Student Intern (Alt+Left)"
+                  aria-label="Previous Student Intern"
+                >
+                  <IconChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="dtr-pager-btn"
+                  disabled={currentIndex === -1 || currentIndex >= placements.length - 1}
+                  onClick={handleNextStudent}
+                  title="Next Student Intern (Alt+Right)"
+                  aria-label="Next Student Intern"
+                >
+                  <IconChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="dtr-modal-body">
           {currentUser && (

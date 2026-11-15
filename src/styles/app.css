@@ -4537,6 +4537,113 @@ input[type="number"] {
   background: rgba(168, 199, 250, 0.08) !important;
 }
 
+/* ============================================================================
+   OFFICIAL DOCUMENT STUDENT SWITCHER TOOLBAR (M3)
+   ============================================================================ */
+.dtr-student-nav-bar {
+  flex-shrink: 0;
+  padding: 10px 24px;
+  background: var(--bg-surface-elevated, #f0f4f9);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: background-color 150ms ease;
+}
+
+[data-theme="dark"] .dtr-student-nav-bar {
+  background: #1e1f20;
+}
+
+.dtr-student-nav-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dtr-student-nav-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.dtr-student-nav-select-wrap {
+  flex: 1 1 380px;
+  max-width: 520px;
+  min-width: 220px;
+}
+
+.dtr-student-select {
+  width: 100%;
+}
+
+.dtr-student-nav-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dtr-pager-counter {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dtr-pager-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dtr-pager-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 100ms ease;
+  padding: 0;
+}
+
+.dtr-pager-btn:hover:not(:disabled) {
+  background: rgba(11, 87, 208, 0.08);
+  color: var(--md-sys-color-primary, #0b57d0);
+  border-color: var(--md-sys-color-primary, #0b57d0);
+}
+
+[data-theme="dark"] .dtr-pager-btn:hover:not(:disabled) {
+  background: rgba(168, 199, 250, 0.12);
+  color: #a8c7fa;
+  border-color: #a8c7fa;
+}
+
+.dtr-pager-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.dtr-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: transparent;
+  background: transparent;
+}
+
 .dtr-modal-body {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -8851,7 +8958,8 @@ input[type="number"] {
 
   .modal-header,
   .modal-footer,
-  .dtr-modal-header {
+  .dtr-modal-header,
+  .dtr-student-nav-bar {
     display: none !important;
   }
 
@@ -11487,6 +11595,29 @@ input[type="number"] {
   }
 
   .modal-header .action-row-wrap {
+    width: 100%;
+  }
+
+  .dtr-student-nav-bar {
+    padding: 10px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dtr-student-nav-selector {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .dtr-student-nav-select-wrap {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .dtr-student-nav-pager {
+    justify-content: space-between;
     width: 100%;
   }
 
