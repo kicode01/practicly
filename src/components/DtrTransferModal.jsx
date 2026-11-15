@@ -1005,7 +1005,7 @@ export default function DtrTransferModal({
                             <td className="mono">{tl.date}</td>
                             <td className="mono">{tl.time_in}-{tl.time_out}</td>
                             <td className="mono font-bold">{Number(tl.hours_rendered).toFixed(1)}h</td>
-                            <td style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <td style={{ maxWidth: '280px', lineHeight: 1.4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
                               {tl.task_description}
                             </td>
                           </tr>

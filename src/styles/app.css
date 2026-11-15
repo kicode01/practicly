@@ -3447,7 +3447,8 @@ p {
 }
 
 .table tbody tr {
-  height: 52px;
+  min-height: 52px;
+  height: auto;
   background: var(--bg-surface);
   transition: background-color 0.14s ease;
 }
@@ -3562,26 +3563,27 @@ p {
   color: var(--text-muted);
 }
 
-/* Titles and Sub-labels inside Table Cells */
+/* Titles and Sub-labels inside Table Cells — natural multi-line wrapping, zero artificial ellipsis clamps */
 .row-title {
   font-weight: 500;
   color: var(--text-primary);
   font-size: 13px;
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 195px;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  max-width: none;
 }
 
 .row-sub {
   font-size: 11.5px;
   color: var(--text-muted);
   margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 195px;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  max-width: none;
 }
 
 @media (max-width: 1380px) and (min-width: 961px) {
@@ -3603,7 +3605,9 @@ p {
 
   .table:not(.table-overview) .row-title,
   .table:not(.table-overview) .row-sub {
-    max-width: 120px;
+    max-width: none;
+    white-space: normal;
+    word-break: normal;
   }
 
   .table:not(.table-overview) .m3-cell-stack .row-sub {
@@ -3619,6 +3623,8 @@ p {
 .row-sub.mono {
   font-family: var(--font-mono);
   font-size: 11px;
+  white-space: normal;
+  word-break: normal;
 }
 
 /* Task & Accomplishment Text Cell */
@@ -10019,10 +10025,10 @@ textarea.input:focus {
 
 .table-overview .row-title,
 .table-overview .row-sub {
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: none;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .table-overview th,
