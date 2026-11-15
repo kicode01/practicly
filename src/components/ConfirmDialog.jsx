@@ -39,10 +39,10 @@ export default function ConfirmDialog({
   if (!rendered || typeof document === 'undefined') return null;
 
   const renderIcon = () => {
-    if (iconType === 'trash') return <IconTrash size={20} />;
-    if (iconType === 'logout') return <IconLogOut size={20} />;
-    if (iconType === 'shield') return <IconShieldCheck size={20} />;
-    return <IconAlert size={20} />;
+    if (iconType === 'trash') return <IconTrash size={24} />;
+    if (iconType === 'logout') return <IconLogOut size={24} />;
+    if (iconType === 'shield') return <IconShieldCheck size={24} />;
+    return <IconAlert size={24} />;
   };
 
   const handleConfirmClick = async () => {

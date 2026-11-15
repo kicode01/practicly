@@ -185,7 +185,7 @@ export default function PersonaSwitcher({
                 }}
                 title="Sign out of current account"
               >
-                <IconLogOut size={14} />
+                <IconLogOut size={15} />
                 <span>Sign Out</span>
               </button>
             )}

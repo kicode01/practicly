@@ -6924,11 +6924,11 @@ textarea.input:focus {
 
 .m3-active-meta {
   font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .m3-active-tag-row {
@@ -6944,37 +6944,44 @@ textarea.input:focus {
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 12px;
-  border-radius: 9999px;
-  border: 1px solid rgba(198, 40, 40, 0.25);
-  background: rgba(198, 40, 40, 0.08);
-  color: var(--danger-fg, #b71c1c);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--md-sys-color-outline, #747775);
+  background: transparent;
+  color: var(--md-sys-color-on-surface, #1f1f1f);
   font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
   white-space: nowrap;
-  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .m3-active-signout-btn:hover {
-  background: rgba(198, 40, 40, 0.14);
-  border-color: rgba(198, 40, 40, 0.42);
+  background: rgba(60, 64, 67, 0.08);
+  border-color: var(--text-primary);
+  color: var(--text-primary);
 }
 
 .m3-active-signout-btn:active {
-  transform: scale(0.97);
+  background: rgba(60, 64, 67, 0.14);
 }
 
 [data-theme="dark"] .m3-active-signout-btn {
-  background: rgba(242, 184, 181, 0.12);
-  border-color: rgba(242, 184, 181, 0.28);
-  color: #f2b8b5;
+  border-color: #8e918f;
+  color: #e3e3e3;
+  background: transparent;
 }
 
 [data-theme="dark"] .m3-active-signout-btn:hover {
-  background: rgba(242, 184, 181, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #c4c7c5;
+  color: #f2f2f2;
+}
+
+[data-theme="dark"] .m3-active-signout-btn:active {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .m3-session-status {
@@ -11676,27 +11683,29 @@ textarea.input:focus {
 }
 
 .confirm-dialog-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: transparent !important;
+  border-radius: 0;
+  margin-top: 1px;
 }
 
 .confirm-dialog-icon.is-danger {
-  background: rgba(179, 38, 30, 0.12);
-  color: #b3261e;
+  background: transparent !important;
+  color: var(--md-sys-color-error, #b3261e);
 }
 
 .confirm-dialog-icon.is-warning {
-  background: rgba(217, 119, 6, 0.14);
-  color: #b45309;
+  background: transparent !important;
+  color: #e27500;
 }
 
 .confirm-dialog-icon.is-primary {
-  background: rgba(11, 87, 208, 0.12);
+  background: transparent !important;
   color: var(--md-sys-color-primary, #0b57d0);
 }
 
@@ -11748,13 +11757,18 @@ textarea.input:focus {
 }
 
 [data-theme="dark"] .confirm-dialog-icon.is-danger {
-  background: rgba(242, 184, 181, 0.14);
+  background: transparent !important;
   color: #f2b8b5;
 }
 
 [data-theme="dark"] .confirm-dialog-icon.is-warning {
-  background: rgba(252, 211, 77, 0.14);
-  color: #fcd34d;
+  background: transparent !important;
+  color: #ffb74d;
+}
+
+[data-theme="dark"] .confirm-dialog-icon.is-primary {
+  background: transparent !important;
+  color: #a8c7fa;
 }
 
 [data-theme="dark"] .confirm-dialog-warning {

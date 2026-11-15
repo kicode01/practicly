@@ -1224,7 +1224,7 @@ export default function App() {
       warning: shiftWarn,
       confirmLabel: 'Sign Out',
       cancelLabel: 'Stay Signed In',
-      variant: activeShift?.startedAt ? 'warning' : 'danger',
+      variant: activeShift?.startedAt ? 'warning' : 'primary',
       iconType: 'logout',
       onConfirm: executeLogout,
     });
