@@ -6825,7 +6825,7 @@ textarea.input:focus {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
-  max-width: 140px;
+  max-width: 220px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6879,10 +6879,17 @@ textarea.input:focus {
 /* A. Active User Hero Card */
 .m3-active-card {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 14px;
-  padding: 18px 20px;
+  padding: 18px 20px 16px;
   background: linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg-surface) 100%);
+}
+
+.m3-active-profile-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
 }
 
 .m3-active-avatar {
@@ -6939,12 +6946,21 @@ textarea.input:focus {
   flex-wrap: wrap;
 }
 
+.m3-active-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding-top: 4px;
+}
+
 .m3-active-signout-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 14px;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 22px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--md-sys-color-outline, #747775);
   background: transparent;
@@ -6953,9 +6969,8 @@ textarea.input:focus {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  flex-shrink: 0;
   white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .m3-active-signout-btn:hover {
@@ -8128,22 +8143,23 @@ textarea.input:focus {
 
 .modal-header-identity {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 12px;
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .modal-header-icon-box {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--md-sys-color-primary-container, rgba(11, 87, 208, 0.12));
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  background: transparent !important;
   color: var(--role-primary, var(--md-sys-color-primary, #0b57d0));
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .modal-title {
@@ -10916,7 +10932,10 @@ textarea.input:focus {
   .m3-active-card {
     padding: 14px 16px;
     gap: 12px;
-    flex-wrap: wrap;
+  }
+
+  .m3-active-actions-row {
+    width: 100%;
   }
 
   .m3-active-signout-btn {
@@ -11726,15 +11745,21 @@ textarea.input:focus {
 }
 
 .confirm-dialog-detail {
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 12px;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-default);
-  font-size: 12px;
+  background: var(--md-sys-color-surface-container, #f0f4f9);
+  border: none;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1.45;
+  color: var(--text-secondary);
+  line-height: 1.5;
   word-break: break-word;
+}
+
+[data-theme="dark"] .confirm-dialog-detail {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: #c4c7c5;
 }
 
 .confirm-dialog-warning {
@@ -11781,21 +11806,69 @@ textarea.input:focus {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 8px;
+  padding-top: 10px;
 }
 
-/* Material 3 Secondary Action: Clean text/tonal button without harsh black border */
+.confirm-dialog-footer .btn {
+  height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+/* Material 3 Secondary Action: Clean text button without border */
 .confirm-dialog-footer .btn-secondary {
   background: transparent !important;
   border: none !important;
   color: var(--md-sys-color-primary, #0b57d0) !important;
   font-weight: 500 !important;
   padding: 0 16px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
 }
 
 .confirm-dialog-footer .btn-secondary:hover {
   background: rgba(11, 87, 208, 0.08) !important;
   color: var(--md-sys-color-primary, #0b57d0) !important;
+}
+
+.confirm-dialog-footer .btn-primary {
+  background: var(--md-sys-color-primary, #0b57d0) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0 24px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
+.confirm-dialog-footer .btn-primary:hover {
+  background: #0842a0 !important;
+}
+
+.confirm-dialog-footer .btn-danger {
+  background: var(--md-sys-color-error, #b3261e) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0 24px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
+.confirm-dialog-footer .btn-danger:hover {
+  background: #8c1d18 !important;
+}
+
+.confirm-dialog-footer .btn-warning {
+  background: #e27500 !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0 24px !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: none !important;
+}
+
+.confirm-dialog-footer .btn-warning:hover {
+  background: #b45309 !important;
 }
 
 [data-theme="dark"] .confirm-dialog-footer .btn-secondary {

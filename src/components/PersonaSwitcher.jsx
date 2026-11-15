@@ -156,38 +156,42 @@ export default function PersonaSwitcher({
         >
           {/* A. CURRENT ACTIVE USER HERO CARD */}
           <div className="m3-active-card">
-            <div className={`m3-active-avatar m3-role-${currentUser?.role || 'student'}`}>
-              {getRoleIcon(currentUser?.role, 24)}
-            </div>
-            <div className="m3-active-details">
-              <div className="m3-active-name">{currentUser?.display_name}</div>
-              <div className="m3-active-meta">
-                <span className="mono">{currentUser?.identifier_code || currentUser?.username}</span>
-                {currentUser?.unit_label && <span> · {currentUser.unit_label}</span>}
+            <div className="m3-active-profile-row">
+              <div className={`m3-active-avatar m3-role-${currentUser?.role || 'student'}`}>
+                {getRoleIcon(currentUser?.role, 24)}
               </div>
-              <div className="m3-active-tag-row">
-                <span className={`m3-role-chip m3-role-${currentUser?.role || 'student'}`}>
-                  {getRoleLabel(currentUser?.role)}
-                </span>
-                <span className="m3-session-status">
-                  <IconCheck size={12} />
-                  <span>Current Active Session</span>
-                </span>
+              <div className="m3-active-details">
+                <div className="m3-active-name">{currentUser?.display_name}</div>
+                <div className="m3-active-meta">
+                  <span className="mono">{currentUser?.identifier_code || currentUser?.username}</span>
+                  {currentUser?.unit_label && <span> · {currentUser.unit_label}</span>}
+                </div>
+                <div className="m3-active-tag-row">
+                  <span className={`m3-role-chip m3-role-${currentUser?.role || 'student'}`}>
+                    {getRoleLabel(currentUser?.role)}
+                  </span>
+                  <span className="m3-session-status">
+                    <IconCheck size={12} />
+                    <span>Current Active Session</span>
+                  </span>
+                </div>
               </div>
             </div>
             {onRequestLogout && (
-              <button
-                type="button"
-                className="m3-active-signout-btn"
-                onClick={() => {
-                  setIsOpen(false);
-                  onRequestLogout();
-                }}
-                title="Sign out of current account"
-              >
-                <IconLogOut size={15} />
-                <span>Sign Out</span>
-              </button>
+              <div className="m3-active-actions-row">
+                <button
+                  type="button"
+                  className="m3-active-signout-btn"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onRequestLogout();
+                  }}
+                  title="Sign out of current account"
+                >
+                  <IconLogOut size={15} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
             )}
           </div>
 
