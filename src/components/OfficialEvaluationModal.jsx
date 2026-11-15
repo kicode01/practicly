@@ -314,7 +314,13 @@ export default function OfficialEvaluationModal({
   const slotRoles = SIGNATORY_ROLE_SLOTS[activeInstrument.id] || ['supervisor', 'adviser'];
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+    <div
+      className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`}
+      onClick={exiting ? undefined : onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="official-eval-title"
+    >
       <div
         className={`modal-card modal-entry-card official-eval-modal ${exiting ? 'is-exiting' : ''}`}
         style={{ maxWidth: '960px', width: '95vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
@@ -323,11 +329,11 @@ export default function OfficialEvaluationModal({
         {/* MODAL HEADER */}
         <div className="modal-header no-print">
           <div className="modal-header-identity">
-            <div className="modal-header-icon-box">
+            <div className="modal-header-icon-box" aria-hidden="true">
               <IconEvaluation size={18} />
             </div>
             <div>
-              <div className="modal-title">
+              <h2 id="official-eval-title" className="modal-title">
                 {isBlankPrintMode
                   ? 'Printable INST-02 HTE Supervisor Evaluation Form'
                   : userRole === 'student'
@@ -337,7 +343,7 @@ export default function OfficialEvaluationModal({
                   : userRole === 'supervisor'
                   ? 'HTE Supervisor Evaluation Form (INST-02)'
                   : 'Official OJT Evaluation Instruments & Rubrics Hub'}
-              </div>
+              </h2>
               <div className="modal-subtitle">
                 {isBlankPrintMode
                   ? 'Print cleanly for your HTE Training Supervisor wet-ink signature, then upload scanned proof'
@@ -625,9 +631,9 @@ export default function OfficialEvaluationModal({
                   <table className="table table-compact official-rubric-table" style={{ width: '100%', margin: 0 }}>
                     <thead>
                       <tr>
-                        <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                        <th>Performance Indicator / Criterion</th>
-                        <th style={{ width: '160px', textAlign: 'center' }}>Rating (5 to 1)</th>
+                        <th scope="col" style={{ width: '40px', textAlign: 'center' }}>#</th>
+                        <th scope="col">Performance Indicator / Criterion</th>
+                        <th scope="col" style={{ width: '160px', textAlign: 'center' }}>Rating (5 to 1)</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -46,7 +46,7 @@ export default function StudentProfileModal({
   const HeaderIcon = isStudentRole ? IconUser : IconStudent;
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={syncing || exiting ? undefined : onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={syncing || exiting ? undefined : onClose} role="dialog" aria-modal="true" aria-labelledby="student-profile-modal-title">
       <div
         className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
         style={{ maxWidth: '640px' }}
@@ -59,13 +59,13 @@ export default function StudentProfileModal({
               <HeaderIcon size={18} />
             </div>
             <div>
-              <div className="modal-title">
+              <h2 id="student-profile-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>
                 {isStudentRole
                   ? 'Edit My Student Profile'
                   : editingStudentId
                   ? `Edit Student #${editingStudentId}`
                   : 'Register New Student'}
-              </div>
+              </h2>
               <div className="modal-subtitle">
                 {isStudentRole
                   ? 'Update your contact number, institutional email, or section details'

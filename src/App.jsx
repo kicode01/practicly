@@ -220,13 +220,13 @@ function WorkspaceSkeleton({ activeTab, role }) {
               <table className="table">
                 <thead>
                   <tr>
-                    <th><div className="sk-shimmer" style={{ width: '54px', height: '10px' }} /></th>
-                    <th><div className="sk-shimmer" style={{ width: '120px', height: '10px' }} /></th>
-                    <th><div className="sk-shimmer" style={{ width: '120px', height: '10px' }} /></th>
-                    <th><div className="sk-shimmer" style={{ width: '64px', height: '10px' }} /></th>
-                    <th><div className="sk-shimmer" style={{ width: '140px', height: '10px' }} /></th>
-                    <th><div className="sk-shimmer" style={{ width: '80px', height: '10px' }} /></th>
-                    <th className="text-right"><div className="sk-shimmer" style={{ width: '54px', height: '10px', marginLeft: 'auto' }} /></th>
+                    <th scope="col"><div className="sk-shimmer" style={{ width: '54px', height: '10px' }} /></th>
+                    <th scope="col"><div className="sk-shimmer" style={{ width: '120px', height: '10px' }} /></th>
+                    <th scope="col"><div className="sk-shimmer" style={{ width: '120px', height: '10px' }} /></th>
+                    <th scope="col"><div className="sk-shimmer" style={{ width: '64px', height: '10px' }} /></th>
+                    <th scope="col"><div className="sk-shimmer" style={{ width: '140px', height: '10px' }} /></th>
+                    <th scope="col"><div className="sk-shimmer" style={{ width: '80px', height: '10px' }} /></th>
+                    <th scope="col" className="text-right"><div className="sk-shimmer" style={{ width: '54px', height: '10px', marginLeft: 'auto' }} /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -273,13 +273,13 @@ function WorkspaceSkeleton({ activeTab, role }) {
             <table className="table">
               <thead>
                 <tr>
-                  <th><div className="sk-shimmer" style={{ width: '92px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '120px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '110px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '76px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '115px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '72px', height: '10px' }} /></th>
-                  <th className="text-right"><div className="sk-shimmer" style={{ width: '80px', height: '10px', marginLeft: 'auto' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '92px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '120px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '110px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '76px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '115px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '72px', height: '10px' }} /></th>
+                  <th scope="col" className="text-right"><div className="sk-shimmer" style={{ width: '80px', height: '10px', marginLeft: 'auto' }} /></th>
                 </tr>
               </thead>
               <tbody>
@@ -439,6 +439,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
+  const [liveAnnounceText, setLiveAnnounceText] = useState('');
   const toastTimerRef = useRef(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [selectedClearanceReport, setSelectedClearanceReport] = useState(null);
@@ -711,6 +712,7 @@ export default function App() {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
+    setLiveAnnounceText(message);
     setToast((prev) => ({ id: (prev?.id || 0) + 1, message, type }));
     toastTimerRef.current = setTimeout(() => {
       toastTimerRef.current = null;
@@ -2864,6 +2866,7 @@ export default function App() {
 
     return (
       <div className="auth-centered-shell">
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         {/* STICKY EDITORIAL TOP BAR — GOOGLE WORKSPACE STYLE */}
         <div className="auth-topbar-wrap">
           <header className="auth-topbar">
@@ -2900,6 +2903,7 @@ export default function App() {
           </header>
         </div>
 
+        <main id="main-content" tabIndex="-1">
         {/* BAND 1: CLEAN GOOGLE WORKSPACE HERO + REAL PRODUCT WORKSPACE PREVIEW */}
         <section className="auth-hero-band" aria-label="Practicly Overview">
           <div className="auth-hero-container">
@@ -2962,6 +2966,7 @@ export default function App() {
                   src="/hero-workspace.jpg"
                   alt="Editorial illustration of a student intern clocking practicum hours with a verified DTR sheet, a host supervisor approving attendance, and a faculty adviser reviewing clearance"
                   className="auth-hero-illustration"
+                  fetchPriority="high"
                 />
               </div>
             </div>
@@ -2996,6 +3001,8 @@ export default function App() {
                       alt={slide.imageAlt}
                       aria-hidden={!isCurrent}
                       className={`auth-preview-illustration ${isCurrent ? 'is-active' : ''}`}
+                      loading="lazy"
+                      decoding="async"
                     />
                   );
                 })}
@@ -3206,6 +3213,7 @@ export default function App() {
             </div>
           </div>
         </section>
+        </main>
 
         {/* FULL-WIDTH GENERALIZED FOOTER */}
         <div className="auth-footer-wrap">
@@ -3247,6 +3255,7 @@ export default function App() {
           onLogin={handleLogin}
           onRegister={handleRegister}
         />
+        <div id="live-announcer" aria-live="polite" aria-atomic="true" className="visually-hidden">{liveAnnounceText}</div>
       </div>
     );
   }
@@ -3287,6 +3296,7 @@ export default function App() {
       className={`app-layout ${mobileMenuOpen ? 'drawer-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${isAnyModalOpen ? 'modal-open' : ''}`}
       data-role={currentUser?.role || 'student'}
     >
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* MOBILE BACKDROP */}
       {mobileBackdropPresence.rendered && (
         <div
@@ -3487,7 +3497,7 @@ export default function App() {
 
         {(loading || syncing) && <div className="topbar-sync-bar" />}
 
-        <main className="page-container">
+        <main className="page-container" id="main-content" tabIndex="-1">
           {loading ? (
             <WorkspaceSkeleton activeTab={activeTab} role={currentUser.role} />
           ) : (
@@ -3763,10 +3773,10 @@ export default function App() {
                     <table className="table table-fit">
                       <thead>
                         <tr>
-                          <th>Date</th>
-                          <th>Shift</th>
-                          <th className="text-right">Hours</th>
-                          <th>Accomplishment / Tasks Completed</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">Shift</th>
+                          <th scope="col" className="text-right">Hours</th>
+                          <th scope="col">Accomplishment / Tasks Completed</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3987,13 +3997,13 @@ export default function App() {
                   <table className="table table-fit table-overview table-adviser-overview">
                     <thead>
                       <tr>
-                        <th>Student</th>
-                        <th>Host Company</th>
-                        <th className="text-right">Hours</th>
-                        <th>Progress</th>
-                        <th>Eval</th>
-                        <th>Status</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Host Company</th>
+                        <th scope="col" className="text-right">Hours</th>
+                        <th scope="col">Progress</th>
+                        <th scope="col">Eval</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4309,13 +4319,13 @@ export default function App() {
                     <table className="table">
                       <thead>
                         <tr>
-                          <th>Date</th>
-                          <th>Intern</th>
-                          <th>Shift</th>
-                          <th className="text-right">Hours</th>
-                          <th>Workplace Accomplishment</th>
-                          <th>Status</th>
-                          <th className="text-right">Stage 1 Action</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">Intern</th>
+                          <th scope="col">Shift</th>
+                          <th scope="col" className="text-right">Hours</th>
+                          <th scope="col">Workplace Accomplishment</th>
+                          <th scope="col">Status</th>
+                          <th scope="col" className="text-right">Stage 1 Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4386,12 +4396,12 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Intern Name</th>
-                        <th>Role / Designation</th>
-                        <th>Academic Adviser</th>
-                        <th>Hours Progress</th>
-                        <th>Supervisor Eval</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Intern Name</th>
+                        <th scope="col">Role / Designation</th>
+                        <th scope="col">Academic Adviser</th>
+                        <th scope="col">Hours Progress</th>
+                        <th scope="col">Supervisor Eval</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4640,11 +4650,11 @@ export default function App() {
                     <table className="table table-fit table-overview table-admin-split">
                       <thead>
                         <tr>
-                          <th>Student</th>
-                          <th>Host Company</th>
-                          <th>Progress</th>
-                          <th>Status</th>
-                          <th className="text-right">Actions</th>
+                          <th scope="col">Student</th>
+                          <th scope="col">Host Company</th>
+                          <th scope="col">Progress</th>
+                          <th scope="col">Status</th>
+                          <th scope="col" className="text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4843,14 +4853,14 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Student No.</th>
-                        <th>Full Name</th>
-                        <th>Program &amp; Section</th>
-                        <th>Email &amp; Contact</th>
-                        <th>Assigned HTE</th>
-                        <th className="text-right">Rendered Hours</th>
-                        <th>Status</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Student No.</th>
+                        <th scope="col">Full Name</th>
+                        <th scope="col">Program &amp; Section</th>
+                        <th scope="col">Email &amp; Contact</th>
+                        <th scope="col">Assigned HTE</th>
+                        <th scope="col" className="text-right">Rendered Hours</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5025,12 +5035,12 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Student</th>
-                        <th>Designation</th>
-                        <th>Adviser</th>
-                        <th className="text-right">Hours Rendered</th>
-                        <th>Status</th>
-                        <th className="text-right">Action</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Designation</th>
+                        <th scope="col">Adviser</th>
+                        <th scope="col" className="text-right">Hours Rendered</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" className="text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5142,12 +5152,12 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Company &amp; Office Address</th>
-                        <th>Industry</th>
-                        <th>Supervisor / Contact</th>
-                        <th>MOA Status</th>
-                        <th className="text-right">Interns Hosted</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Company &amp; Office Address</th>
+                        <th scope="col">Industry</th>
+                        <th scope="col">Supervisor / Contact</th>
+                        <th scope="col">MOA Status</th>
+                        <th scope="col" className="text-right">Interns Hosted</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5443,8 +5453,7 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th
-                          className="th-sortable"
+                        <th scope="col"                           className="th-sortable"
                           onClick={() => {
                             if (placementSortCol === 'student_name') {
                               setPlacementSortAsc(!placementSortAsc);
@@ -5456,8 +5465,7 @@ export default function App() {
                         >
                           Student {placementSortCol === 'student_name' && <span className="th-sort-icon">{placementSortAsc ? '▲' : '▼'}</span>}
                         </th>
-                        <th
-                          className="th-sortable"
+                        <th scope="col"                           className="th-sortable"
                           onClick={() => {
                             if (placementSortCol === 'company_name') {
                               setPlacementSortAsc(!placementSortAsc);
@@ -5469,10 +5477,9 @@ export default function App() {
                         >
                           Host Company {placementSortCol === 'company_name' && <span className="th-sort-icon">{placementSortAsc ? '▲' : '▼'}</span>}
                         </th>
-                        <th>Adviser</th>
-                        <th>Duration</th>
-                        <th
-                          className="th-sortable text-right"
+                        <th scope="col">Adviser</th>
+                        <th scope="col">Duration</th>
+                        <th scope="col"                           className="th-sortable text-right"
                           onClick={() => {
                             if (placementSortCol === 'hours_rendered') {
                               setPlacementSortAsc(!placementSortAsc);
@@ -5484,9 +5491,9 @@ export default function App() {
                         >
                           Hours {placementSortCol === 'hours_rendered' && <span className="th-sort-icon">{placementSortAsc ? '▲' : '▼'}</span>}
                         </th>
-                        <th>Progress</th>
-                        <th>Status</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Progress</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5976,13 +5983,13 @@ export default function App() {
                     <table className="table">
                       <thead>
                         <tr>
-                          <th>Date</th>
-                          {currentUser.role !== 'student' && <th>Student</th>}
-                          <th>Shift</th>
-                          <th className="text-right">Hours</th>
-                          <th>Accomplishment</th>
-                          <th>Status</th>
-                          <th className="text-right">Actions</th>
+                          <th scope="col">Date</th>
+                          {currentUser.role !== 'student' && <th scope="col">Student</th>}
+                          <th scope="col">Shift</th>
+                          <th scope="col" className="text-right">Hours</th>
+                          <th scope="col">Accomplishment</th>
+                          <th scope="col">Status</th>
+                          <th scope="col" className="text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -6638,12 +6645,12 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Student</th>
-                        <th>Evaluator</th>
-                        <th className="text-right">Score</th>
-                        <th>Remarks</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Evaluator</th>
+                        <th scope="col" className="text-right">Score</th>
+                        <th scope="col">Remarks</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -6957,15 +6964,15 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Faculty Adviser</th>
-                        <th>Student</th>
-                        <th>Host Company</th>
-                        <th>Last Attendance</th>
-                        <th className="text-right">Hours</th>
-                        <th>Completion</th>
-                        <th>Evaluations</th>
-                        <th>Clearance</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Faculty Adviser</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Host Company</th>
+                        <th scope="col">Last Attendance</th>
+                        <th scope="col" className="text-right">Hours</th>
+                        <th scope="col">Completion</th>
+                        <th scope="col">Evaluations</th>
+                        <th scope="col">Clearance</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -7158,12 +7165,12 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Student</th>
-                        <th>Host Company</th>
-                        <th>Training Hours</th>
-                        <th>Evaluations</th>
-                        <th>Status &amp; Reference</th>
-                        <th className="no-print text-right">Actions</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Host Company</th>
+                        <th scope="col">Training Hours</th>
+                        <th scope="col">Evaluations</th>
+                        <th scope="col">Status &amp; Reference</th>
+                        <th scope="col" className="no-print text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -7349,13 +7356,13 @@ export default function App() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Username</th>
-                        <th>Role</th>
-                        <th>Account Holder</th>
-                        <th>Department / Section</th>
-                        <th>Account Status</th>
-                        <th>Last Login</th>
-                        <th className="text-right">Actions</th>
+                        <th scope="col">Username</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Account Holder</th>
+                        <th scope="col">Department / Section</th>
+                        <th scope="col">Account Status</th>
+                        <th scope="col">Last Login</th>
+                        <th scope="col" className="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -7855,6 +7862,7 @@ export default function App() {
       />
 
       <Snackbar message={toast?.message} type={toast?.type} onClose={dismissNotice} />
+      <div id="live-announcer" aria-live="polite" aria-atomic="true" className="visually-hidden">{liveAnnounceText}</div>
     </div>
   );
 }

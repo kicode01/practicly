@@ -61,7 +61,7 @@ export default function EvaluationEntryModal({
       : 'Needs Improvement / Retraining Required';
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true" aria-labelledby="eval-entry-title">
       <div
         className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
         onClick={(e) => e.stopPropagation()}
@@ -73,9 +73,9 @@ export default function EvaluationEntryModal({
               <IconEvaluation size={18} />
             </div>
             <div>
-              <div className="modal-title">
+              <h2 id="eval-entry-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>
                 {editingEvalId ? `Edit Evaluation #${editingEvalId}` : 'Submit Performance Evaluation'}
-              </div>
+              </h2>
               <div className="modal-subtitle">
                 {evalForm.evaluator_type === 'employer'
                   ? 'Record Host Training Establishment (HTE) workplace evaluation from company rubric or letter'

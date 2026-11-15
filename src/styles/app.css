@@ -1,4 +1,10 @@
 :root {
+  /* Google Chrome Modern Web Guidance (MWG) Platform Conformance */
+  color-scheme: light dark;
+  accent-color: var(--md-sys-color-primary, #0b57d0);
+  scrollbar-color: var(--border-default, #c4c7c5) transparent;
+  scrollbar-width: thin;
+
   /* ==========================================================================
      GOOGLE MATERIAL DESIGN 3 (M3) WEB DESIGN TOKENS — https://github.com/material-components/material-web
      ========================================================================== */
@@ -291,6 +297,8 @@
 html {
   scroll-behavior: smooth;
   overflow-y: scroll;
+  scrollbar-gutter: stable;
+  accent-color: var(--md-sys-color-primary, #0b57d0);
 }
 
 html,
@@ -305,6 +313,164 @@ body {
   letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
+   GOOGLE CHROME MODERN WEB GUIDANCE (MWG) PLATFORM ENHANCEMENTS
+   Standards: Accessibility (WCAG 2.2), Core Web Vitals, Forms, Typography, CSS
+   ============================================================================ */
+
+/* 1. Canonical Visually Hidden Utility (MWG Accessibility Guide) */
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* 2. Accessible Skip-to-Content Link (WCAG 2.4.1 Bypass Blocks) */
+.skip-link {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 100000;
+  padding: 10px 18px;
+  background: var(--md-sys-color-primary, #0b57d0);
+  color: #ffffff !important;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  text-decoration: none;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  transition: transform 0.15s var(--ease-out-expo);
+}
+.skip-link:not(:focus):not(:focus-within) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* 3. Universal High-Contrast Focus Ring (WCAG 2.4.7 Focus Visible & 1.4.11) */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--md-sys-color-primary, #0b57d0);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 4. Modern Typography Wrapping & Numerics (MWG Typography Guide) */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.page-title,
+.panel-title,
+.modal-title,
+.auth-hero-headline,
+.public-verify-action-title,
+th {
+  text-wrap: balance;
+}
+
+p,
+.page-desc,
+.panel-desc,
+.modal-subtitle,
+.auth-hero-lead,
+.auth-hero-desc,
+.field-hint,
+.public-verify-action-sub {
+  text-wrap: pretty;
+}
+
+p,
+.auth-hero-lead {
+  max-inline-size: 75ch;
+}
+
+/* High-precision tabular numerics for all data tables, clocks, timers, and KPI metrics */
+.mono,
+.table td,
+.table th,
+.metric-value,
+.sk-metric-value,
+.public-verify-summary-metric,
+.time-badge,
+.hours-badge,
+.kpi-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 5. Natural Interactions & Press Feedback (MWG Natural Interactions Guide) */
+.btn:active:not(:disabled),
+.sidebar-item:active,
+.m3-toolbar-filter-chip:active,
+.m3-tab-item:active,
+.quick-action-pill:active {
+  scale: 0.98;
+  transition: scale 90ms var(--ease-out-expo);
+}
+
+/* Modal, Sheet, and Dropdown Scroll Containment */
+.modal-backdrop,
+.modal-card,
+.sidebar,
+.mobile-bottom-nav,
+.dropdown,
+.m3-select-menu {
+  overscroll-behavior: contain;
+}
+
+/* 6. Forms & Accessible Validation States (MWG Forms & Accessible Error Announcement) */
+:where(input, select, textarea):user-invalid {
+  border-color: var(--md-sys-color-error, #ba1a1a) !important;
+  background-color: var(--danger-bg, #ffdad6) !important;
+}
+
+:where(input, select, textarea) {
+  font-size: max(1rem, 13.5px);
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .sidebar-item,
+  .mobile-bottom-nav a,
+  .m3-toolbar-filter-chip,
+  input,
+  select,
+  textarea {
+    min-block-size: 44px;
+  }
+}
+
+/* 7. CSS Rendering Performance & Containment (MWG Performance Guide) */
+.table-wrap tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 46px;
+}
+
+.panel,
+.metric-strip,
+.erd-entity-grid {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 120px;
 }
 
 /* ============================================================================

@@ -34,7 +34,7 @@ export default function SupervisorShareModal({
   };
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true" aria-labelledby="supervisor-share-modal-title">
       <div className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`} style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
         {/* HEADER */}
         <div className="modal-header">
@@ -43,7 +43,7 @@ export default function SupervisorShareModal({
               <IconLink size={18} />
             </div>
             <div>
-              <div className="modal-title">Share DTR Verification Link to Supervisor</div>
+              <h2 id="supervisor-share-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>Share DTR Verification Link to Supervisor</h2>
               <div className="modal-subtitle">
                 Generate a zero-friction, passwordless verification link for your HTE Supervisor
               </div>

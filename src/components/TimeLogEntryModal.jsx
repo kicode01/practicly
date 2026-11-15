@@ -63,7 +63,7 @@ export default function TimeLogEntryModal({
   };
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true" aria-labelledby="timelog-entry-modal-title">
       <div
         className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
         onClick={(e) => e.stopPropagation()}
@@ -75,13 +75,13 @@ export default function TimeLogEntryModal({
               <IconClock size={18} />
             </div>
             <div>
-              <div className="modal-title">
+              <h2 id="timelog-entry-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>
                 {editingLogId
                   ? `Edit Attendance Entry #${editingLogId}`
                   : currentUser?.role === 'student'
                   ? 'Log Practicum Attendance'
                   : 'Record Intern Attendance Entry'}
-              </div>
+              </h2>
               <div className="modal-subtitle">
                 {currentUser?.role === 'student'
                   ? 'Submit your daily shift hours for HTE supervisor verification'

@@ -21,11 +21,17 @@ export default function DtrModal({ placement: placementProp, logs = [], currentU
     .reduce((sum, l) => sum + Number(l.hours_rendered || 0), 0);
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose}>
+    <div
+      className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`}
+      onClick={exiting ? undefined : onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dtr-modal-title"
+    >
       <div className={`modal-card dtr-modal-card ${exiting ? 'is-exiting' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-header dtr-modal-header no-print">
           <div>
-            <div className="panel-title">Official OJT Daily Time Record (DTR)</div>
+            <h2 id="dtr-modal-title" className="panel-title">Official OJT Daily Time Record (DTR)</h2>
             <div className="panel-desc">
               Verified attendance ledger for {placement.student_name} ({placement.student_number})
             </div>
@@ -35,7 +41,7 @@ export default function DtrModal({ placement: placementProp, logs = [], currentU
               <IconPrinter size={14} />
               Print Official DTR
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Close dialog">
               Close
             </button>
           </div>
@@ -102,15 +108,15 @@ export default function DtrModal({ placement: placementProp, logs = [], currentU
           </div>
 
           <div className="table-wrap" style={{ border: '1px solid #d1d5db', borderRadius: '6px' }}>
-            <table className="table">
+            <table className="table" aria-label="Official Daily Time Record Entries">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Time In</th>
-                  <th>Time Out</th>
-                  <th className="text-right">Hours</th>
-                  <th>Status</th>
-                  <th>Accomplishment / Technical Tasks</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Time In</th>
+                  <th scope="col">Time Out</th>
+                  <th scope="col" className="text-right">Hours</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Accomplishment / Technical Tasks</th>
                 </tr>
               </thead>
               <tbody>

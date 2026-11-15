@@ -365,7 +365,7 @@ export default function DatabaseInspectorView({
             <thead>
               <tr>
                 {activeColumns.map((col) => (
-                  <th key={col} className="mono">
+                  <th key={col} scope="col" className="mono">
                     {col}
                   </th>
                 ))}
@@ -406,11 +406,11 @@ export default function DatabaseInspectorView({
             <table className="table">
               <thead>
                 <tr>
-                  <th>Parent Entity</th>
-                  <th>Child Entity</th>
-                  <th>Cardinality</th>
-                  <th>Foreign Key</th>
-                  <th>Relational Rule</th>
+                  <th scope="col">Parent Entity</th>
+                  <th scope="col">Child Entity</th>
+                  <th scope="col">Cardinality</th>
+                  <th scope="col">Foreign Key</th>
+                  <th scope="col">Relational Rule</th>
                 </tr>
               </thead>
               <tbody>

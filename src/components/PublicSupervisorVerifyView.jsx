@@ -516,17 +516,17 @@ export default function PublicSupervisorVerifyView({
           </div>
 
           <div className="table-wrap">
-            <table className="table table-fit">
+            <table className="table table-fit" aria-label="Student attendance shift logs">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Time In</th>
-                  <th>Time Out</th>
-                  <th>Break</th>
-                  <th className="text-right">Net Hours</th>
-                  <th>Task Description &amp; Deliverables</th>
-                  <th>Status</th>
-                  <th className="text-right no-print">Actions</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Time In</th>
+                  <th scope="col">Time Out</th>
+                  <th scope="col">Break</th>
+                  <th scope="col" className="text-right">Net Hours</th>
+                  <th scope="col">Task Description &amp; Deliverables</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="text-right no-print">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -657,12 +657,12 @@ export default function PublicSupervisorVerifyView({
                   {section.title}
                 </div>
                 <div className="table-wrap">
-                  <table className="table official-rubric-table">
+                  <table className="table official-rubric-table" aria-label="Official performance evaluation rubric">
                     <thead>
                       <tr>
-                        <th style={{ width: '40px' }}>#</th>
-                        <th>Performance Indicator</th>
-                        <th className="text-right" style={{ width: '220px' }}>Rating (1 Low – 5 High)</th>
+                        <th scope="col" style={{ width: '40px' }}>#</th>
+                        <th scope="col">Performance Indicator</th>
+                        <th scope="col" className="text-right" style={{ width: '220px' }}>Rating (1 Low – 5 High)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -759,6 +759,9 @@ export default function PublicSupervisorVerifyView({
         <div
           className={`modal-backdrop ${flagModalPresence.exiting ? 'is-exiting' : ''}`}
           onClick={flagModalPresence.exiting ? undefined : () => setFlagModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="flag-modal-title"
         >
           <div
             className={`modal-card modal-entry-card ${flagModalPresence.exiting ? 'is-exiting' : ''}`}
@@ -766,8 +769,8 @@ export default function PublicSupervisorVerifyView({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <div className="modal-title">Request DTR Correction from Student</div>
-              <button type="button" className="modal-close-btn" onClick={() => setFlagModalOpen(false)}>
+              <h2 id="flag-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>Request DTR Correction from Student</h2>
+              <button type="button" className="modal-close-btn" onClick={() => setFlagModalOpen(false)} aria-label="Close dialog">
                 <IconClose size={16} />
               </button>
             </div>
@@ -901,17 +904,17 @@ export function PublicSupervisorVerifySkeleton({ onClose }) {
           </div>
 
           <div className="table-wrap">
-            <table className="table table-fit">
+            <table className="table table-fit" aria-hidden="true">
               <thead>
                 <tr>
-                  <th><div className="sk-shimmer" style={{ width: '60px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '55px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '55px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '45px', height: '10px' }} /></th>
-                  <th className="text-right"><div className="sk-shimmer" style={{ width: '65px', height: '10px', marginLeft: 'auto' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '180px', height: '10px' }} /></th>
-                  <th><div className="sk-shimmer" style={{ width: '70px', height: '10px' }} /></th>
-                  <th className="text-right"><div className="sk-shimmer" style={{ width: '50px', height: '10px', marginLeft: 'auto' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '60px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '55px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '55px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '45px', height: '10px' }} /></th>
+                  <th scope="col" className="text-right"><div className="sk-shimmer" style={{ width: '65px', height: '10px', marginLeft: 'auto' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '180px', height: '10px' }} /></th>
+                  <th scope="col"><div className="sk-shimmer" style={{ width: '70px', height: '10px' }} /></th>
+                  <th scope="col" className="text-right"><div className="sk-shimmer" style={{ width: '50px', height: '10px', marginLeft: 'auto' }} /></th>
                 </tr>
               </thead>
               <tbody>

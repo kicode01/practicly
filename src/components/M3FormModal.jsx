@@ -41,6 +41,8 @@ export default function M3FormModal({
       onClick={syncing || exiting ? undefined : onClose}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="m3-modal-title"
+      aria-describedby={subtitle ? 'm3-modal-subtitle' : undefined}
     >
       <div
         className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
@@ -51,13 +53,13 @@ export default function M3FormModal({
         <div className="modal-header">
           <div className="modal-header-identity">
             {HeaderIcon && (
-              <div className="modal-header-icon-box">
+              <div className="modal-header-icon-box" aria-hidden="true">
                 <HeaderIcon size={18} />
               </div>
             )}
             <div>
-              <div className="modal-title">{title}</div>
-              {subtitle && <div className="modal-subtitle">{subtitle}</div>}
+              <h2 id="m3-modal-title" className="modal-title">{title}</h2>
+              {subtitle && <p id="m3-modal-subtitle" className="modal-subtitle">{subtitle}</p>}
             </div>
           </div>
           {headerActions}

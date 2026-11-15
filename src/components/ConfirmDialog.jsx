@@ -65,6 +65,7 @@ export default function ConfirmDialog({
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
+      aria-describedby="confirm-dialog-message"
     >
       <div
         className={`modal-card confirm-dialog-card ${exiting ? 'is-exiting' : ''}`}
@@ -78,7 +79,7 @@ export default function ConfirmDialog({
             <h3 id="confirm-dialog-title" className="confirm-dialog-title">
               {title}
             </h3>
-            <p className="confirm-dialog-message">{message}</p>
+            <p id="confirm-dialog-message" className="confirm-dialog-message">{message}</p>
           </div>
           <button
             type="button"

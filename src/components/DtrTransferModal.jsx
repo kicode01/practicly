@@ -364,7 +364,7 @@ export default function DtrTransferModal({
   if (!rendered) return null;
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose} role="dialog" aria-modal="true" aria-labelledby="dtr-transfer-modal-title">
       <div className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`} style={{ maxWidth: '820px' }} onClick={(e) => e.stopPropagation()}>
         {/* MODAL HEADER */}
         <div className="modal-header">
@@ -373,7 +373,7 @@ export default function DtrTransferModal({
               <IconClock size={18} />
             </div>
             <div>
-              <div className="modal-title">DTR Transfer &amp; Signed Verification Studio</div>
+              <h2 id="dtr-transfer-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>DTR Transfer &amp; Signed Verification Studio</h2>
               <div className="modal-subtitle">
                 Transfer batch attendance records from Excel, attach signed HR copies, and cross-verify hours
               </div>
@@ -570,12 +570,12 @@ export default function DtrTransferModal({
                     <table className="table">
                       <thead>
                         <tr>
-                          <th>Date</th>
-                          <th>In</th>
-                          <th>Out</th>
-                          <th>Break</th>
-                          <th className="text-right">Net Hours</th>
-                          <th>Task Summary</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">In</th>
+                          <th scope="col">Out</th>
+                          <th scope="col">Break</th>
+                          <th scope="col" className="text-right">Net Hours</th>
+                          <th scope="col">Task Summary</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -993,10 +993,10 @@ export default function DtrTransferModal({
                     <table className="table table-compact" style={{ width: '100%', fontSize: '11px' }}>
                       <thead>
                         <tr>
-                          <th>Date</th>
-                          <th>Time</th>
-                          <th>Hours</th>
-                          <th>Task</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">Time</th>
+                          <th scope="col">Hours</th>
+                          <th scope="col">Task</th>
                         </tr>
                       </thead>
                       <tbody>

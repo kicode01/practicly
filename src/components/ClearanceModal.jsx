@@ -21,11 +21,17 @@ export default function ClearanceModal({ report: reportProp, currentUser = null,
   const hoursMet = instStatus.hoursMet;
 
   return (
-    <div className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`} onClick={exiting ? undefined : onClose}>
+    <div
+      className={`modal-backdrop ${exiting ? 'is-exiting' : ''}`}
+      onClick={exiting ? undefined : onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="clearance-modal-title"
+    >
       <div className={`modal-card dtr-modal-card ${exiting ? 'is-exiting' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-header dtr-modal-header no-print">
           <div>
-            <div className="panel-title">OJT Compliance &amp; Clearance Certificate</div>
+            <h2 id="clearance-modal-title" className="panel-title">OJT Compliance &amp; Clearance Certificate</h2>
             <div className="panel-desc">
               Official institutional summary for {report.student_name}
             </div>
@@ -35,7 +41,7 @@ export default function ClearanceModal({ report: reportProp, currentUser = null,
               <IconPrinter size={14} />
               Print Certificate
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Close dialog">
               Close
             </button>
           </div>
