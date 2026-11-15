@@ -10023,7 +10023,7 @@ textarea.input:focus {
 
 .table-overview .row-title,
 .table-overview .row-sub {
-  max-width: 96px;
+  max-width: 140px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -4704,9 +4704,21 @@ export default function App() {
                                     <StatusChip variant="warning">Ongoing</StatusChip>
                                   )}
                                 </div>
-                                <div className="row-sub mono" style={{ marginTop: '3px' }}>
-                                  {getPlacementInstrumentStatus(pl).completedCount}/4 instruments
-                                  {Number(pl.evaluation_count) > 0 ? ` · Mean ${pl.average_rating}/5.0` : ''}
+                                <div
+                                  className="mono"
+                                  style={{
+                                    marginTop: '3px',
+                                    fontSize: '11px',
+                                    color: 'var(--text-muted)',
+                                    lineHeight: 1.3,
+                                    whiteSpace: 'normal',
+                                  }}
+                                  title={`${getPlacementInstrumentStatus(pl).completedCount}/4 official evaluation instruments completed${Number(pl.evaluation_count) > 0 ? ` · Mean: ${pl.average_rating}/5.0` : ''}`}
+                                >
+                                  <div>{getPlacementInstrumentStatus(pl).completedCount}/4 instruments</div>
+                                  {Number(pl.evaluation_count) > 0 && (
+                                    <div style={{ fontSize: '10.5px' }}>Mean {Number(pl.average_rating).toFixed(1)}/5.0</div>
+                                  )}
                                 </div>
                               </td>
                               <td className="text-right">
