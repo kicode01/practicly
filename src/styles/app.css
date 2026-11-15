@@ -2085,11 +2085,6 @@ p {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: box-shadow 0.2s var(--ease-standard), border-color 0.2s var(--ease-standard);
-}
-
-.student-hero-card:hover {
-  box-shadow: var(--shadow-sm);
 }
 
 .student-hero-top {
@@ -3051,15 +3046,6 @@ p {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition:
-    background-color 0.16s var(--ease-standard),
-    border-color 0.16s var(--ease-standard),
-    box-shadow 0.16s var(--ease-standard);
-}
-
-.metric-cell:hover {
-  box-shadow: var(--shadow-sm);
-  border-color: var(--md-sys-color-outline-variant);
 }
 
 .metric-head-row {
@@ -3206,10 +3192,6 @@ p {
 .panel-body:last-child {
   border-bottom-left-radius: 19px;
   border-bottom-right-radius: 19px;
-}
-
-.panel:hover {
-  box-shadow: var(--shadow-sm);
 }
 
 .panel-header {
@@ -5700,12 +5682,6 @@ textarea.input:focus {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.analytics-card:hover {
-  border-color: var(--md-sys-color-outline-variant);
-  box-shadow: var(--shadow-sm);
 }
 
 .analytics-header {
@@ -6044,11 +6020,6 @@ textarea.input:focus {
   box-shadow: var(--shadow-xs);
   flex-wrap: wrap;
   height: 100%;
-  transition: box-shadow 0.16s var(--ease-standard), border-color 0.16s var(--ease-standard);
-}
-
-.stopwatch-idle-card:hover {
-  box-shadow: var(--shadow-sm);
 }
 
 .stopwatch-idle-main {
@@ -6374,11 +6345,6 @@ textarea.input:focus {
   border-radius: 20px;
   padding: 18px 22px;
   box-shadow: var(--shadow-xs);
-  transition: box-shadow 0.18s var(--ease-standard), border-color 0.18s var(--ease-standard);
-}
-
-.pipeline-indicator-panel:hover {
-  box-shadow: var(--shadow-sm);
 }
 
 .pipeline-header {
