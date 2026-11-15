@@ -22,6 +22,15 @@ export default function M3FormModal({
   const modalRef = useRef(null);
   const { rendered, exiting } = usePresence(isOpen, 150);
 
+  const lastPropsRef = useRef({ title, subtitle, submitLabel, icon: HeaderIcon });
+  if (isOpen) {
+    lastPropsRef.current = { title, subtitle, submitLabel, icon: HeaderIcon };
+  }
+  const activeTitle = isOpen ? title : (lastPropsRef.current.title || title);
+  const activeSubtitle = isOpen ? subtitle : (lastPropsRef.current.subtitle || subtitle);
+  const activeSubmitLabel = isOpen ? submitLabel : (lastPropsRef.current.submitLabel || submitLabel);
+  const ActiveIcon = isOpen ? HeaderIcon : (lastPropsRef.current.icon || HeaderIcon);
+
   useEffect(() => {
     if (!isOpen) return undefined;
     const handleKeyDown = (e) => {
@@ -42,7 +51,7 @@ export default function M3FormModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="m3-modal-title"
-      aria-describedby={subtitle ? 'm3-modal-subtitle' : undefined}
+      aria-describedby={activeSubtitle ? 'm3-modal-subtitle' : undefined}
     >
       <div
         className={`modal-card modal-entry-card ${exiting ? 'is-exiting' : ''}`}
@@ -52,14 +61,14 @@ export default function M3FormModal({
       >
         <div className="modal-header">
           <div className="modal-header-identity">
-            {HeaderIcon && (
+            {ActiveIcon && (
               <div className="modal-header-icon-box" aria-hidden="true">
-                <HeaderIcon size={18} />
+                <ActiveIcon size={18} />
               </div>
             )}
             <div>
-              <h2 id="m3-modal-title" className="modal-title">{title}</h2>
-              {subtitle && <p id="m3-modal-subtitle" className="modal-subtitle">{subtitle}</p>}
+              <h2 id="m3-modal-title" className="modal-title">{activeTitle}</h2>
+              {activeSubtitle && <p id="m3-modal-subtitle" className="modal-subtitle">{activeSubtitle}</p>}
             </div>
           </div>
           {headerActions}
@@ -92,7 +101,7 @@ export default function M3FormModal({
               disabled={syncing}
             >
               <IconCheckCircle size={14} />
-              {submitLabel}
+              {activeSubmitLabel}
             </button>
           </div>
         </form>

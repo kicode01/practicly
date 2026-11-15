@@ -47,15 +47,22 @@ export default function OfficialEvaluationModal({
   const userId = currentUser?.user_id || currentUser?.linked_id || userRole;
   const activeSignature = useSessionSignature(userRole, userId);
 
+  const lastInstrumentsRef = useRef({ forcedInstrumentId, initialInstrumentId });
+  if (isOpen) {
+    lastInstrumentsRef.current = { forcedInstrumentId, initialInstrumentId };
+  }
+  const activeForcedInstrumentId = isOpen ? forcedInstrumentId : lastInstrumentsRef.current.forcedInstrumentId;
+  const activeInitialInstrumentId = isOpen ? initialInstrumentId : lastInstrumentsRef.current.initialInstrumentId;
+
   const visibleInstruments = useMemo(() => {
-    if (forcedInstrumentId) {
-      const forced = EVALUATION_INSTRUMENTS.find((i) => i.id === forcedInstrumentId);
+    if (activeForcedInstrumentId) {
+      const forced = EVALUATION_INSTRUMENTS.find((i) => i.id === activeForcedInstrumentId);
       return forced ? [forced] : getInstrumentsForRole(userRole);
     }
     return getInstrumentsForRole(userRole);
-  }, [userRole, forcedInstrumentId]);
+  }, [userRole, activeForcedInstrumentId]);
 
-  const isBlankPrintMode = Boolean(forcedInstrumentId && userRole === 'student');
+  const isBlankPrintMode = Boolean(activeForcedInstrumentId && userRole === 'student');
 
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(
     () => visibleInstruments[0]?.id || 'supervisor_to_student'

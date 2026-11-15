@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { IconSupervisor } from './Icons';
 import M3FormModal from './M3FormModal';
 
@@ -14,19 +14,25 @@ export default function AdviserModal({
   editingAdviserId,
   syncing = false,
 }) {
+  const lastAdviserIdRef = useRef(editingAdviserId);
+  if (isOpen) {
+    lastAdviserIdRef.current = editingAdviserId;
+  }
+  const activeEditingAdviserId = isOpen ? editingAdviserId : lastAdviserIdRef.current;
+
   return (
     <M3FormModal
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={onSubmit}
       icon={IconSupervisor}
-      title={editingAdviserId ? `Edit Faculty Adviser #${editingAdviserId}` : 'Register Faculty OJT Adviser'}
+      title={activeEditingAdviserId ? `Edit Faculty Adviser #${activeEditingAdviserId}` : 'Register Faculty OJT Adviser'}
       subtitle={
-        editingAdviserId
+        activeEditingAdviserId
           ? 'Update faculty coordinator profile'
           : 'Creates adviser record and provisions login account'
       }
-      submitLabel={editingAdviserId ? 'Save Changes' : 'Save Adviser'}
+      submitLabel={activeEditingAdviserId ? 'Save Changes' : 'Save Adviser'}
       maxWidth="640px"
       syncing={syncing}
     >
@@ -90,7 +96,7 @@ export default function AdviserModal({
             required
           />
         </div>
-        {!editingAdviserId && (
+        {!activeEditingAdviserId && (
           <div className="field">
             <label className="field-label" htmlFor="adviser-modal-username">Login Username (Optional)</label>
             <input

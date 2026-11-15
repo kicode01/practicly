@@ -18,6 +18,12 @@ export default function TimeLogEntryModal({
   const modalRef = useRef(null);
   const { rendered, exiting } = usePresence(isOpen, 150);
 
+  const lastLogIdRef = useRef(editingLogId);
+  if (isOpen) {
+    lastLogIdRef.current = editingLogId;
+  }
+  const activeEditingLogId = isOpen ? editingLogId : lastLogIdRef.current;
+
   // Close on Escape
   useEffect(() => {
     function handleKeyDown(e) {
@@ -76,8 +82,8 @@ export default function TimeLogEntryModal({
             </div>
             <div>
               <h2 id="timelog-entry-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>
-                {editingLogId
-                  ? `Edit Attendance Entry #${editingLogId}`
+                {activeEditingLogId
+                  ? `Edit Attendance Entry #${activeEditingLogId}`
                   : currentUser?.role === 'student'
                   ? 'Log Practicum Attendance'
                   : 'Record Intern Attendance Entry'}

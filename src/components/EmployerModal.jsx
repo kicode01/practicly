@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { IconBuilding } from './Icons';
 import { MaterialSelect } from './MaterialComponents';
 import M3FormModal from './M3FormModal';
@@ -15,19 +15,25 @@ export default function EmployerModal({
   editingEmployerId,
   syncing = false,
 }) {
+  const lastEmployerIdRef = useRef(editingEmployerId);
+  if (isOpen) {
+    lastEmployerIdRef.current = editingEmployerId;
+  }
+  const activeEditingEmployerId = isOpen ? editingEmployerId : lastEmployerIdRef.current;
+
   return (
     <M3FormModal
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={onSubmit}
       icon={IconBuilding}
-      title={editingEmployerId ? `Edit Partner Company #${editingEmployerId}` : 'Register Partner Company'}
+      title={activeEditingEmployerId ? `Edit Partner Company #${activeEditingEmployerId}` : 'Register Partner Company'}
       subtitle={
-        editingEmployerId
+        activeEditingEmployerId
           ? 'Update HTE contact details, supervisor, or MOA validity'
           : 'Add a Host Training Establishment to the departmental directory'
       }
-      submitLabel={editingEmployerId ? 'Save Changes' : 'Save Partner HTE'}
+      submitLabel={activeEditingEmployerId ? 'Save Changes' : 'Save Partner HTE'}
       maxWidth="660px"
       syncing={syncing}
     >

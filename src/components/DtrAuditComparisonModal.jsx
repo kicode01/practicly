@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   IconClose,
   IconFileText,
@@ -17,7 +17,7 @@ import usePresence, { usePresenceValue, useSmoothSwitch } from '../utils/usePres
 export default function DtrAuditComparisonModal({
   isOpen,
   onClose,
-  placement,
+  placement: placementProp,
   placements = [],
   onSelectPlacement,
   timelogs = [],
@@ -25,6 +25,11 @@ export default function DtrAuditComparisonModal({
   onUpdateApproval,
   currentUser
 }) {
+  const lastPlacementRef = useRef(placementProp);
+  if (isOpen && placementProp) {
+    lastPlacementRef.current = placementProp;
+  }
+  const placement = (isOpen && placementProp) ? placementProp : lastPlacementRef.current;
   const [activeTab, setActiveTab] = useState('side_by_side'); // 'side_by_side' | 'document_only' | 'digital_only'
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [flagModalOpen, setFlagModalOpen] = useState(false);
@@ -58,7 +63,7 @@ export default function DtrAuditComparisonModal({
     return placementLogs.filter((tl) => tl.approval_status === 'flagged').length;
   }, [placementLogs]);
 
-  const { rendered, exiting } = usePresence(isOpen && Boolean(placement), 150);
+  const { rendered, exiting } = usePresence(isOpen && Boolean(placementProp || lastPlacementRef.current), 150);
   const flagModalPresence = usePresenceValue(
     flagModalOpen && selectedLogToFlag ? selectedLogToFlag : null,
     150

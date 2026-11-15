@@ -30,6 +30,13 @@ export default function StudentProfileModal({
   const modalRef = useRef(null);
   const { rendered, exiting } = usePresence(isOpen, 150);
 
+  const lastStateRef = useRef({ editingStudentId, assignedPlacement });
+  if (isOpen) {
+    lastStateRef.current = { editingStudentId, assignedPlacement };
+  }
+  const activeEditingStudentId = isOpen ? editingStudentId : lastStateRef.current.editingStudentId;
+  const activeAssignedPlacement = isOpen ? assignedPlacement : lastStateRef.current.assignedPlacement;
+
   useEffect(() => {
     if (!isOpen) return undefined;
     const handleKeyDown = (e) => {
@@ -62,14 +69,14 @@ export default function StudentProfileModal({
               <h2 id="student-profile-modal-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>
                 {isStudentRole
                   ? 'Edit My Student Profile'
-                  : editingStudentId
-                  ? `Edit Student #${editingStudentId}`
+                  : activeEditingStudentId
+                  ? `Edit Student #${activeEditingStudentId}`
                   : 'Register New Student'}
               </h2>
               <div className="modal-subtitle">
                 {isStudentRole
                   ? 'Update your contact number, institutional email, or section details'
-                  : editingStudentId
+                  : activeEditingStudentId
                   ? 'Update student academic profile and placement supervision'
                   : 'Create student record and provision login credentials'}
               </div>
@@ -106,20 +113,20 @@ export default function StudentProfileModal({
                     </div>
                   </div>
 
-                  {assignedPlacement ? (
+                  {activeAssignedPlacement ? (
                     <div className="gws-readonly-divider">
                       <div className="gws-readonly-row">
                         <div className="gws-readonly-item">
                           <span className="gws-readonly-label">
                             <IconBuilding size={12} /> Host Company (HTE)
                           </span>
-                          <span className="gws-readonly-val">{assignedPlacement.company_name}</span>
+                          <span className="gws-readonly-val">{activeAssignedPlacement.company_name}</span>
                         </div>
                         <div className="gws-readonly-item">
                           <span className="gws-readonly-label">
                             <IconSupervisor size={12} /> Faculty Adviser
                           </span>
-                          <span className="gws-readonly-val">{assignedPlacement.adviser_name}</span>
+                          <span className="gws-readonly-val">{activeAssignedPlacement.adviser_name}</span>
                         </div>
                       </div>
                       <div className="gws-readonly-note">
@@ -182,7 +189,7 @@ export default function StudentProfileModal({
                   </div>
                 </div>
 
-                {assignedPlacement && (
+                {activeAssignedPlacement && (
                   <div className="field">
                     <label className="field-label" htmlFor="student-profile-position">Internship Designation / Role</label>
                     <input
@@ -258,7 +265,7 @@ export default function StudentProfileModal({
                       required
                     />
                   </div>
-                  {!editingStudentId && (
+                  {!activeEditingStudentId && (
                     <div className="field">
                       <label className="field-label" htmlFor="admin-student-username">Login Username (Optional)</label>
                       <input
@@ -335,7 +342,7 @@ export default function StudentProfileModal({
               disabled={syncing}
             >
               <IconCheckCircle size={14} />
-              {editingStudentId ? 'Save Changes' : 'Save Student'}
+              {activeEditingStudentId ? 'Save Changes' : 'Save Student'}
             </button>
           </div>
         </form>

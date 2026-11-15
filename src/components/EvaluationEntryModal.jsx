@@ -18,6 +18,12 @@ export default function EvaluationEntryModal({
   const modalRef = useRef(null);
   const { rendered, exiting } = usePresence(isOpen, 150);
 
+  const lastEvalIdRef = useRef(editingEvalId);
+  if (isOpen) {
+    lastEvalIdRef.current = editingEvalId;
+  }
+  const activeEditingEvalId = isOpen ? editingEvalId : lastEvalIdRef.current;
+
   // Close on Escape
   useEffect(() => {
     function handleKeyDown(e) {
@@ -74,7 +80,7 @@ export default function EvaluationEntryModal({
             </div>
             <div>
               <h2 id="eval-entry-title" className="modal-title" style={{ margin: 0, fontSize: '16px' }}>
-                {editingEvalId ? `Edit Evaluation #${editingEvalId}` : 'Submit Performance Evaluation'}
+                {activeEditingEvalId ? `Edit Evaluation #${activeEditingEvalId}` : 'Submit Performance Evaluation'}
               </h2>
               <div className="modal-subtitle">
                 {evalForm.evaluator_type === 'employer'
@@ -380,7 +386,7 @@ export default function EvaluationEntryModal({
               disabled={syncing}
             >
               <IconCheckCircle size={14} />
-              {editingEvalId ? 'Save Changes' : 'Submit Evaluation'}
+              {activeEditingEvalId ? 'Save Changes' : 'Submit Evaluation'}
             </button>
           </div>
         </form>

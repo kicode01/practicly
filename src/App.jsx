@@ -7867,8 +7867,8 @@ export default function App() {
         warning={confirmDialog?.warning}
         confirmLabel={confirmDialog?.confirmLabel}
         cancelLabel={confirmDialog?.cancelLabel}
-        variant={confirmDialog?.variant || 'danger'}
-        iconType={confirmDialog?.iconType || 'alert'}
+        variant={confirmDialog?.variant}
+        iconType={confirmDialog?.iconType}
         onConfirm={confirmDialog?.onConfirm}
         onClose={() => setConfirmDialog(null)}
       />

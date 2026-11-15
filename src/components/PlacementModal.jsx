@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { IconBriefcase } from './Icons';
 import { MaterialSelect } from './MaterialComponents';
 import M3FormModal from './M3FormModal';
@@ -18,19 +18,25 @@ export default function PlacementModal({
   advisers = [],
   syncing = false,
 }) {
+  const lastPlacementIdRef = useRef(editingPlacementId);
+  if (isOpen) {
+    lastPlacementIdRef.current = editingPlacementId;
+  }
+  const activeEditingPlacementId = isOpen ? editingPlacementId : lastPlacementIdRef.current;
+
   return (
     <M3FormModal
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={onSubmit}
       icon={IconBriefcase}
-      title={editingPlacementId ? `Edit Placement Contract #${editingPlacementId}` : 'Assign Student Placement'}
+      title={activeEditingPlacementId ? `Edit Placement Contract #${activeEditingPlacementId}` : 'Assign Student Placement'}
       subtitle={
-        editingPlacementId
+        activeEditingPlacementId
           ? 'Modify student assignment, host company, adviser, or required hours'
           : 'Create an OJT deployment contract for the term'
       }
-      submitLabel={editingPlacementId ? 'Save Changes' : 'Create Placement'}
+      submitLabel={activeEditingPlacementId ? 'Save Changes' : 'Create Placement'}
       maxWidth="660px"
       syncing={syncing}
     >
@@ -143,7 +149,7 @@ export default function PlacementModal({
               required
             />
           </div>
-          {editingPlacementId && (
+          {activeEditingPlacementId && (
             <div className="field">
               <label className="field-label" htmlFor="placement-modal-status">Placement Status</label>
               <MaterialSelect

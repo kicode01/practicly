@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   IconClose,
   IconLink,
@@ -14,11 +14,17 @@ import { getVerifyPath } from '../utils/appRouter';
 export default function SupervisorShareModal({
   isOpen,
   onClose,
-  placement,
+  placement: placementProp,
   onOpenSupervisorView
 }) {
+  const lastPlacementRef = useRef(placementProp);
+  if (isOpen && placementProp) {
+    lastPlacementRef.current = placementProp;
+  }
+  const placement = (isOpen && placementProp) ? placementProp : lastPlacementRef.current;
+
   const [copied, setCopied] = useState(false);
-  const { rendered, exiting } = usePresence(isOpen && Boolean(placement), 150);
+  const { rendered, exiting } = usePresence(isOpen && Boolean(placementProp || lastPlacementRef.current), 150);
 
   if (!rendered || !placement) return null;
 

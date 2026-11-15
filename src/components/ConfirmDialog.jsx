@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { IconAlert, IconClose, IconLogOut, IconShieldCheck, IconTrash } from './Icons';
 import usePresence from '../utils/usePresence';
@@ -24,6 +24,42 @@ export default function ConfirmDialog({
   const [submitting, setSubmitting] = useState(false);
   const { rendered, exiting } = usePresence(isOpen, 150);
 
+  const lastPropsRef = useRef({
+    title,
+    message,
+    detail,
+    warning,
+    confirmLabel,
+    cancelLabel,
+    variant,
+    iconType,
+    onConfirm,
+  });
+
+  if (isOpen && (title || message || detail || confirmLabel)) {
+    lastPropsRef.current = {
+      title,
+      message,
+      detail,
+      warning,
+      confirmLabel,
+      cancelLabel,
+      variant,
+      iconType,
+      onConfirm,
+    };
+  }
+
+  const activeTitle = (isOpen ? title : lastPropsRef.current.title) || title || 'Confirm Action';
+  const activeMessage = (isOpen ? message : lastPropsRef.current.message) || message || 'Are you sure you want to continue?';
+  const activeDetail = (isOpen ? detail : lastPropsRef.current.detail) ?? detail;
+  const activeWarning = (isOpen ? warning : lastPropsRef.current.warning) ?? warning;
+  const activeConfirmLabel = (isOpen ? confirmLabel : lastPropsRef.current.confirmLabel) || confirmLabel || 'Confirm';
+  const activeCancelLabel = (isOpen ? cancelLabel : lastPropsRef.current.cancelLabel) || cancelLabel || 'Cancel';
+  const activeVariant = (isOpen ? variant : lastPropsRef.current.variant) || variant || 'danger';
+  const activeIconType = (isOpen ? iconType : lastPropsRef.current.iconType) || iconType || 'alert';
+  const activeOnConfirm = isOpen ? onConfirm : (lastPropsRef.current.onConfirm || onConfirm);
+
   useEffect(() => {
     if (!isOpen) return undefined;
     const handleKeyDown = (e) => {
@@ -39,17 +75,17 @@ export default function ConfirmDialog({
   if (!rendered || typeof document === 'undefined') return null;
 
   const renderIcon = () => {
-    if (iconType === 'trash') return <IconTrash size={24} />;
-    if (iconType === 'logout') return <IconLogOut size={24} />;
-    if (iconType === 'shield') return <IconShieldCheck size={24} />;
+    if (activeIconType === 'trash') return <IconTrash size={24} />;
+    if (activeIconType === 'logout') return <IconLogOut size={24} />;
+    if (activeIconType === 'shield') return <IconShieldCheck size={24} />;
     return <IconAlert size={24} />;
   };
 
   const handleConfirmClick = async () => {
-    if (!onConfirm || submitting) return;
+    if (!activeOnConfirm || submitting) return;
     setSubmitting(true);
     try {
-      await onConfirm();
+      await activeOnConfirm();
     } finally {
       setSubmitting(false);
     }
@@ -72,28 +108,28 @@ export default function ConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="confirm-dialog-header">
-          <div className={`confirm-dialog-icon is-${variant}`}>
+          <div className={`confirm-dialog-icon is-${activeVariant}`}>
             {renderIcon()}
           </div>
           <div className="confirm-dialog-heading">
             <h3 id="confirm-dialog-title" className="confirm-dialog-title">
-              {title}
+              {activeTitle}
             </h3>
-            <p id="confirm-dialog-message" className="confirm-dialog-message">{message}</p>
+            <p id="confirm-dialog-message" className="confirm-dialog-message">{activeMessage}</p>
           </div>
         </div>
 
-        {(detail || warning) && (
+        {(activeDetail || activeWarning) && (
           <div className="confirm-dialog-body">
-            {detail && (
+            {activeDetail && (
               <div className="confirm-dialog-detail">
-                {detail}
+                {activeDetail}
               </div>
             )}
-            {warning && (
+            {activeWarning && (
               <div className="confirm-dialog-warning">
                 <IconAlert size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-                <span>{warning}</span>
+                <span>{activeWarning}</span>
               </div>
             )}
           </div>
@@ -106,21 +142,21 @@ export default function ConfirmDialog({
             onClick={onClose}
             disabled={submitting}
           >
-            {cancelLabel}
+            {activeCancelLabel}
           </button>
           <button
             type="button"
             className={`btn btn-sm ${
-              variant === 'danger'
+              activeVariant === 'danger'
                 ? 'btn-danger'
-                : variant === 'warning'
+                : activeVariant === 'warning'
                 ? 'btn-warning'
                 : 'btn-primary'
             }`}
             onClick={handleConfirmClick}
             disabled={submitting}
           >
-            {submitting ? 'Processing...' : confirmLabel}
+            {submitting ? 'Processing...' : activeConfirmLabel}
           </button>
         </div>
       </div>

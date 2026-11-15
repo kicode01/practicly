@@ -58,11 +58,17 @@ const DOC_CONFIGS = {
 export default function SignedDtrUploadModal({
   isOpen,
   onClose,
-  placement,
+  placement: placementProp,
   onSuccess,
   documentKind = 'dtr',
   onOpenBlankForm = null,
 }) {
+  const lastPlacementRef = useRef(placementProp);
+  if (isOpen && placementProp) {
+    lastPlacementRef.current = placementProp;
+  }
+  const placement = (isOpen && placementProp) ? placementProp : lastPlacementRef.current;
+
   const cfg = DOC_CONFIGS[documentKind] || DOC_CONFIGS.dtr;
   const p = cfg.fieldPrefix;
 
@@ -91,7 +97,7 @@ export default function SignedDtrUploadModal({
     }
   }, [isOpen, placement?.placement_id, documentKind, existingNotes]);
 
-  const { rendered, exiting } = usePresence(isOpen && Boolean(placement), 150);
+  const { rendered, exiting } = usePresence(isOpen && Boolean(placementProp || lastPlacementRef.current), 150);
 
   if (!rendered || !placement) return null;
 

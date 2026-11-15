@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { IconPrinter, IconBrandLogo } from './Icons';
 import SessionSignatureControl, {
   PrintableSignatoryBlock,
@@ -9,13 +9,19 @@ import { usePresenceValue } from '../utils/usePresence';
 export default function DtrModal({ placement: placementProp, logs = [], currentUser = null, onClose }) {
   const { rendered, exiting, value: placement } = usePresenceValue(placementProp, 150);
 
+  const lastLogsRef = useRef(logs);
+  if (placementProp && logs && logs.length > 0) {
+    lastLogsRef.current = logs;
+  }
+  const activeLogs = (placementProp && logs && logs.length > 0) ? logs : lastLogsRef.current;
+
   const userRole = currentUser?.role || 'student';
   const userId = currentUser?.user_id || currentUser?.linked_id || userRole;
   const activeSignature = useSessionSignature(userRole, userId);
 
   if (!rendered || !placement) return null;
 
-  const sortedLogs = [...logs].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const sortedLogs = [...activeLogs].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const approvedHours = sortedLogs
     .filter((l) => l.approval_status !== 'flagged')
     .reduce((sum, l) => sum + Number(l.hours_rendered || 0), 0);
