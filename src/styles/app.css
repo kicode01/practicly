@@ -4292,9 +4292,28 @@ textarea.input:hover {
 .select:focus,
 textarea.input:focus {
   outline: none;
-  border-color: var(--brand);
+  border-color: var(--md-sys-color-primary, #0b57d0);
   border-width: 2px;
-  box-shadow: 0 0 0 3px var(--brand-ring);
+  box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.18);
+}
+
+[data-theme="dark"] .input:focus,
+[data-theme="dark"] .select:focus,
+[data-theme="dark"] textarea.input:focus {
+  border-color: var(--md-sys-color-primary, #a8c7fa);
+  box-shadow: 0 0 0 3px rgba(168, 199, 250, 0.22);
+}
+
+/* Material 3 Clean Number Inputs — Strip browser native black spin-buttons */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .input[readonly] {
