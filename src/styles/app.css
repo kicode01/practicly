@@ -1261,7 +1261,7 @@ p {
 
 .auth-modal-backdrop {
   z-index: 1200;
-  background: rgba(0, 0, 0, 0.4); /* Authentic Google M3 Scrim */
+  background: rgba(15, 23, 42, 0.14); /* Google Workspace Airy Desktop Scrim */
   animation: authModalBackdropIn 0.24s var(--ease-out-expo) both;
 }
 
@@ -4364,7 +4364,7 @@ textarea.input:focus {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4); /* Authentic Google M3 Scrim — zero frosted glass blur */
+  background: rgba(15, 23, 42, 0.14); /* Google Workspace Airy Desktop Scrim — crisp, bright canvas */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11640,7 +11640,7 @@ textarea.input:focus {
   padding: 20px !important;
   align-items: center !important;
   justify-content: center !important;
-  background: rgba(0, 0, 0, 0.4) !important; /* Authentic Google M3 Scrim */
+  background: rgba(15, 23, 42, 0.14) !important; /* Google Workspace Airy Desktop Scrim */
 }
 
 .confirm-dialog-card {
@@ -11790,6 +11790,12 @@ textarea.input:focus {
 
 [data-theme="dark"] .confirm-dialog-footer .btn-secondary:hover {
   background: rgba(168, 199, 250, 0.08) !important;
+}
+
+[data-theme="dark"] .modal-backdrop,
+[data-theme="dark"] .auth-modal-backdrop,
+[data-theme="dark"] .confirm-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.45) !important;
 }
 
 @media screen and (max-width: 520px) {
