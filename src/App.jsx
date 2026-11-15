@@ -1198,7 +1198,7 @@ export default function App() {
     }));
     setActiveTab('dashboard');
     setMobileMenuOpen(false);
-    setAuthScreenOpen(true);
+    setAuthScreenOpen(false);
     setAuthMode('login');
     setLoginError('');
     setRegSuccessMessage('');
