@@ -368,19 +368,6 @@ export default function App() {
     initialRoute.kind === 'auth' ? initialRoute.mode : 'login'
   );
   const [landingPreviewTab, setLandingPreviewTab] = useState('student');
-  const [landingPreviewPaused, setLandingPreviewPaused] = useState(false);
-
-  useEffect(() => {
-    if (currentUser || authScreenOpen || landingPreviewPaused) return undefined;
-    const roleOrder = ['student', 'supervisor', 'adviser', 'admin'];
-    const timer = setTimeout(() => {
-      setLandingPreviewTab((curr) => {
-        const idx = roleOrder.indexOf(curr);
-        return roleOrder[(idx + 1) % roleOrder.length];
-      });
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [currentUser, authScreenOpen, landingPreviewPaused, landingPreviewTab]);
   const [registerForm, setRegisterForm] = useState({
     role: 'student',
     full_name: '',
@@ -2661,10 +2648,12 @@ export default function App() {
         }
         if (statusFilter !== 'all' && p.status !== statusFilter) return false;
 
-        const hrs = Number(p.hours_rendered || 0);
-        if (placementQuickFilter === 'cleared' && hrs < 300) return false;
-        if (placementQuickFilter === 'near' && (hrs < 200 || hrs >= 300)) return false;
-        if (placementQuickFilter === 'ongoing' && hrs >= 200) return false;
+        const hrs = Number(p.total_hours_completed ?? p.hours_rendered ?? 0);
+        const req = Number(p.required_hours || 300);
+        const isCleared = Number(p.requirement_met) === 1 || p.status === 'completed';
+        if (placementQuickFilter === 'cleared' && !isCleared) return false;
+        if (placementQuickFilter === 'near' && (isCleared || p.status === 'dropped' || hrs < req * 0.66)) return false;
+        if (placementQuickFilter === 'ongoing' && (isCleared || (p.status !== 'dropped' && hrs >= req * 0.66))) return false;
 
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -2880,7 +2869,6 @@ export default function App() {
         imageAlt: 'Illustration of a practicum coordinator managing industry partner MOAs, faculty approvals, and institutional ledgers',
       },
     };
-    const previewContent = previewContentMap[landingPreviewTab] || previewContentMap.student;
 
     return (
       <div className="auth-centered-shell">
@@ -2912,7 +2900,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                className="btn btn-primary btn-sm"
+                className="btn btn-primary btn-sm auth-topbar-register-btn"
                 onClick={() => openAuthScreen('register', 'student')}
               >
                 Get started
@@ -2933,7 +2921,7 @@ export default function App() {
                 </h1>
 
                 <p className="auth-hero-lead">
-                  Built for colleges and universities across any degree program. Coordinate daily DTR logs, supervisor sign-offs, and faculty clearances from day one.
+                  Built for the Metropolitan Institute of Technology, College of Engineering. Coordinate daily DTR logs, supervisor verification, and faculty clearances from day one.
                 </p>
 
                 <div className="auth-hero-ctas">
@@ -2952,28 +2940,6 @@ export default function App() {
                     Create an account
                   </button>
                 </div>
-
-                <div className="auth-hero-suite-strip auth-desktop-showcase" aria-label="Included role workspaces">
-                  <span className="auth-hero-suite-label">Includes workspaces for</span>
-                  <div className="auth-hero-suite-items">
-                    <span className="auth-hero-suite-item">
-                      <IconStudent size={15} />
-                      <span>Students</span>
-                    </span>
-                    <span className="auth-hero-suite-item">
-                      <IconSupervisor size={15} />
-                      <span>Host Supervisors</span>
-                    </span>
-                    <span className="auth-hero-suite-item">
-                      <IconShieldCheck size={15} />
-                      <span>Faculty Advisers</span>
-                    </span>
-                    <span className="auth-hero-suite-item">
-                      <IconDashboard size={15} />
-                      <span>Coordinators</span>
-                    </span>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -2984,7 +2950,7 @@ export default function App() {
                   src="/hero-workspace.jpg"
                   alt="Editorial illustration of a student intern clocking practicum hours with a verified DTR sheet, a host supervisor approving attendance, and a faculty adviser reviewing clearance"
                   className="auth-hero-illustration"
-                  fetchPriority="high"
+                  fetchpriority="high"
                 />
               </div>
             </div>
@@ -3003,11 +2969,7 @@ export default function App() {
               </p>
             </div>
 
-            <div
-              className="auth-spotlight-grid"
-              onMouseEnter={() => setLandingPreviewPaused(true)}
-              onMouseLeave={() => setLandingPreviewPaused(false)}
-            >
+            <div className="auth-spotlight-grid">
               <div className="auth-preview-window">
                 {previewOrder.map((roleKey) => {
                   const slide = previewContentMap[roleKey];
@@ -3019,7 +2981,6 @@ export default function App() {
                       alt={slide.imageAlt}
                       aria-hidden={!isCurrent}
                       className={`auth-preview-illustration ${isCurrent ? 'is-active' : ''}`}
-                      loading="lazy"
                       decoding="async"
                     />
                   );
@@ -3027,13 +2988,6 @@ export default function App() {
               </div>
 
               <div className="auth-spotlight-rail">
-                <div key={landingPreviewTab} className="auth-spotlight-slideshow-meta">
-                  <span className="auth-spotlight-slideshow-title">{previewContent.tabTitle}</span>
-                  <span className={`gws-role-chip ${previewContent.badgeClass}`} style={{ marginBottom: 0 }}>
-                    {previewContent.roleBadge}
-                  </span>
-                </div>
-
                 <div className="auth-spotlight-tabs" role="tablist" aria-label="Workspace role preview">
                   {[
                     {
@@ -3078,13 +3032,6 @@ export default function App() {
                             <div className="auth-spotlight-tab-desc">{item.desc}</div>
                           </div>
                         </div>
-                        {isActive && (
-                          <span
-                            key={`bar-${item.id}`}
-                            className={`auth-spotlight-progress ${landingPreviewPaused ? 'is-paused' : ''}`}
-                            aria-hidden="true"
-                          />
-                        )}
                       </button>
                     );
                   })}
@@ -3233,11 +3180,11 @@ export default function App() {
         </section>
         </main>
 
-        {/* FULL-WIDTH GENERALIZED FOOTER */}
+        {/* FULL-WIDTH FOOTER */}
         <div className="auth-footer-wrap">
           <footer className="auth-footer">
             <div>Practicly · Institutional Internship &amp; Practicum Platform</div>
-            <div style={{ textAlign: 'right' }}>Multi-School · All Academic Programs</div>
+            <div style={{ textAlign: 'right' }}>Metropolitan Institute of Technology · Computer Engineering</div>
           </footer>
         </div>
 
@@ -3357,14 +3304,16 @@ export default function App() {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            className="sidebar-close-btn mobile-only"
-            aria-label="Close sidebar navigation"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <IconClose size={16} />
-          </button>
+          {mobileMenuOpen && (
+            <button
+              type="button"
+              className="sidebar-close-btn mobile-only"
+              aria-label="Close sidebar navigation"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <IconClose size={16} />
+            </button>
+          )}
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary Navigation">
@@ -3730,7 +3679,6 @@ export default function App() {
 
                   <div className="gws-deployment-foot">
                     <span>Supervisor: <strong>{myPlacement.company_contact_person}</strong></span>
-                    <span className="gws-meta-sep" aria-hidden="true">·</span>
                     <span>Adviser: <strong>{myPlacement.adviser_name}</strong></span>
                   </div>
                 </section>
@@ -4655,7 +4603,9 @@ export default function App() {
                   <div className="panel-header">
                     <div>
                       <div className="panel-title">Cohort Placement Progress</div>
-                      <div className="panel-desc">Real-time hour accumulation and clearance status</div>
+                      <div className="panel-desc">
+                        Showing {Math.min(6, data.placements.length)} of {data.placements.length} placements &middot; active review &amp; clearance
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -4677,7 +4627,10 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.placements.map((pl) => {
+                        {[...data.placements]
+                          .sort((a, b) => Number(a.requirement_met) - Number(b.requirement_met))
+                          .slice(0, 6)
+                          .map((pl) => {
                           const isEligible = Number(pl.requirement_met) === 1;
                           return (
                             <tr key={pl.placement_id}>
@@ -5437,8 +5390,10 @@ export default function App() {
                           value: 'cleared',
                           label: (
                             <span className="seg-filter-item">
-                              <span>Cleared (≥300h)</span>
-                              <span className="filter-pill-count">{data.placements.filter((p) => Number(p.hours_rendered) >= 300).length}</span>
+                              <span>Cleared</span>
+                              <span className="filter-pill-count">
+                                {data.placements.filter((p) => Number(p.requirement_met) === 1 || p.status === 'completed').length}
+                              </span>
                             </span>
                           ),
                         },
@@ -5446,8 +5401,17 @@ export default function App() {
                           value: 'near',
                           label: (
                             <span className="seg-filter-item">
-                              <span>200–299h</span>
-                              <span className="filter-pill-count">{data.placements.filter((p) => Number(p.hours_rendered) >= 200 && Number(p.hours_rendered) < 300).length}</span>
+                              <span>Final Stretch</span>
+                              <span className="filter-pill-count">
+                                {
+                                  data.placements.filter((p) => {
+                                    const isCleared = Number(p.requirement_met) === 1 || p.status === 'completed';
+                                    const hrs = Number(p.total_hours_completed ?? p.hours_rendered ?? 0);
+                                    const req = Number(p.required_hours || 300);
+                                    return !isCleared && p.status !== 'dropped' && hrs >= req * 0.66;
+                                  }).length
+                                }
+                              </span>
                             </span>
                           ),
                         },
@@ -5456,7 +5420,16 @@ export default function App() {
                           label: (
                             <span className="seg-filter-item">
                               <span>&lt;200h</span>
-                              <span className="filter-pill-count">{data.placements.filter((p) => Number(p.hours_rendered) < 200).length}</span>
+                              <span className="filter-pill-count">
+                                {
+                                  data.placements.filter((p) => {
+                                    const isCleared = Number(p.requirement_met) === 1 || p.status === 'completed';
+                                    const hrs = Number(p.total_hours_completed ?? p.hours_rendered ?? 0);
+                                    const req = Number(p.required_hours || 300);
+                                    return !isCleared && (p.status === 'dropped' || hrs < req * 0.66);
+                                  }).length
+                                }
+                              </span>
                             </span>
                           ),
                         },

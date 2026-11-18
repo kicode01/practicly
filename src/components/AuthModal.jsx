@@ -257,10 +257,6 @@ export default function AuthModal({
                         </button>
                       ))}
                     </div>
-                    <div className="auth-demo-note">
-                      <span>Shared evaluation password</span>
-                      <code className="mono">password123</code>
-                    </div>
                   </div>
                 )}
               </div>

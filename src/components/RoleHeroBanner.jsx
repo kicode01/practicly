@@ -80,9 +80,7 @@ export default function RoleHeroBanner({
                 <IconBriefcase size={13} />
                 <strong>{placement.company_name}</strong>
               </span>
-              <span className="gws-meta-sep" aria-hidden="true">·</span>
               <span className="gws-meta-item">{placement.position_title}</span>
-              <span className="gws-meta-sep" aria-hidden="true">·</span>
               <span className="gws-meta-item">
                 Adviser: <strong>{placement.adviser_name}</strong>
               </span>
@@ -174,26 +172,6 @@ export default function RoleHeroBanner({
                 Evaluate (INST-01/04)
               </button>
             )}
-            {onOpenClearanceModal && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => onOpenClearanceModal(placement)}
-              >
-                <IconCheckCircle size={14} />
-                Clearance Status
-              </button>
-            )}
-            {onOpenDtrTransfer && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={onOpenDtrTransfer}
-              >
-                <IconDownload size={14} />
-                Excel Import
-              </button>
-            )}
           </div>
         </div>
       </section>
@@ -216,7 +194,6 @@ export default function RoleHeroBanner({
                 <IconBuilding size={13} />
                 <strong>{currentUser.unit_label || 'Host Training Establishment'}</strong>
               </span>
-              <span className="gws-meta-sep" aria-hidden="true">·</span>
               <span className="gws-meta-item">Department of Computer Engineering Industry Partner</span>
             </div>
           </div>
@@ -421,14 +398,13 @@ export default function RoleHeroBanner({
             <span className="gws-meta-item">
               Metropolitan Institute of Technology · Department of Computer Engineering
             </span>
-            <span className="gws-meta-sep" aria-hidden="true">·</span>
             <span className="gws-meta-item">AY 2026–2027 1st Semester</span>
           </div>
         </div>
 
         <div className="gws-hero-context-badge">
           <span className="gws-context-dot" />
-          <span className="mono">{kpis?.total_placements ?? 0} Placements · {kpis?.completed_placements ?? 0} Cleared</span>
+          <span className="mono">{kpis?.total_placements ?? 0} Placements · {kpis?.eligible_for_clearance ?? kpis?.completed_placements ?? 0} Cleared</span>
         </div>
       </div>
 

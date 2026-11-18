@@ -90,7 +90,7 @@ export default function InteractiveAnalyticsChart({
       .slice(0, 6);
   }, [placements]);
 
-  // Status breakdown
+  // Status breakdown (aligned strictly to KPI cleared / requirement_met semantics)
   const statusStats = useMemo(() => {
     let cleared = 0;
     let near = 0;
@@ -98,8 +98,9 @@ export default function InteractiveAnalyticsChart({
     placements.forEach((p) => {
       const hrs = Number(p.completed_hours ?? p.total_hours_completed ?? p.hours_rendered ?? 0);
       const req = Number(p.required_hours || 300);
-      if (Number(p.requirement_met) === 1 || p.status === 'completed' || hrs >= req) cleared++;
-      else if (hrs >= req * 0.66) near++;
+      const isCleared = Number(p.requirement_met) === 1 || p.status === 'completed';
+      if (isCleared) cleared++;
+      else if (p.status !== 'dropped' && hrs >= req * 0.66) near++;
       else ongoing++;
     });
     const total = placements.length || 1;
@@ -114,15 +115,23 @@ export default function InteractiveAnalyticsChart({
     };
   }, [placements]);
 
+  const maxPartnerHours = useMemo(() => {
+    return Math.max(1, ...partnerStats.map((p) => p.totalHours || 0));
+  }, [partnerStats]);
+
   // SVG Chart Dimensions
   const chartW = 540;
   const chartH = 160;
-  const padL = 36;
+  const padL = 38;
   const padR = 20;
   const padT = 16;
   const padB = 26;
 
-  const maxVal = Math.max(100, ...weeklyData.map((d) => (activeMetricTab === 'cohort' ? d.cumulative : d.hours)));
+  const rawMax = Math.max(100, ...weeklyData.map((d) => (activeMetricTab === 'cohort' ? d.cumulative : d.hours)));
+  const rawStep = rawMax / 4;
+  const stepMag = Math.pow(10, Math.floor(Math.log10(Math.max(1, rawStep))));
+  const niceStep = ([1, 1.25, 1.5, 1.6, 2, 2.5, 5, 10].find((m) => m * stepMag >= rawStep) || 10) * stepMag;
+  const maxVal = Math.round(niceStep * 4);
   const usableW = chartW - padL - padR;
   const usableH = chartH - padT - padB;
 
@@ -185,13 +194,16 @@ export default function InteractiveAnalyticsChart({
         {activeMetricTab === 'partners' ? (
           <div className="partners-grid">
             {partnerStats.map((part) => (
-              <div
+              <button
                 key={part.name}
+                type="button"
                 className={`partner-bar-item ${hoveredPartner === part.name ? 'hovered' : ''}`}
                 onMouseEnter={() => setHoveredPartner(part.name)}
                 onMouseLeave={() => setHoveredPartner(null)}
+                onFocus={() => setHoveredPartner(part.name)}
+                onBlur={() => setHoveredPartner(null)}
                 onClick={() => onFilterCompany && onFilterCompany(part.name)}
-                title={`Click to filter trainees at ${part.name}`}
+                title={`Filter trainees at ${part.name}`}
               >
                 <div className="partner-bar-top">
                   <span className="partner-name">{part.name}</span>
@@ -200,7 +212,7 @@ export default function InteractiveAnalyticsChart({
                 <div className="partner-bar-track">
                   <div
                     className="partner-bar-fill"
-                    style={{ width: `${Math.min(100, (part.count / placements.length) * 100 * 2.8)}%` }}
+                    style={{ width: `${Math.max(8, Math.round((part.totalHours / maxPartnerHours) * 100))}%` }}
                   />
                 </div>
                 <div className="partner-bar-footer">
@@ -209,7 +221,7 @@ export default function InteractiveAnalyticsChart({
                     {part.completedCount}/{part.count} cleared
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         ) : (
@@ -268,15 +280,20 @@ export default function InteractiveAnalyticsChart({
               )}
 
               {/* Interactive Data Points */}
-              {points.map((p, idx) => {
+              {points.map((p) => {
                 const isHovered = hoveredPoint?.week === p.week;
                 return (
                   <g
                     key={p.week}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${p.week}: ${p.val} ${activeMetricTab === 'cohort' ? 'total hours' : 'hours logged'} across ${p.activeStudents} interns`}
                     onMouseEnter={() => {
                       setHoveredPoint(p);
                     }}
                     onMouseLeave={() => setHoveredPoint(null)}
+                    onFocus={() => setHoveredPoint(p)}
+                    onBlur={() => setHoveredPoint(null)}
                     style={{ cursor: 'pointer' }}
                   >
                     <circle
@@ -333,12 +350,13 @@ export default function InteractiveAnalyticsChart({
           </div>
         )}
 
-        {/* Status Distribution Pills */}
+        {/* Status Distribution Filters */}
         <div className="status-radial-strip">
-          <div
+          <button
+            type="button"
             className="status-radial-item cleared"
             onClick={() => onFilterStatus && onFilterStatus('cleared')}
-            title="Filter cleared students (>= 300 hrs)"
+            title="Filter cleared students (hours and evaluations complete)"
           >
             <div className="radial-top">
               <span className="radial-dot cleared" />
@@ -349,12 +367,13 @@ export default function InteractiveAnalyticsChart({
               <div className="radial-bar-fill cleared" style={{ width: `${statusStats.clearedPct}%` }} />
             </div>
             <div className="radial-foot">{statusStats.cleared} of {statusStats.total} students</div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             className="status-radial-item near"
             onClick={() => onFilterStatus && onFilterStatus('near')}
-            title="Filter students close to goal (200-299 hrs)"
+            title="Filter students in final stretch (200+ hrs or awaiting evals)"
           >
             <div className="radial-top">
               <span className="radial-dot near" />
@@ -365,12 +384,13 @@ export default function InteractiveAnalyticsChart({
               <div className="radial-bar-fill near" style={{ width: `${statusStats.nearPct}%` }} />
             </div>
             <div className="radial-foot">{statusStats.near} of {statusStats.total} students</div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             className="status-radial-item ongoing"
             onClick={() => onFilterStatus && onFilterStatus('ongoing')}
-            title="Filter ongoing students (< 200 hrs)"
+            title="Filter ongoing or dropped placements below 200 hrs"
           >
             <div className="radial-top">
               <span className="radial-dot ongoing" />
@@ -381,7 +401,7 @@ export default function InteractiveAnalyticsChart({
               <div className="radial-bar-fill ongoing" style={{ width: `${statusStats.ongoingPct}%` }} />
             </div>
             <div className="radial-foot">{statusStats.ongoing} of {statusStats.total} students</div>
-          </div>
+          </button>
         </div>
       </div>
     </div>

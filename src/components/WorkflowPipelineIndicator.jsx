@@ -66,6 +66,16 @@ export default function WorkflowPipelineIndicator({
     },
   ];
 
+  const studentFocusLabel = isCleared
+    ? 'All 4 Stages Complete · Clearance Issued'
+    : activeStage >= 4
+    ? 'Stage 4 · Pending Evaluation & Final Clearance'
+    : activeStage === 3
+    ? 'Stage 3 · Faculty Adviser Audit & Evaluation'
+    : activeStage === 2
+    ? 'Stage 2 · HTE Supervisor Verification'
+    : 'Stage 1 · Log Daily Attendance & Signed Proof';
+
   return (
     <div className={`pipeline-indicator-panel ${compact ? 'is-compact' : ''}`}>
       <div className="pipeline-header">
@@ -81,7 +91,7 @@ export default function WorkflowPipelineIndicator({
               : currentRole === 'supervisor'
               ? 'Stage 2 · HTE Workplace DTR Verification'
               : currentRole === 'student'
-              ? 'Stage 1 · Student Intern Logs & Signed Proof'
+              ? studentFocusLabel
               : 'Stage 4 · Practicum Coordinator Final Clearance'}
           </span>
         </div>
@@ -91,7 +101,7 @@ export default function WorkflowPipelineIndicator({
         {stages.map((st, idx) => {
           const isDone = st.isComplete || activeStage > st.stage || (st.stage === 4 && isCleared);
           const isCurrent = activeStage === st.stage && !isDone;
-          const isRoleFocus = st.isCurrentRole;
+          const isRoleFocus = (st.isCurrentRole && !isDone) || isCurrent;
 
           return (
             <React.Fragment key={st.stage}>
